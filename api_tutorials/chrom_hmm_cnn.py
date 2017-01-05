@@ -10,7 +10,6 @@
 
 from __future__ import print_function
 
-
 import os
 import math
 import h5py
@@ -32,10 +31,6 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers.core import Dense, Dropout, Flatten, Reshape, Activation
 
-#data_path = './'
-#data_path = '/Users/sam/vqsr_data/'
-#data_path = '/home/sam/big_data/vqsr/'
-
 data_path = '/dsde/data/deep/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
 chrom_hmm_bed_file = data_path + 'wgEncodeAwgSegmentationCombinedGm12878.bed'
@@ -50,6 +45,7 @@ def run():
 		make_big_model(args)
 	else:
 		print('Unknown model argument')
+
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -235,6 +231,7 @@ def load_dna_and_chrom_label(args, only_labels=None):
 
 	return (train_data, train_labels)
 
+
 def bed_file_labels_to_dict(bed_file):
 	bed = {}
 	labels = {}
@@ -268,6 +265,7 @@ def bed_file_labels_to_dict(bed_file):
 		print('label is:', l , 'len ', len(labels[l][0]))
 
 	return bed, labels
+
 
 def in_bed_file(bed_dict, contig, pos):
 	lows = bed_dict[contig][0]
@@ -425,6 +423,7 @@ def plot_roc(model, test_data, test_truth, labels, title):
 	plt.legend(loc="lower right")
 	plt.savefig("./roc_"+title+".jpg")	
 
+
 def get_fpr_tpr_roc(model, test_data, test_truth, labels):
 	y_pred = model.predict(test_data, batch_size=32, verbose=0)
 
@@ -441,6 +440,7 @@ def get_fpr_tpr_roc(model, test_data, test_truth, labels):
 	fpr["micro"], tpr["micro"], _ = roc_curve(test_truth.ravel(), y_pred.ravel())
 	roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 	return fpr, tpr, roc_auc
+
 
 def plot_roc_per_class(model, test_data, test_truth, labels, title):
 	# Compute macro-average ROC curve and ROC area
@@ -480,6 +480,7 @@ def plot_roc_per_class(model, test_data, test_truth, labels, title):
 	plt.legend(loc="lower right")
 	plt.savefig("./per_class_roc_"+title+".jpg")	
 
+
 def plot_history(history, title):
 	# list all data in history
 	print(history.history.keys())
@@ -499,6 +500,7 @@ def plot_history(history, title):
 	plt.xlabel('epoch')
 	plt.legend(['train', 'test'], loc='upper left')
 	plt.savefig("./plot_history_"+title+".jpg")	
+
 
 def plot_metric_history(history, title):
 	# list all data in history
