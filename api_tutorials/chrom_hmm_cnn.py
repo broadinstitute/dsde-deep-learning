@@ -1,11 +1,22 @@
+# DSDE Deep Learning
+#
+# Train 1D Convolutional Neural Network from a labeled bed filepath
+# Input is a small window of reference sequence
+# Output is the softmax predicted probabilty of each label from the bed file
+#
+# January 2017
+# Sam Friedman 
+# sam@broadinstitute.org
+
+from __future__ import print_function
 
 import os
 import math
-import gzip
 import h5py
-import pickle
 import argparse
+import matplotlib
 import numpy as np
+matplotlib.use('Agg')
 from scipy import interp
 from keras import metrics
 import keras.backend as K
@@ -20,9 +31,7 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers.convolutional import Convolution1D, MaxPooling1D
 from keras.layers.core import Dense, Dropout, Flatten, Reshape, Activation
 
-#data_path = './'
-#data_path = '/Users/sam/vqsr_data/'
-data_path = '/home/sam/big_data/vqsr/'
+data_path = '/dsde/data/deep/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
 chrom_hmm_bed_file = data_path + 'wgEncodeAwgSegmentationCombinedGm12878.bed'
 
@@ -37,10 +46,11 @@ def run():
 	else:
 		print('Unknown model argument')
 
+
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--model',	            default='small')
+	parser.add_argument('--model',	            default='big')
 	parser.add_argument('--window_size', 		default=128, type=int)
 	parser.add_argument('--samples',			default=1000, type=int)
 	parser.add_argument('--reference_fasta',	default=reference_fasta)
@@ -49,7 +59,7 @@ def parse_args():
 	parser.add_argument('--labels', 			default={'TSS':0, 'PF':1, 'E':2, 'WE':3, 'CTCF':4, 'T':5, 'R':6 })
 
 	args = parser.parse_args()
-	print 'Arguments are', args
+	print('Arguments are', args)
 	return args
 
 
@@ -60,7 +70,6 @@ def make_small_model(args):
 	train, valid, test = split_data(train_data)
 
 	weight_path = weight_path_from_args(args)
-	model = build_sequential_chrom_label(args)
 	model = train_chrom_labeller(model, train, valid, weight_path)
 
 	title = weight_path_to_title(weight_path)
@@ -84,8 +93,9 @@ def make_big_model(args):
 	model = train_chrom_labeller(model, train, valid, weight_path)
 
 	title = weight_path_to_title(weight_path)
-	plot_roc(model, test[0], test[1], defines.chrom_hmm_labels, title)
-	plot_roc_per_class(model, test[0], test[1], defines.chrom_hmm_labels, title)	
+	plot_roc(model, test[0], test[1], args.labels, title)
+	plot_roc_per_class(model, test[0], test[1], args.labels, title)	
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Models ~~~~~~~~~~~~~~~~~~
@@ -118,12 +128,10 @@ def build_small_chrom_label(args):
 	classes = args.labels.keys()
 	my_metrics = [metrics.categorical_accuracy, precision, recall, per_class_precision(classes), per_class_recall(classes) ]
 
-	print 'compiling model'
-	model.compile(loss='mse', optimizer=adamo, metrics=my_metrics)
-	print 'model nodes', model.summary()
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
+	print('model summary:\n', model.summary())
 
 	return model
-
 
 
 def build_sequential_chrom_label(args):
@@ -157,9 +165,8 @@ def build_sequential_chrom_label(args):
 	classes = args.labels.keys()
 	my_metrics = [metrics.categorical_accuracy, precision, recall, per_class_precision(classes), per_class_recall(classes) ]
 
-	print 'compiling model'
-	model.compile(loss='mse', optimizer=adamo, metrics=my_metrics)
-	print 'model nodes', model.summary()
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
+	print('model summary:\n', model.summary())
 
 	return model
 
@@ -214,15 +221,16 @@ def load_dna_and_chrom_label(args, only_labels=None):
 			elif b in amiguity_codes.keys():
 				train_data[count, i, :4] = amiguity_codes[b]
 			else:
-				print 'Error! Unknown code:', b
+				print('Error! Unknown code:', b)
 				return
 
 		count += 1
 
-	print 'Label:', bed_labels.keys(), 'label counts:', np.sum(train_labels, axis=0)
-	print 'Train data shape:', train_data.shape, ' Training labels shape:', train_labels.shape
+	print('Label:', bed_labels.keys(), 'label counts:', np.sum(train_labels, axis=0))
+	print('Train data shape:', train_data.shape, ' Training labels shape:', train_labels.shape)
 
 	return (train_data, train_labels)
+
 
 def bed_file_labels_to_dict(bed_file):
 	bed = {}
@@ -250,13 +258,14 @@ def bed_file_labels_to_dict(bed_file):
 
 	for k in bed.keys():
 		bed[k] = (np.array(bed[k][0]), np.array(bed[k][1]), bed[k][2])		
-		print 'key is:', k , 'len ', len(bed[k][0])
+		print('key is:', k , 'len ', len(bed[k][0]))
 
 	for l in labels.keys():
 		labels[l] = (np.array(labels[l][0]), np.array(labels[l][1]))		
-		print 'label is:', l , 'len ', len(labels[l][0])	
+		print('label is:', l , 'len ', len(labels[l][0]))
 
 	return bed, labels
+
 
 def in_bed_file(bed_dict, contig, pos):
 	lows = bed_dict[contig][0]
@@ -326,6 +335,7 @@ def sample_from_bed(bed_dict, contig_key_prefix=''):
 	mid_pos = (lowers[idx] + uppers[idx]) / 2
 	return contig_key, mid_pos
 
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -382,12 +392,9 @@ def per_class_recall(classes):
 	return class_recall
 
 
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Plots ~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 
 def plot_roc(model, test_data, test_truth, labels, title):
 	y_pred = model.predict(test_data, batch_size=32, verbose=0)
@@ -416,6 +423,7 @@ def plot_roc(model, test_data, test_truth, labels, title):
 	plt.legend(loc="lower right")
 	plt.savefig("./roc_"+title+".jpg")	
 
+
 def get_fpr_tpr_roc(model, test_data, test_truth, labels):
 	y_pred = model.predict(test_data, batch_size=32, verbose=0)
 
@@ -432,6 +440,7 @@ def get_fpr_tpr_roc(model, test_data, test_truth, labels):
 	fpr["micro"], tpr["micro"], _ = roc_curve(test_truth.ravel(), y_pred.ravel())
 	roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 	return fpr, tpr, roc_auc
+
 
 def plot_roc_per_class(model, test_data, test_truth, labels, title):
 	# Compute macro-average ROC curve and ROC area
@@ -471,6 +480,7 @@ def plot_roc_per_class(model, test_data, test_truth, labels, title):
 	plt.legend(loc="lower right")
 	plt.savefig("./per_class_roc_"+title+".jpg")	
 
+
 def plot_history(history, title):
 	# list all data in history
 	print(history.history.keys())
@@ -490,6 +500,7 @@ def plot_history(history, title):
 	plt.xlabel('epoch')
 	plt.legend(['train', 'test'], loc='upper left')
 	plt.savefig("./plot_history_"+title+".jpg")	
+
 
 def plot_metric_history(history, title):
 	# list all data in history
@@ -543,15 +554,13 @@ def weight_path_from_args(args):
 		save_weight_hd5 += '__' + str(arg) + '_' + str(attr)
 
 	save_weight_hd5 += '.hd5'
-	print 'save weight path:' , save_weight_hd5
+	print('save weight path:', save_weight_hd5)
 
 	return save_weight_hd5
 
+
 def weight_path_to_title(wp):
 	return wp.split('/')[-1].replace('__', '-')
-
-
-
 
 
 if '__main__'==__name__:
