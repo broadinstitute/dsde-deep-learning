@@ -50,7 +50,7 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--model',	            default='big')
+	parser.add_argument('--model',	            default='small')
 	parser.add_argument('--window_size', 		default=128, type=int)
 	parser.add_argument('--samples',			default=1000, type=int)
 	parser.add_argument('--reference_fasta',	default=reference_fasta)
@@ -95,6 +95,7 @@ def make_big_model(args):
 	title = weight_path_to_title(weight_path)
 	plot_roc(model, test[0], test[1], args.labels, title)
 	plot_roc_per_class(model, test[0], test[1], args.labels, title)	
+
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -325,6 +326,7 @@ def sample_from_fasta(record_dict):
 	contig = record_dict[c_idx]
 	p_idx = np.random.randint(len(contig))
 	return c_idx, p_idx
+
 
 def sample_from_bed(bed_dict, contig_key_prefix=''):
 	contig_key = contig_key_prefix + str(np.random.randint(1,20))
