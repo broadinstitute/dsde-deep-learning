@@ -8,8 +8,8 @@ from keras.models import Sequential
 from keras.layers.core import Dense
 
 def run():
-	linear_regression()
-	logistic_regression()
+	#linear_regression()
+	#logistic_regression()
 	multilayer_perceptron()
 
 def linear_regression():
@@ -51,7 +51,7 @@ def logistic_regression():
 
 
 def multilayer_perceptron():
-	train, test, valid = load_data('mnist.pkl.gz')
+	train, test, valid = load_data('/home/sam/Dropbox/Code/python/cnn/data/mnist.pkl.gz')
 
 	num_labels = 10
 	train_y = make_one_hot(train[1], num_labels)
@@ -62,7 +62,7 @@ def multilayer_perceptron():
 	mlp_model.add(Dense(300, activation='relu', input_dim=784))
 	mlp_model.add(Dense(10, activation='softmax'))
 	mlp_model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
-	mlp_model.fit(train[0], train_y, validation_data=(valid[0],valid_y), batch_size=32, nb_epoch=10)
+	mlp_model.fit(train[0], train_y, validation_data=(valid[0],valid_y), batch_size=32, nb_epoch=50)
 
 	print 'Test set loss and accuracy:', mlp_model.evaluate(test[0], test_y)
 
