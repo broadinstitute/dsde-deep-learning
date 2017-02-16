@@ -51,7 +51,7 @@ def logistic_regression():
 
 
 def multilayer_perceptron():
-	train, test, valid = load_data('/home/sam/Dropbox/Code/python/cnn/data/mnist.pkl.gz')
+	train, test, valid = load_data('/dsde/data/deep/mnist.pkl.gz')
 
 	num_labels = 10
 	train_y = make_one_hot(train[1], num_labels)

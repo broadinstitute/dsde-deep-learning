@@ -119,7 +119,7 @@ def mlp_dropout_model(X, w_h, w_h2, w_o, p_drop_input, p_drop_hidden):
 
 def cnn_model(X, w, w2, w3, w4, w_o, p_drop_conv, p_drop_hidden):
 	l1a = rectify(T.nnet.conv2d(X, w, border_mode='full'))
-	l1 = S.downsample.max_pool_2d(l1a, (2, 2))
+	l1 = T.signal.downsample.max_pool_2d(l1a, (2, 2))
 	l1 = dropout(l1, p_drop_conv)
 
 	l2a = rectify(T.nnet.conv2d(l1, w2))
@@ -144,7 +144,7 @@ def make_one_hot(y):
 	return ohy
 
 def run_cnn_on_mnist():
-	train, test, valid = load_data('/home/sam/Dropbox/Code/python/cnn/data/mnist.pkl.gz')
+	train, test, valid = load_data('/dsde/data/deep/mnist.pkl.gz')
 
 	trX = train[0]
 	trY = make_one_hot(train[1])
