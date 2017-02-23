@@ -13,6 +13,12 @@ int w = 80;
 
 // It's possible to convolve the image with 
 // many different matrices
+float[][] gauss = {  { 1.0/273.0, 4.0/273.0, 7.0/273.0, 4.0/273.0, 1.0/273.0 },
+                     { 4.0/273.0, 16.0/273.0, 26.0/273.0, 16.0/273.0, 4.0/273.0 },
+                     { 7.0/273.0, 26.0/273.0, 41.0/273.0, 26.0/273.0, 7.0/273.0 },
+                     { 4.0/273.0, 16.0/273.0, 26.0/273.0, 16.0/273.0, 4.0/273.0 },
+                     { 1.0/273.0, 4.0/273.0, 7.0/273.0, 4.0/273.0, 1.0/273.0 }}; 
+
 float[][] mexican_hat = { { 0, 0, 1, 0, 0 },
                      { 0, 1, 2, 1, 0 },
                      { 1, 2, -16, 2, 1 },
@@ -76,17 +82,25 @@ void draw() {
   if (keyPressed) {
     if (key == '1' ) {
       matrix = block_avg;
+    } else if (key == '2' ){
+        matrix = mexican_hat;
+    } else if (key == '3' ){
+        matrix = sobel_x;
+    } else if (key == '4' ){
+        matrix = sobel_y;
+    } else if (key == '5' ){
+        matrix = toeplitz;
+    } else if (key == '6' ){
+        matrix = toeplitz;
+    } else if (key == '7' ){
+        matrix = gauss;
     }
-  } else if (key == '2' ){
-      matrix = mexican_hat;
-  } else if (key == '3' ){
-      matrix = sobel_x;
-  } else if (key == '4' ){
-      matrix = sobel_y;
-  } else if (key == '5' ){
-      matrix = toeplitz;
-  } else if (key == '6' ){
-      matrix = toeplitz;
+    
+    if (key == 'a'){
+      img = loadImage("sunflower.jpg");
+    } else if (key == 'd'){
+      img = loadImage("end.jpg");
+    }
   }
 }
 

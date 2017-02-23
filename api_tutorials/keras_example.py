@@ -8,8 +8,8 @@ from keras.models import Sequential
 from keras.layers.core import Dense
 
 def run():
-	#linear_regression()
-	#logistic_regression()
+	linear_regression()
+	logistic_regression()
 	multilayer_perceptron()
 
 def linear_regression():
