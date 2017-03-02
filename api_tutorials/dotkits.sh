@@ -1,3 +1,4 @@
+. /broad/software/scripts/useuse
 use Anaconda
 use .cuda-7.0-ea
 use .gcc-4.9.1
