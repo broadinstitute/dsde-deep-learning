@@ -24,17 +24,17 @@ vgg_weights = data_path + 'vgg16_weights_th_dim_ordering_th_kernels.h5'
 # some settings we found interesting
 saved_settings = {
 	'bad_trip': {'features': {'block4_conv1': 0.05,
-							  'block4_conv2': 0.01,
-							  'block4_conv3': 0.01},
+							  'block4_conv2': 0.02,
+							  'block4_conv3': 0.03},
 				 'continuity': 0.1,
 				 'dream_l2': 0.8,
-				 'jitter': 5},
-	'dreamy': {'features': {'block5_conv1': 0.05,
-							'block5_conv2': 0.02,
-							'block5_conv3': 0.02},
-			   'continuity': 0.2,
+				 'jitter': 0.1},
+	'dreamy': {'features': {'block5_conv1': 0.02,
+							'block5_conv2': 0.04,
+							'block5_conv3': 0.06},
+			   'continuity': 0.04,
 			   'dream_l2': 0.02,
-			   'jitter': 0},
+			   'jitter': 0.1},
 	'sams': {'features': {'convolution2d_13': 0.05,
 						  'convolution2d_11': 0.02},
 			   'continuity': 0.1,
@@ -45,6 +45,7 @@ saved_settings = {
 
 # the settings we will use in this experiment
 settings = saved_settings['dreamy']
+
 
 def run():
 	args = parse_args()
@@ -62,23 +63,24 @@ def run():
 	else:
 		print 'unknown visualize mode:', args.mode
 
+
 def parse_args():
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--weights', default='')
 	parser.add_argument('--model', default='vgg')
 	parser.add_argument('--labels', default=1000, type=int)
-	parser.add_argument('--width', default=299, type=int)
-	parser.add_argument('--height', default=299, type=int)
+	parser.add_argument('--width', default=224, type=int)
+	parser.add_argument('--height', default=224, type=int)
 	parser.add_argument('--channels', default=3, type=int)
 	parser.add_argument('--mode', default='deep_dream')
 	parser.add_argument('--batch_size', default=32, type=int)
-	parser.add_argument('--iterations', default=20, type=int)
+	parser.add_argument('--iterations', default=5, type=int)
 	parser.add_argument('--image_path', default=data_root+'/Photos/dog.jpg')	
-	parser.add_argument('--save_path', default=data_root+'/Photos/activations/')
-	parser.add_argument('--video_path', default=data_root+'/Photos/activations/viz.avi')
+	parser.add_argument('--save_path', default=data_root+'/Photos/new_activations/')
+	parser.add_argument('--video_path', default=data_root+'/Photos/new_activations/viz.avi')
 	parser.add_argument('--video_writer', default=None)
-	parser.add_argument('--fps', default=20, type=int)
+	parser.add_argument('--fps', default=30, type=int)
 
 	args = parser.parse_args()
 	print 'Arguments are', args	
@@ -116,9 +118,9 @@ def model_from_args(args):
 	input_image = Input(shape=(args.channels, args.height, args.width), name='input_image')
 
 	if 'inception' == args.model:
-		model = inception_v3(args.labels, inception_weights, input_image)
+		model = inception_v3(args.labels, args.weights, input_image)
 	elif 'vgg' == args.model:
-		model = vgg_16(args.labels, vgg_weights, input_image)
+		model = vgg_16(args.labels, args.weights, input_image)
 	else:
 		print '\n\nError: unknown model architecture:', args.model	
 
@@ -177,8 +179,9 @@ def get_deep_dream_fxn(args, model):
 	f_outputs = K.function([dream], outputs)
 	return f_outputs
 
+
 def deep_dream(args, model):
-	img_size = (args.channels, args.height, args.width)
+	img_size = (args.channels, args.width, args.height)
 	f_out = get_deep_dream_fxn(args, model)
 	evaluator = Evaluator(args, f_out)
 
@@ -226,30 +229,97 @@ def deep_dream2(args, model, canvas):
 
 		# run L-BFGS for 7 steps
 		x, min_val, info = fmin_l_bfgs_b(evaluator.loss, x.flatten(),
-										 fprime=evaluator.grads, maxfun=2)
+										 fprime=evaluator.grads, maxfun=1)
 		print('Current loss value:', min_val)
 		# decode the dream and save it
 		x = x.reshape(img_size)
 		x -= random_jitter
 		img = deprocess_image(np.copy(x))
+
 		fname = args.save_path + 'dream2_at_iteration_%d.png' % i
 		imsave(fname, img)
 		end_time = time.time()
 		print('Image saved as', fname)
 		print('Iteration %d completed in %ds' % (i, end_time - start_time))
+
 		if args.video_writer:
-			print('Frame written...')
+			img = img[:,:,::-1]
 			args.video_writer.write(img)
 
-		canvas[:img.shape[0],:img.shape[1],:] = img
+
+def preprocess(net, img):
+	return np.float32(np.rollaxis(img, 2)[::-1]) - net.transformer.mean['data']
+def deprocess(net, img):
+	return np.dstack((img + net.transformer.mean['data'])[::-1])
+
+def objective_L2(dst):
+	dst.diff[:] = dst.data 
+
+def make_step(net, end, step_size=1.5, jitter=32, clip=True, objective=objective_L2):
+	'''Basic gradient ascent step.'''
+	src = net.blobs['data'] # input image is stored in Net's 'data' blob
+	dst = net.blobs[end]
+
+	ox, oy = np.random.randint(-jitter, jitter+1, 2)
+	src.data[0] = np.roll(np.roll(src.data[0], ox, -1), oy, -2) # apply jitter shift
+			
+	net.forward(end=end)
+	objective(dst)  # specify the optimization objective
+	net.backward(start=end)
+	g = src.diff[0]
+	# apply normalized ascent step to the input image
+	src.data[:] += step_size/np.abs(g).mean() * g
+
+	src.data[0] = np.roll(np.roll(src.data[0], -ox, -1), -oy, -2) # unshift image
+			
+	if clip:
+		bias = net.transformer.mean['data']
+		src.data[:] = np.clip(src.data, -bias, 255-bias)
 
 
+def deepdream3(net, base_img, iter_n=20, octave_n=4, octave_scale=2.8, 
+			  end='inception_4c/output', clip=True, **step_params):
+	# prepare base images for all octaves
+	octaves = [preprocess(net, base_img)]
+	for i in xrange(1, octave_n-1):
+		octave_inv = 1.0/octave_scale
+		octaves.append(nd.zoom(octaves[-1], (1, octave_inv, octave_inv), order=1))
+		#print 'Adding octave:', i, ' octave inv', octave_inv, "Base img shape:", base_img.shape
+	
+	src = net.blobs['data']
+	detail = np.zeros_like(octaves[-1]) # allocate image for network-produced details
+	for octave, octave_base in enumerate(octaves[::-1]):
+		h, w = octave_base.shape[-2:]
+		if octave > 0:
+			# upscale details from the previous octave
+			h1, w1 = detail.shape[-2:]
+			detail = nd.zoom(detail, (1, 1.0*h/h1,1.0*w/w1), order=1)
+
+		src.reshape(1,3,h,w) # resize the network's input image size
+		src.data[0] = octave_base+detail
+		for i in xrange(iter_n):
+			#print "Make step:", i, "of iteration:", iter_n, "octave:", octave, "with h:", h, "w:", w
+			make_step(net, end, jitter=32, clip=clip, **step_params)
+			
+			# visualize last iteration
+	#         if i == iter_n-1 and octave == octave_n-2 :
+				# vis = deprocess(net, src.data[0])
+				# if not clip: # adjust image contrast if clipping is disabled
+				# 	vis = vis*(255.0/np.percentile(vis, 99.98))
+				# showarray(vis)
+				# print octave, i, end, vis.shape
+				# clear_output(wait=True)
+	#         if cv2.waitKey(1) and 0xFF == ord('q'):
+				# return deprocess(net, src.data[0])
+		# extract details produced on the current octave
+		detail = src.data[0]-octave_base
+	# returning the resulting image 
+	return deprocess(net, src.data[0])
 
 def eval_loss_and_grads(x, args, f_outputs):
 	img_size = (args.channels, args.height, args.width)
 	if args.video_writer:
 		frame = x.reshape(img_size).astype('uint8')
-		print 'frame shape is:', frame.shape
 		args.video_writer.write(frame)	
 	x = x.reshape((1,) + img_size)
 	outs = f_outputs([x])
@@ -294,24 +364,30 @@ class Evaluator(object):
 
 def excite_softmax(args, model, img_path=None):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	for filter_index in range(3, 56, 4):
-		iterate = iterate_fxn(model, layer_dict, '1000_predictions', filter_index)
+	img_size = (args.channels, args.height, args.width)
 
-		if args.image_path != '':
+	for filter_index in range(0, 47, 2):
+		iterate = iterate_fxn(model, layer_dict, 'predictions', filter_index)
+
+		if os.path.exists(args.image_path):
 			im = cv2.resize(cv2.imread(args.image_path ), (args.width, args.height))
-			im = np.array(im.transpose((2,1,0)), np.float32)
+			im = np.array(im.transpose((2,0,1)), np.float32)
 			im -= im.mean()
 			im /= (im.std() + 1e-5)
-			im *= 0.1			
+			im *= 0.3			
 			input_img_data = np.expand_dims(im, axis=0)
 			out_file = args.save_path + '%s_%s_%s_filter_%d.png' % (os.path.basename(args.weights), os.path.basename(args.image_path), layer.name, filter_index)
 		else:
 			input_img_data = np.random.random((1, args.channels, args.width, args.height)) * 20 + 128.
 			out_file = args.save_path + 'excite_softmax_%d.png' % (filter_index)
 		# run gradient ascent
+		lr = 0.05
 		for i in range(args.iterations):
+			random_jitter = 0.1 * (np.random.random(img_size) - 0.5)
+			input_img_data += random_jitter
 			loss_value, grads_value = iterate([input_img_data])
-			input_img_data += grads_value #* i
+			input_img_data -= random_jitter
+			input_img_data += grads_value * lr
 			if i % 4 == 0:
 				print "After iteration:", i, "loss is:", loss_value, "filter index:", filter_index
 		
@@ -333,17 +409,17 @@ def write_filters(args, model):
 			
 			if args.image_path != '':
 				im = cv2.resize(cv2.imread(args.image_path), (args.width, args.height))
-				im = np.array(im.transpose((2,1,0)), np.float32)
+				im = np.array(im.transpose((2,0,1)), np.float32)
 				input_img_data = np.expand_dims(im, axis=0)
 				out_file = args.save_path + '%s_%s_%s_filter_%d.png' % (os.path.basename(args.weights), os.path.basename(args.image_path), layer.name, filter_index)
 			else:
 				input_img_data = np.random.random((1, 3, args.width, args.height)) * 20 + 128.
-				out_file = args.save_path + 'vgg2_overfit_random_%s_filter_%d.png' % (layer.name, filter_index)
+				out_file = args.save_path + 'random_%s_filter_%d.png' % (layer.name, filter_index)
 
 			# run gradient ascent
 			for i in range(args.iterations):
 				loss_value, grads_value = iterate([input_img_data])
-				input_img_data += grads_value * i
+				input_img_data += grads_value
 				if i % 4 == 0:
 					print "After iteration:", i, "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index
 			
@@ -427,7 +503,7 @@ def deprocess_image(x):
 	# normalize tensor: center on 0., ensure std is 0.1
 	x -= x.mean()
 	x /= (x.std() + 1e-5)
-	x *= 0.1
+	x *= 0.3
 
 	# clip to [0, 1]
 	x += 0.5
@@ -435,7 +511,12 @@ def deprocess_image(x):
 
 	# convert to RGB array
 	x *= 255
-	x = x.transpose((2, 1, 0))
+	print 'cur x shape is', x.shape
+	x = x.transpose((1, 2, 0))
+	print 'after trnaspose x shape is', x.shape
+	x = x[:,:,::-1]
+	print 'after bgr x shape is', x.shape
+
 	x = np.clip(x, 0, 255).astype('uint8')
 	return x
 
