@@ -27,10 +27,10 @@ import sys
 
 
 def run():
-	train_from_scratch()
+	#train_from_scratch()
 	load_model_and_sample()
 
-def train_from_scratch();
+def train_from_scratch():
 	lstm_units = 128
 	window_size = 40
 
@@ -38,14 +38,14 @@ def train_from_scratch();
 	x,y = make_io_tensors(text, window_size)
 	chars = sorted(list(set(text)))
 
-	model = lstm_model(lstm_units, window_size, len(chars))
+	model = lstm_model(lstm_units, window_size, len(chars), state=True)
 	train_rnn(model, x, y, text, 'lstm_dna')
 
 
 def load_model_and_sample():
 	text = wikipedia()
-	model = load_model('rnn_model_lstm_wiki.hd5')
-	generate_sample_sentences(model, text, window_size)
+	model = load_model('rnn_model_lstm_dna.hd5')
+	generate_sample_sentences(model, text, 40)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Training Data ~~~~~~~~~~~
@@ -97,7 +97,7 @@ def make_io_tensors(text, window_size, step=3):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def lstm_model(lstm_units, input_size, alphabet_size):    
 	model = Sequential()
-	model.add(LSTM(128, input_shape=(input_size, alphabet_size)))
+	model.add(LSTM(lstm_units, input_shape=(input_size, alphabet_size)))
 	model.add(Dense(alphabet_size, activation='softmax'))
 
 	optimizer = RMSprop(lr=0.01)
@@ -139,7 +139,7 @@ def train_rnn(model, x, y, text, title):
 		print()
 		print('-' * 50)
 		print('Iteration', iteration)
-		model.fit(x, y, batch_size=512, nb_epoch=2)
+		model.fit(x, y, batch_size=512, nb_epoch=1)
 		model.save('rnn_model_'+title+'.hd5')
 		generate_sample_sentences(model, text, x.shape[1])
 
