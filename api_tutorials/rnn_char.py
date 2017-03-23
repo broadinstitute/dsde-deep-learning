@@ -15,27 +15,37 @@ has at least ~100k characters. ~1M is better.
 from __future__ import print_function
 
 from keras.layers import Dense, Activation, LSTM, GRU
+from keras.models import Sequential, load_model
 from keras.utils.data_utils import get_file
 from keras.optimizers import RMSprop
-from keras.models import Sequential
 from Bio import Seq, SeqIO
 
 import numpy as np
+import argparse
 import random
 import sys
 
 
 def run():
+	train_from_scratch()
+	load_model_and_sample()
+
+def train_from_scratch();
 	lstm_units = 128
 	window_size = 40
 
-	text = wikipedia()
+	text = dna_from_reference()
 	x,y = make_io_tensors(text, window_size)
 	chars = sorted(list(set(text)))
 
 	model = lstm_model(lstm_units, window_size, len(chars))
-	train_rnn(model, x, y, text, 'lstm_wiki')
+	train_rnn(model, x, y, text, 'lstm_dna')
 
+
+def load_model_and_sample():
+	text = wikipedia()
+	model = load_model('rnn_model_lstm_wiki.hd5')
+	generate_sample_sentences(model, text, window_size)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Training Data ~~~~~~~~~~~
@@ -124,10 +134,6 @@ def sample(preds, temperature=1.0):
 # ~~~~~ Train and Generate  ~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def train_rnn(model, x, y, text, title):
-	chars = sorted(list(set(text)))
-	char_indices = dict((c, i) for i, c in enumerate(chars))
-	indices_char = dict((i, c) for i, c in enumerate(chars))
-
 	# train the model, output generated text after each iteration
 	for iteration in range(1, 60):
 		print()
@@ -135,34 +141,40 @@ def train_rnn(model, x, y, text, title):
 		print('Iteration', iteration)
 		model.fit(x, y, batch_size=512, nb_epoch=2)
 		model.save('rnn_model_'+title+'.hd5')
-		start_index = random.randint(0, len(text) - x.shape[1] - 1)
+		generate_sample_sentences(model, text, x.shape[1])
 
-		for diversity in [0.2, 0.5, 1.0, 1.2]:
-			print()
-			print('----- diversity:', diversity)
 
-			generated = ''
-			sentence = text[start_index: start_index + x.shape[1]]
-			generated += sentence
-			print('----- Generating with seed: "' + sentence + '"')
-			sys.stdout.write(generated)
+def generate_sample_sentences(model, text, window_size):
+	chars = sorted(list(set(text)))
+	char_indices = dict((c, i) for i, c in enumerate(chars))
+	indices_char = dict((i, c) for i, c in enumerate(chars))	
+	start_index = random.randint(0, len(text) - window_size - 1)
 
-			for i in range(400):
-				gx = np.zeros((1, x.shape[1], x.shape[2]))
-				for t, char in enumerate(sentence):
-					gx[0, t, char_indices[char]] = 1.
+	for temperature in [0.001, 0.1, 0.2, 0.3, 0.5, 1.1]:
+		print()
+		print('----- temperature:', temperature)
 
-				preds = model.predict(gx, verbose=0)[0]
-				next_index = sample(preds, diversity)
-				next_char = indices_char[next_index]
+		generated = ''
+		sentence = text[start_index: start_index + window_size]
+		generated += sentence
+		print('----- Generating with seed: "' + sentence + '"')
+		sys.stdout.write(generated)
 
-				generated += next_char
-				sentence = sentence[1:] + next_char
+		for i in range(400):
+			gx = np.zeros((1, window_size, len(chars)))
+			for t, char in enumerate(sentence):
+				gx[0, t, char_indices[char]] = 1.
 
-				sys.stdout.write(next_char)
-				sys.stdout.flush()
-			print()
+			preds = model.predict(gx, verbose=0)[0]
+			next_index = sample(preds, temperature)
+			next_char = indices_char[next_index]
 
+			generated += next_char
+			sentence = sentence[1:] + next_char
+
+			sys.stdout.write(next_char)
+			sys.stdout.flush()
+		print()	
 
 if '__main__'==__name__:
 	run()
