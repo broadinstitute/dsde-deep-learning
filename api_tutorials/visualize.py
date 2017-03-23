@@ -13,13 +13,12 @@ from scipy.optimize import fmin_l_bfgs_b
 from keras.preprocessing.image import load_img, img_to_array
 from keras.layers import Convolution2D, Input, ZeroPadding2D, MaxPooling2D
 
-#data_root = '/Users/sam/Dropbox'
+data_root = '/Users/sam/Dropbox'
 data_root = '/home/sam/Dropbox/'
 data_path = data_root+'Code/python/cnn/saved_networks/'
 
 inception_weights = data_path + 'inception_v3_weights_th_dim_ordering_th_kernels.h5'
 vgg_weights = data_path + 'vgg16_weights_th_dim_ordering_th_kernels.h5'
-
 
 # some settings we found interesting
 saved_settings = {
@@ -35,17 +34,14 @@ saved_settings = {
 			   'continuity': 0.04,
 			   'dream_l2': 0.02,
 			   'jitter': 0.1},
-	'sams': {'features': {'convolution2d_13': 0.05,
-						  'convolution2d_11': 0.02},
-			   'continuity': 0.1,
-			   'dream_l2': 0.02,
-			   'jitter': 0},
+	'sams': {'features': {'convolution2d_37': 0.17,
+						  'convolution2d_36': 0.2},
+			   'continuity': 0.15,
+			   'dream_l2': 0.1,
+			   'jitter': 0.1},
 }
-
-
 # the settings we will use in this experiment
-settings = saved_settings['dreamy']
-
+settings = saved_settings['sams']
 
 def run():
 	args = parse_args()
@@ -60,6 +56,8 @@ def run():
 		deep_dream(args, model)		
 	elif 'draw' == args.mode:
 		draw_loop(args, model)
+	elif 'write_video' == args.mode:
+		write_dream_video(args, model)		
 	else:
 		print 'unknown visualize mode:', args.mode
 
@@ -67,19 +65,20 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--weights', default='')
-	parser.add_argument('--model', default='vgg')
+	parser.add_argument('--weights', default=inception_weights)
+	parser.add_argument('--model', default='inception')
 	parser.add_argument('--labels', default=1000, type=int)
-	parser.add_argument('--width', default=224, type=int)
-	parser.add_argument('--height', default=224, type=int)
+	parser.add_argument('--width', default=800, type=int)
+	parser.add_argument('--height', default=800, type=int)
 	parser.add_argument('--channels', default=3, type=int)
 	parser.add_argument('--mode', default='deep_dream')
 	parser.add_argument('--batch_size', default=32, type=int)
-	parser.add_argument('--iterations', default=5, type=int)
-	parser.add_argument('--image_path', default=data_root+'/Photos/dog.jpg')	
-	parser.add_argument('--save_path', default=data_root+'/Photos/new_activations/')
-	parser.add_argument('--video_path', default=data_root+'/Photos/new_activations/viz.avi')
+	parser.add_argument('--iterations', default=270, type=int)
+	parser.add_argument('--image_path', default=data_root+'/Screenshots/panther.png')	
+	parser.add_argument('--save_path', default=data_root+'/Video/activations/frames/')
+	parser.add_argument('--video_path', default=data_root+'/Video/activations/cat_viz5.mpg')
 	parser.add_argument('--video_writer', default=None)
+	parser.add_argument('--maxfun', default=9, type=int)
 	parser.add_argument('--fps', default=30, type=int)
 
 	args = parser.parse_args()
@@ -106,13 +105,18 @@ def draw_loop(args, model):
 		elif char == 8: # Delete
 			pass
 		elif char == 10: # Enter/return key
-			args.video_writer = get_video_writer(args)
-			deep_dream2(args, model, canvas)
-			args.video_writer.release()
-			print 'wrote dream video'
+				args.video_writer = get_video_writer(args)
+				deep_dream2(args, model, canvas)
+				args.video_writer.release()
 		elif char != 255:
 			print 'special char:', char
 
+
+def write_dream_video(args, model):
+	#args.video_writer = get_video_writer(args)
+	deep_dream2(args, model)
+	#args.video_writer.release()
+	print 'wrote dream video'
 
 def model_from_args(args):
 	input_image = Input(shape=(args.channels, args.height, args.width), name='input_image')
@@ -129,7 +133,8 @@ def model_from_args(args):
 
 def get_video_writer(args):
 	# Define the codec and create VideoWriter object
-	fourcc = cv2.VideoWriter_fourcc(*'XVID')
+	#fourcc = cv2.VideoWriter_fourcc(*'XVID')
+	fourcc = cv2.VideoWriter_fourcc('P','I','M','1')
 	return cv2.VideoWriter(args.video_path, fourcc, args.fps, (args.width, args.height))
 
 
@@ -188,7 +193,7 @@ def deep_dream(args, model):
 	# run scipy-based optimization (L-BFGS) over the pixels of the generated image
 	# so as to minimize the loss
 	x = preprocess_image(args, args.image_path)
-	for i in range(5):
+	for i in range(args.iterations):
 		print('Start of iteration', i)
 		start_time = time.time()
 
@@ -211,7 +216,7 @@ def deep_dream(args, model):
 		print('Iteration %d completed in %ds' % (i, end_time - start_time))
 
 
-def deep_dream2(args, model, canvas):
+def deep_dream2(args, model):
 	img_size = (args.channels, args.height, args.width)
 	f_out = get_deep_dream_fxn(args, model)
 	evaluator = Evaluator(args, f_out)
@@ -229,18 +234,19 @@ def deep_dream2(args, model, canvas):
 
 		# run L-BFGS for 7 steps
 		x, min_val, info = fmin_l_bfgs_b(evaluator.loss, x.flatten(),
-										 fprime=evaluator.grads, maxfun=1)
-		print('Current loss value:', min_val)
+										 fprime=evaluator.grads, maxfun=args.maxfun)
 		# decode the dream and save it
 		x = x.reshape(img_size)
 		x -= random_jitter
 		img = deprocess_image(np.copy(x))
-
-		fname = args.save_path + 'dream2_at_iteration_%d.png' % i
-		imsave(fname, img)
+		fdir = os.path.join(args.save_path, plain_name(args.image_path), plain_name(args.weights))
+		fname = fdir + ('/iteration_%d.png' % i)
+		if not os.path.exists(fdir):
+			os.makedirs(fdir)
+		cv2.imwrite(fname, img)
 		end_time = time.time()
-		print('Image saved as', fname)
-		print('Iteration %d completed in %ds' % (i, end_time - start_time))
+		print('Image saved as: %s \nIteration %d completed in %ds, loss:%0.2f' % 
+			(fname, i, end_time - start_time, min_val))
 
 		if args.video_writer:
 			img = img[:,:,::-1]
@@ -366,7 +372,7 @@ def excite_softmax(args, model, img_path=None):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	img_size = (args.channels, args.height, args.width)
 
-	for filter_index in range(0, 47, 2):
+	for filter_index in range(0, 4, 2):
 		iterate = iterate_fxn(model, layer_dict, 'predictions', filter_index)
 
 		if os.path.exists(args.image_path):
@@ -535,6 +541,11 @@ def preprocess_input(x):
     x -= 0.5
     x *= 2.
     return x
+
+def plain_name(full_name):
+	name = os.path.basename(full_name)
+	name = name.split('.')[0]
+	return name
 
 if __name__ == '__main__':
 	run()
