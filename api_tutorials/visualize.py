@@ -68,15 +68,15 @@ def parse_args():
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--weights', default='')
-	parser.add_argument('--model', default='vgg')
+	parser.add_argument('--model', default='inception')
 	parser.add_argument('--labels', default=1000, type=int)
-	parser.add_argument('--width', default=224, type=int)
-	parser.add_argument('--height', default=224, type=int)
+	parser.add_argument('--width', default=299, type=int)
+	parser.add_argument('--height', default=299, type=int)
 	parser.add_argument('--channels', default=3, type=int)
 	parser.add_argument('--mode', default='deep_dream')
 	parser.add_argument('--batch_size', default=32, type=int)
 	parser.add_argument('--iterations', default=5, type=int)
-	parser.add_argument('--image_path', default=data_root+'/Photos/dog.jpg')	
+	parser.add_argument('--image_path', default='')#data_root+'/Photos/dog.jpg')	
 	parser.add_argument('--save_path', default=data_root+'/Photos/new_activations/')
 	parser.add_argument('--video_path', default=data_root+'/Photos/new_activations/viz.avi')
 	parser.add_argument('--video_writer', default=None)
@@ -366,7 +366,7 @@ def excite_softmax(args, model, img_path=None):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	img_size = (args.channels, args.height, args.width)
 
-	for filter_index in range(0, 47, 2):
+	for filter_index in range(0, 4, 1):
 		iterate = iterate_fxn(model, layer_dict, 'predictions', filter_index)
 
 		if os.path.exists(args.image_path):
