@@ -14,7 +14,7 @@ has at least ~100k characters. ~1M is better.
 '''
 from __future__ import print_function
 
-from keras.layers import Dense, Activation, LSTM
+from keras.layers import Dense, Activation, LSTM, GRU
 from keras.utils.data_utils import get_file
 from keras.optimizers import RMSprop
 from keras.models import Sequential
@@ -29,12 +29,12 @@ def run():
 	lstm_units = 128
 	window_size = 40
 
-	text = nietzsche()
+	text = wikipedia()
 	x,y = make_io_tensors(text, window_size)
 	chars = sorted(list(set(text)))
 
 	model = lstm_model(lstm_units, window_size, len(chars))
-	train_lstm(model, x, y, text)
+	train_rnn(model, x, y, text, 'lstm_wiki')
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,7 +98,7 @@ def lstm_model(lstm_units, input_size, alphabet_size):
 
 def gru_model(lstm_units, input_size, alphabet_size):    
 	model = Sequential()
-	model.add(LSTM(128, input_shape=(input_size, alphabet_size)))
+	model.add(GRU(128, input_shape=(input_size, alphabet_size)))
 	model.add(Dense(alphabet_size, activation='softmax'))
 
 	optimizer = RMSprop(lr=0.01)
@@ -123,7 +123,7 @@ def sample(preds, temperature=1.0):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~ Train and Generate  ~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def train_lstm(model, x, y, text):
+def train_rnn(model, x, y, text, title):
 	chars = sorted(list(set(text)))
 	char_indices = dict((c, i) for i, c in enumerate(chars))
 	indices_char = dict((i, c) for i, c in enumerate(chars))
@@ -133,8 +133,8 @@ def train_lstm(model, x, y, text):
 		print()
 		print('-' * 50)
 		print('Iteration', iteration)
-		model.fit(x, y, batch_size=512, nb_epoch=1)
-
+		model.fit(x, y, batch_size=512, nb_epoch=2)
+		model.save('rnn_model_'+title+'.hd5')
 		start_index = random.randint(0, len(text) - x.shape[1] - 1)
 
 		for diversity in [0.2, 0.5, 1.0, 1.2]:
