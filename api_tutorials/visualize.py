@@ -372,7 +372,7 @@ def excite_softmax(args, model, img_path=None):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	img_size = (args.channels, args.height, args.width)
 
-	for filter_index in range(0, 4, 2):
+	for filter_index in range(0, 4, 1):
 		iterate = iterate_fxn(model, layer_dict, 'predictions', filter_index)
 
 		if os.path.exists(args.image_path):
