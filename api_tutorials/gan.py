@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import cPickle, random, sys, keras
 
 import keras.models as models
-from keras.models import Model
+from keras.models import Model, save_model, load_model
 from keras.optimizers import *
 from keras.activations import *
 from keras.regularizers import *
@@ -30,17 +30,17 @@ from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2
 dropout_rate = 0.25
 seeds = 100
 def run():
-	gan_on_imagenet()
-	#gan_on_cifar()
+	#gan_on_imagenet()
+	gan_on_cifar()
 	#gan_on_mnist()
 
 def gan_on_imagenet():
-	in_shape = (3,224,224)
+	in_shape = (3,128,128)
 	generator = build_imagenet_generative_model()
 	discriminator = build_imagenet_discriminative(in_shape)
 	gan = build_stacked_gan(generator, discriminator)	
+	
 	make_trainable(discriminator, False)	
-
 	train_imagenet_gan(generator, discriminator, gan)	
 
 
@@ -49,6 +49,11 @@ def gan_on_cifar():
 	generator = build_generative_model()
 	discriminator = build_discriminative(in_shape)
 	gan = build_stacked_gan(generator, discriminator)	
+
+	# gan = load_model('cifar10_gan.hd5')
+	# generator = load_model('cifar10_generator.hd5') 
+	# discriminator = load_model('cifar10_discriminator.hd5')
+
 	make_trainable(discriminator, False)	
 
 	train_cifar_gan(generator, discriminator, gan)
@@ -57,9 +62,14 @@ def gan_on_cifar():
 def gan_on_mnist():
 	in_shape = (1,28,28)
 
-	generator = build_mnist_generative_model()
-	discriminator = build_mnist_discriminative(in_shape)
-	gan = build_stacked_gan(generator, discriminator)	
+	# generator = build_mnist_generative_model()
+	# discriminator = build_mnist_discriminative(in_shape)
+	# gan = build_stacked_gan(generator, discriminator)
+
+	gan = load_model('mnist_gan.hd5')
+	generator = load_model('mnist_generator.hd5') 
+	discriminator = load_model('mnist_discriminator.hd5')
+
 	make_trainable(discriminator, False)	
 
 	train_mnist_gan(generator, discriminator, gan)	
@@ -101,11 +111,11 @@ def load_cifar():
 	return (x_train, y_train), (x_test, y_test)
 
 
-def load_imagenet():
-	num_labels = 2
+def load_imagenet(num_labels=24):
+
 	imagenet_path = '/home/sam/big_data/imagenet/ILSVRC2014_DET_train/'
 	train_paths = [ imagenet_path + tp for tp in sorted(os.listdir(imagenet_path)) if os.path.isdir(imagenet_path + tp)  ]
-	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels)
+	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=(128,128))
 
 	x_train = x_train.astype('float32')
 	x_test = x_test.astype('float32')
@@ -120,8 +130,25 @@ def load_imagenet():
 	return (x_train, y_train), (x_test, y_test)
 
 
+def load_faces(num_labels=14000):
+	imagenet_path = '/home/sam/big_data/faces/lfw/'
+	train_paths = [ imagenet_path + tp for tp in sorted(os.listdir(imagenet_path)) if os.path.isdir(imagenet_path + tp)  ]
+	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=(128,128))
 
-def load_images_from_class_dirs(train_paths, num_labels, do_fft=False, shape=(224,224), per_class_max=3000):
+	x_train = x_train.astype('float32')
+	x_test = x_test.astype('float32')
+	#x_train /= 255
+	#x_test /= 255
+
+	print('bounds:', np.min(x_train), np.max(x_train))
+	print('x_train shape:', x_train.shape)
+	print(x_train.shape[0], 'train samples')
+	print(x_test.shape[0], 'test samples')
+
+	return (x_train, y_train), (x_test, y_test)
+
+
+def load_images_from_class_dirs(train_paths, num_labels, shape=(224,224), per_class_max=5000):
 	count = 0
 	train_set = []
 	t_labels = []
@@ -184,27 +211,29 @@ def make_trainable(net, val):
 
 def build_imagenet_generative_model():
 	# Build Generative model ...
-	inner_dim = 28
-	seed_width = 8
-	conv_width = 256
-
+	nch = 256
+	inner_dim = 8
 	g_input = Input(shape=[seeds])
-	H = Dense(seed_width*inner_dim*inner_dim, init='glorot_normal')(g_input)
+	H = Dense(nch*inner_dim*inner_dim, init='glorot_normal')(g_input)
 	H = BatchNormalization(mode=2)(H)
 	H = Activation('relu')(H)
-	H = Reshape( [seed_width, inner_dim, inner_dim] )(H)
+	H = Reshape( [nch, inner_dim, inner_dim] )(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Convolution2D(conv_width, 3, 3, border_mode='same', init='glorot_uniform')(H)
+	H = Convolution2D(nch/2, 3, 3, border_mode='same', init='glorot_uniform')(H)
 	H = BatchNormalization(mode=2)(H)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Convolution2D(conv_width, 3, 3, border_mode='same', init='glorot_uniform')(H)
+	H = Convolution2D(nch/2, 3, 3, border_mode='same', init='glorot_uniform')(H)
+	H = BatchNormalization(mode=2)(H)
+	H = Activation('relu')(H)	
+	H = UpSampling2D(size=(2, 2))(H)	
+	H = Convolution2D(nch/3, 3, 3, border_mode='same', init='glorot_uniform')(H)
 	H = BatchNormalization(mode=2)(H)
 	H = Activation('relu')(H)
-	H = UpSampling2D(size=(2, 2))(H)		
-	H = Convolution2D(conv_width/2, 3, 3, border_mode='same', init='glorot_uniform')(H)
+	H = UpSampling2D(size=(2, 2))(H)	
+	H = Convolution2D(nch/4, 3, 3, border_mode='same', init='glorot_uniform')(H)
 	H = BatchNormalization(mode=2)(H)
-	H = Activation('relu')(H)
+	H = Activation('relu')(H)	
 	H = Convolution2D(3, 1, 1, border_mode='same', init='glorot_uniform')(H)
 	H = Activation('sigmoid')(H)
 	generator = Model(g_input, H)
@@ -213,24 +242,25 @@ def build_imagenet_generative_model():
 	generator.summary()
 	return generator
 
+
 def build_imagenet_discriminative(in_shape, out_labels=2):
 	# Build Discriminative model ...
 	d_input = Input(shape=in_shape)
-	H = Convolution2D(128, 3, 3, subsample=(2, 2), border_mode = 'same', activation='relu')(d_input)
-	H = LeakyReLU(0.2)(H)
-	H = Dropout(dropout_rate)(H)
-	H = Convolution2D(256, 3, 3, subsample=(2, 2), border_mode = 'same', activation='relu')(H)
-	H = LeakyReLU(0.2)(H)
-	H = Dropout(dropout_rate)(H)
-	H = Convolution2D(256, 3, 3, subsample=(2, 2), border_mode = 'same', activation='relu')(H)
+	H = Convolution2D(92, 3, 3, subsample=(2, 2), border_mode = 'same', activation='relu')(d_input)
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(dropout_rate)(H)	
-	H = Flatten()(H)
-	H = Dense(192)(H)
+	H = Convolution2D(192, 3, 3, subsample=(2, 2), border_mode = 'same', activation='relu')(d_input)
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(dropout_rate)(H)
-	d_V = Dense(out_labels, activation='softmax')(H)
-	discriminator = Model(d_input,d_V)
+	H = Convolution2D(128, 3, 3, subsample=(2, 2), border_mode = 'same', activation='relu')(H)
+	H = LeakyReLU(0.2)(H)
+	H = Dropout(dropout_rate)(H)
+	H = Flatten()(H)
+	H = Dense(64)(H)
+	H = LeakyReLU(0.2)(H)
+	H = Dropout(dropout_rate)(H)
+	probability_out = Dense(out_labels, activation='softmax')(H)
+	discriminator = Model(d_input, probability_out)
 	dopt = RMSprop(lr=1e-4)	
 	discriminator.compile(loss='categorical_crossentropy', optimizer=dopt)
 	discriminator.summary()
@@ -251,16 +281,16 @@ def build_generative_model():
 	H = BatchNormalization(mode=2)(H)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Convolution2D(nch/4, 3, 3, border_mode='same', init='glorot_uniform')(H)
+	H = Convolution2D(nch/2, 3, 3, border_mode='same', init='glorot_uniform')(H)
 	H = BatchNormalization(mode=2)(H)
 	H = Activation('relu')(H)	
-	H = Convolution2D(nch/8, 3, 3, border_mode='same', init='glorot_uniform')(H)
+	H = Convolution2D(nch/4, 3, 3, border_mode='same', init='glorot_uniform')(H)
 	H = BatchNormalization(mode=2)(H)
 	H = Activation('relu')(H)
 	H = Convolution2D(3, 1, 1, border_mode='same', init='glorot_uniform')(H)
 	H = Activation('sigmoid')(H)
 	generator = Model(g_input, H)
-	opt = RMSprop(lr=1e-4)	
+	opt = Adam(lr=1e-3)	
 	generator.compile(loss='binary_crossentropy', optimizer=opt)
 	generator.summary()
 	return generator
@@ -275,12 +305,12 @@ def build_discriminative(in_shape, out_labels=2):
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(dropout_rate)(H)
 	H = Flatten()(H)
-	H = Dense(256)(H)
+	H = Dense(128)(H)
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(dropout_rate)(H)
 	d_V = Dense(out_labels, activation='softmax')(H)
 	discriminator = Model(d_input,d_V)
-	dopt = RMSprop(lr=1e-4)	
+	dopt = Adam(lr=1e-4)	
 	discriminator.compile(loss='categorical_crossentropy', optimizer=dopt)
 	discriminator.summary()
 	return discriminator
@@ -303,7 +333,7 @@ def build_mnist_generative_model():
 	H = Convolution2D(1, 1, 1, border_mode='same', init='glorot_uniform')(H)
 	g_V = Activation('sigmoid')(H)
 	generator = Model(g_input,g_V)
-	opt = Adam(lr=1e-3)	
+	opt = Adam(lr=1e-4)	
 	generator.compile(loss='binary_crossentropy', optimizer=opt)
 	generator.summary()
 	return generator
@@ -337,7 +367,8 @@ def build_stacked_gan(generator, discriminator):
 	H = generator(gan_input)
 	gan_V = discriminator(H)
 	GAN = Model(gan_input, gan_V)
-	opt = RMSprop(lr=2e-5)		
+	#opt = RMSprop(lr=2e-5)	
+	opt = Adam(lr=1e-4)		
 	GAN.compile(loss='categorical_crossentropy', optimizer=opt)
 	GAN.summary()
 	return GAN
@@ -345,7 +376,7 @@ def build_stacked_gan(generator, discriminator):
 
 def train_imagenet_gan(generator, discriminator, gan):
 
-	imagenet_data = load_imagenet()
+	imagenet_data = load_faces()
 	(x_train, y_train), (x_test, y_test) = imagenet_data
 	plot_color(x_train)
 
@@ -365,6 +396,7 @@ def train_imagenet_gan(generator, discriminator, gan):
 	make_trainable(discriminator,True)
 	discriminator.fit(x,y, nb_epoch=1, batch_size=32, shuffle=True)
 	y_hat = discriminator.predict(x)
+	plot_gen_color(generator, 25,(5,5),(34,34))
 
 	# Measure accuracy of pre-trained discriminator network
 	y_hat_idx = np.argmax(y_hat,axis=1)
@@ -376,13 +408,13 @@ def train_imagenet_gan(generator, discriminator, gan):
 	print "Accuracy: %0.02f pct (%d of %d) right"%(acc, n_rig, n_tot)	
 
 	# Plot some generated images from our GAN before training
-	plot_gen_color(generator, 25,(5,5),(24,24))
-	train_for_n(imagenet_data, generator, discriminator, gan, nb_epoch=400, plt_frq=399, BATCH_SIZE=32)
-	gan.save_model('imagenet_gan.hd5')
-	generator.save_model('imagenet_generator.hd5')
-	discriminator.save_model('imagenet_discriminator.hd5')
+	plot_gen_color(generator, 25,(5,5),(34,34))
+	train_for_n(imagenet_data, generator, discriminator, gan, nb_epoch=3000, plt_frq=999, BATCH_SIZE=32)
+	save_model(gan, 'face3_gan.hd5')
+	save_model(generator, 'face3_generator.hd5') 
+	save_model(discriminator, 'face3_discriminator.hd5')
 	# Plot some generated images from our GAN after training
-	plot_gen_color(generator, 25,(5,5),(24,24))
+	plot_gen_color(generator, 25,(5,5),(34,34))
 
 
 def train_cifar_gan(generator, discriminator, gan):
@@ -416,10 +448,13 @@ def train_cifar_gan(generator, discriminator, gan):
 	n_rig = (diff==0).sum()
 	acc = n_rig*100.0/n_tot
 	print "Accuracy: %0.02f pct (%d of %d) right"%(acc, n_rig, n_tot)	
-
+	
+	plot_gen_color(generator, 25,(5,5),(12,12))
 	# Train for 6000 epochs at original learning rates
-	train_for_n(cifar_data, generator, discriminator, gan, nb_epoch=10000, plt_frq=2000, BATCH_SIZE=32)
-
+	train_for_n(cifar_data, generator, discriminator, gan, nb_epoch=20000, plt_frq=19999, BATCH_SIZE=32)
+	save_model(gan, 'cifar10_gan2.hd5')
+	save_model(generator, 'cifar10_generator2.hd5') 
+	save_model(discriminator, 'cifar10_discriminator2.hd5')
 	# Plot some generated images from our GAN
 	plot_gen_color(generator, 25,(5,5),(12,12))
 
@@ -454,13 +489,17 @@ def train_mnist_gan(generator, discriminator, gan):
 	acc = n_rig*100.0/n_tot
 	print "Accuracy: %0.02f pct (%d of %d) right"%(acc, n_rig, n_tot)
 		
-
+	# Plot some generated images from our GAN
+	plot_gen(generator, 25,(5,5),(12,12))
 	# Train for 6000 epochs at original learning rates
-	train_for_n(mnist_data, generator, discriminator, gan, nb_epoch=2000, plt_frq=100,BATCH_SIZE=32)
+	train_for_n(mnist_data, generator, discriminator, gan, nb_epoch=6000, plt_frq=1500,BATCH_SIZE=32)
 
 	# Plot some generated images from our GAN
 	plot_gen(generator, 25,(5,5),(12,12))
 	# Plot real MNIST images for comparison
+	save_model(gan, 'mnist_gan.hd5')
+	save_model(generator, 'mnist_generator.hd5') 
+	save_model(discriminator, 'mnist_discriminator.hd5')
 	plot_real(x_train)
 
 
@@ -499,7 +538,7 @@ def train_for_n(data, generator, discriminator, gan, nb_epoch=5000, plt_frq=25,B
 		losses["g"].append(g_loss)
 		
 		# Updates 
-		if e%5==4:
+		if e%50==49:
 			print 'iteration:',e, 'of:', nb_epoch, 'generator loss:', g_loss, 'discriminator loss:', d_loss
 		if e%plt_frq==plt_frq-1:
 			plot_loss(losses)
@@ -538,7 +577,7 @@ def plot_color(x_train, n_ex=16,dim=(4,4), figsize=(10,10) ):
 	plt.show()
 
 
-def plot_gen_color(generator, n_ex=16,dim=(4,4), figsize=(10,10) ):
+def plot_gen_color(generator, n_ex=9,dim=(3,3), figsize=(24,24) ):
 	noise = np.random.uniform(0,1,size=[n_ex,seeds])
 	generated_images = generator.predict(noise)
 
