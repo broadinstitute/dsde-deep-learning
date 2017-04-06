@@ -409,7 +409,7 @@ def train_imagenet_gan(generator, discriminator, gan):
 
 	# Plot some generated images from our GAN before training
 	plot_gen_color(generator, 25,(5,5),(34,34))
-	train_for_n(imagenet_data, generator, discriminator, gan, nb_epoch=3000, plt_frq=999, BATCH_SIZE=32)
+	train_for_n(imagenet_data, generator, discriminator, gan, nb_epoch=3000, plt_frq=999, batch_size=32)
 	save_model(gan, 'face3_gan.hd5')
 	save_model(generator, 'face3_generator.hd5') 
 	save_model(discriminator, 'face3_discriminator.hd5')
@@ -451,7 +451,7 @@ def train_cifar_gan(generator, discriminator, gan):
 	
 	plot_gen_color(generator, 25,(5,5),(12,12))
 	# Train for 6000 epochs at original learning rates
-	train_for_n(cifar_data, generator, discriminator, gan, nb_epoch=20000, plt_frq=19999, BATCH_SIZE=32)
+	train_for_n(cifar_data, generator, discriminator, gan, nb_epoch=20000, plt_frq=19999, batch_size=32)
 	save_model(gan, 'cifar10_gan2.hd5')
 	save_model(generator, 'cifar10_generator2.hd5') 
 	save_model(discriminator, 'cifar10_discriminator2.hd5')
@@ -492,7 +492,7 @@ def train_mnist_gan(generator, discriminator, gan):
 	# Plot some generated images from our GAN
 	plot_gen(generator, 25,(5,5),(12,12))
 	# Train for 6000 epochs at original learning rates
-	train_for_n(mnist_data, generator, discriminator, gan, nb_epoch=6000, plt_frq=1500,BATCH_SIZE=32)
+	train_for_n(mnist_data, generator, discriminator, gan, nb_epoch=6000, plt_frq=1500,batch_size=32)
 
 	# Plot some generated images from our GAN
 	plot_gen(generator, 25,(5,5),(12,12))
@@ -504,7 +504,7 @@ def train_mnist_gan(generator, discriminator, gan):
 
 
 # Set up our main training loop
-def train_for_n(data, generator, discriminator, gan, nb_epoch=5000, plt_frq=25,BATCH_SIZE=32):
+def train_for_n(data, generator, discriminator, gan, nb_epoch=5000, plt_frq=25, batch_size=32):
 	# set up loss storage vector
 	losses = {"d":[], "g":[]}
 	(x_train, y_train), (x_test, y_test) = data
@@ -516,22 +516,22 @@ def train_for_n(data, generator, discriminator, gan, nb_epoch=5000, plt_frq=25,B
 	for e in range(nb_epoch):  
 		
 		# Make generative images
-		image_batch = x_train[np.random.randint(0,x_train.shape[0],size=BATCH_SIZE),:,:,:]    
-		noise_gen = np.random.uniform(0,1,size=[BATCH_SIZE, seeds])
+		image_batch = x_train[np.random.randint(0,x_train.shape[0], size=batch_size),:,:,:]    
+		noise_gen = np.random.uniform(0,1,size=[batch_size, seeds])
 		generated_images = generator.predict(noise_gen)
 		
 		# Train discriminator on generated images
 		X = np.concatenate((image_batch, generated_images))
-		y = np.zeros([2*BATCH_SIZE,2])
-		y[0:BATCH_SIZE,1] = 1
-		y[BATCH_SIZE:,0] = 1
+		y = np.zeros([2*batch_size,2])
+		y[0:batch_size,1] = 1
+		y[batch_size:,0] = 1
 		
 		d_loss  = discriminator.train_on_batch(X,y)
 		losses["d"].append(d_loss)
 	
 		# train Generator-Discriminator stack on input noise to non-generated output class
-		noise_tr = np.random.uniform(0,1,size=[BATCH_SIZE,seeds])
-		y2 = np.zeros([BATCH_SIZE,2])
+		noise_tr = np.random.uniform(0,1,size=[batch_size,seeds])
+		y2 = np.zeros([batch_size,2])
 		y2[:,1] = 1
 		
 		g_loss = gan.train_on_batch(noise_tr, y2 )
