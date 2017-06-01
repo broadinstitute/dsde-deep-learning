@@ -19,10 +19,7 @@ from keras.preprocessing import image
 from keras.utils.data_utils import get_file
 from keras.layers import Flatten, Dense, Input
 from keras.utils.layer_utils import convert_all_kernels_in_model
-from keras.layers import Convolution2D, ZeroPadding2D, MaxPooling2D
-
-
-
+from keras.layers import Conv2D, ZeroPadding2D, MaxPooling2D
 
 
 def vgg_16(num_labels=0, weights_path=None, input_tensor=None):
@@ -49,7 +46,7 @@ def vgg_16(num_labels=0, weights_path=None, input_tensor=None):
 		A Keras model instance.
 	'''
 	# Determine proper input shape
-	if K.image_dim_ordering() == 'th':
+	if  K.image_data_format() == 'channels_first':
 		if num_labels > 0:
 			input_shape = (3, 224, 224)
 		else:
@@ -67,32 +64,33 @@ def vgg_16(num_labels=0, weights_path=None, input_tensor=None):
 			img_input = Input(tensor=input_tensor)
 		else:
 			img_input = input_tensor
+
 	# Block 1
-	x = Convolution2D(64, 3, 3, activation='relu', border_mode='same', name='block1_conv1')(img_input)
-	x = Convolution2D(64, 3, 3, activation='relu', border_mode='same', name='block1_conv2')(x)
+	x = Conv2D(64, (3, 3), activation='relu', padding='same', name='block1_conv1')(img_input)
+	x = Conv2D(64, (3, 3),  activation='relu', padding='same', name='block1_conv2')(x)
 	x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
 
 	# Block 2
-	x = Convolution2D(128, 3, 3, activation='relu', border_mode='same', name='block2_conv1')(x)
-	x = Convolution2D(128, 3, 3, activation='relu', border_mode='same', name='block2_conv2')(x)
+	x = Conv2D(128, (3, 3),  activation='relu', padding='same', name='block2_conv1')(x)
+	x = Conv2D(128, (3, 3),  activation='relu', padding='same', name='block2_conv2')(x)
 	x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
 
 	# Block 3
-	x = Convolution2D(256, 3, 3, activation='relu', border_mode='same', name='block3_conv1')(x)
-	x = Convolution2D(256, 3, 3, activation='relu', border_mode='same', name='block3_conv2')(x)
-	x = Convolution2D(256, 3, 3, activation='relu', border_mode='same', name='block3_conv3')(x)
+	x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv1')(x)
+	x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv2')(x)
+	x = Conv2D(256, (3, 3), activation='relu', padding='same', name='block3_conv3')(x)
 	x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
 
 	# Block 4
-	x = Convolution2D(512, 3, 3, activation='relu', border_mode='same', name='block4_conv1')(x)
-	x = Convolution2D(512, 3, 3, activation='relu', border_mode='same', name='block4_conv2')(x)
-	x = Convolution2D(512, 3, 3, activation='relu', border_mode='same', name='block4_conv3')(x)
+	x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1')(x)
+	x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2')(x)
+	x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3')(x)
 	x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
 
 	# Block 5
-	x = Convolution2D(512, 3, 3, activation='relu', border_mode='same', name='block5_conv1')(x)
-	x = Convolution2D(512, 3, 3, activation='relu', border_mode='same', name='block5_conv2')(x)
-	x = Convolution2D(512, 3, 3, activation='relu', border_mode='same', name='block5_conv3')(x)
+	x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv1')(x)
+	x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv2')(x)
+	x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block5_conv3')(x)
 	x = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(x)
 
 	if num_labels > 0:
@@ -100,16 +98,20 @@ def vgg_16(num_labels=0, weights_path=None, input_tensor=None):
 		x = Flatten(name='flatten')(x)
 		x = Dense(4096, activation='relu', name='fc1')(x)
 		x = Dense(4096, activation='relu', name='fc2')(x)
-		x = Dense(num_labels, activation='softmax', name='predictions')(x)
+		if num_labels == 1000:
+			x = Dense(num_labels, activation='softmax', name='predictions')(x)
+		else:
+			x = Dense(num_labels, activation='softmax', name='predictions_'+str(num_labels))(x)
 
 	# Create model
 	model = Model(img_input, x)
 
 	# load weights
 	if weights_path:
-		print('K.image_dim_ordering:', K.image_dim_ordering())
+		print('K.image_data_format:', K.image_data_format())
 		model.load_weights(weights_path, by_name=True)
 		convert_all_kernels_in_model(model)
 
-		
+	model.summary()
+
 	return model

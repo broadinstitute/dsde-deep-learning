@@ -9,17 +9,18 @@
 # sam@broadinstitute.org
 
 import os
-import cv2
+#import cv2
 import h5py
 import time
 import gzip
 import cPickle
 import argparse
 import numpy as np
-from vgg_16 import vgg_16
-from scipy.misc import imsave
+#from vgg_16 import vgg_16
+#from scipy.misc import imsave
 from keras import backend as K
 from keras.models import Model
+from keras.datasets import mnist
 from inception_v3 import inception_v3
 from keras.optimizers import SGD, Adam
 from keras.callbacks import ModelCheckpoint, EarlyStopping
@@ -60,6 +61,7 @@ def parse_args():
 	parser.add_argument('--iterations', default=20, type=int)
 	parser.add_argument('--image_path', default='/Users/sam/Dropbox/Photos/dog.jpg')	
 	parser.add_argument('--save_path', default='/Users/sam/Dropbox/Photos/activations/')
+	parser.add_argument('--data', default='./mnist.pkl.gz')
 
 	args = parser.parse_args()
 	print 'Arguments are', args	
@@ -83,27 +85,32 @@ def model_from_args(args):
 
 def mnist_cnn(args, input_image):
 	shape = (args.channels, args.height, args.width)
-	x = Convolution2D(32, 3, 3, 
+	x = Convolution2D(32, 5, 5, 
 		activation='relu', 
 		border_mode='valid', 
 		input_shape=shape)(input_image)
-	x = Convolution2D(32, 3, 3, activation='relu', border_mode='same')(x)
+	x = MaxPooling2D((2,2))(x)			
+	x = Convolution2D(64, 3, 3, activation='relu', border_mode='same')(x)
 	x = Dropout(0.2)(x)
 	x = MaxPooling2D((2,2))(x)	
 	x = Flatten()(x)
 	x = Dense(128, activation='relu')(x)
+	x = Dense(64, activation='relu')(x)
+
 	predictions = Dense(args.num_labels, activation='softmax')(x)
 
 	# this creates a model that includes
 	# the Input layer and three Dense layers
 	model = Model(input=input_image, output=predictions)
-	model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+	model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+	model.summary()
 	return model
 
 
 def train_cnn_on_mnist(args, model):
 	#train, test, valid = load_data('/home/sam/Dropbox/Code/python/cnn/data/mnist.pkl.gz')
-	train, test, valid = load_data('/dsde/data/deep/mnist.pkl.gz')
+	#train, test, valid = load_data('/dsde/data/deep/mnist.pkl.gz')
+	train, test, valid = load_data(args.data)
 
 	input_images = train[0]
 	input_images = input_images.reshape(-1, 1, 28, 28)
