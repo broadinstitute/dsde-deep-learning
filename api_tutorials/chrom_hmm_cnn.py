@@ -127,7 +127,7 @@ def build_small_chrom_label(args):
 	sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=0.5)
 	adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
 	classes = args.labels.keys()
-	my_metrics = [metrics.categorical_accuracy, precision, recall, per_class_precision(classes), per_class_recall(classes) ]
+	my_metrics = [metrics.categorical_accuracy, precision, recall ]
 
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
 	print('model summary:\n', model.summary())
@@ -164,7 +164,7 @@ def build_sequential_chrom_label(args):
 	sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=0.5)
 	adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
 	classes = args.labels.keys()
-	my_metrics = [metrics.categorical_accuracy, precision, recall, per_class_precision(classes), per_class_recall(classes) ]
+	my_metrics = [metrics.categorical_accuracy, precision, recall]
 
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
 	print('model summary:\n', model.summary())
@@ -206,7 +206,7 @@ def load_dna_and_chrom_label(args, only_labels=None):
 	count = 0
 	while count < args.samples:
 		contig_key, pos = sample_from_bed(bed_dict, contig_key_prefix='chr')
-		contig = record_dict[contig_key[3:]]
+		contig = record_dict[contig_key]
 		record = contig[pos-idx_offset: pos+idx_offset]
 
 		cur_label_key = bed_file_label(bed_dict, contig_key, pos)
@@ -217,10 +217,11 @@ def load_dna_and_chrom_label(args, only_labels=None):
 		train_labels[count, args.labels[cur_label_key]] = 1
 
 		for i,b in enumerate(record.seq):
-			if b in args.inputs.keys():
-				train_data[count, i, args.inputs[b]] = 1.0
-			elif b in amiguity_codes.keys():
-				train_data[count, i, :4] = amiguity_codes[b]
+			B=b.upper()
+			if B in args.inputs.keys():
+				train_data[count, i, args.inputs[B]] = 1.0
+			elif B in amiguity_codes.keys():
+				train_data[count, i, :4] = amiguity_codes[B]
 			else:
 				print('Error! Unknown code:', b)
 				return
@@ -515,24 +516,41 @@ def plot_metric_history(history, title):
 	cols = int(math.ceil(num_plots/float(rows)))
 
 	f, axes = plt.subplots(rows, cols, sharex=True, figsize=(36, 24))
-	for k in history.history.keys():
+	
+	if cols>1:
+		for k in history.history.keys():
 
-		if 'val' not in k:
-			axes[row, col].plot(history.history[k])
-			axes[row, col].plot(history.history['val_'+k])
+			if 'val' not in k:
+				axes[row, col].plot(history.history[k])
+				axes[row, col].plot(history.history['val_'+k])
 
-			axes[row, col].set_ylabel(str(k))
-			axes[row, col].legend(['train', 'valid'], loc='upper left')
-			axes[row, col].set_xlabel('epoch')
+				axes[row, col].set_ylabel(str(k))
+				axes[row, col].legend(['train', 'valid'], loc='upper left')
+				axes[row, col].set_xlabel('epoch')
 
-			row += 1
-			if row == rows:
-				row = 0
-				col += 1
-				if row*col >= rows*cols:
-					break
+				row += 1
+				if row == rows:
+					row = 0
+					col += 1
+					if row*col >= rows*cols:
+						break
 
-	axes[0, 1].set_title(title)
+		axes[0, 1].set_title(title)
+	else:
+		for k in history.history.keys():
+
+			if 'val' not in k:
+				axes[row].plot(history.history[k])
+				axes[row].plot(history.history['val_'+k])
+
+				axes[row].set_ylabel(str(k))
+				axes[row].legend(['train', 'valid'], loc='upper left')
+				axes[row].set_xlabel('epoch')
+
+				row += 1
+		axes[0].set_title(title)
+
+
 	plt.savefig("./metric_history_"+title+".jpg")	
 
 	
