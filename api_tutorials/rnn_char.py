@@ -176,5 +176,6 @@ def generate_sample_sentences(model, text, window_size):
 			sys.stdout.flush()
 		print()	
 
+
 if '__main__'==__name__:
 	run()

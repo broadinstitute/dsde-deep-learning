@@ -459,7 +459,7 @@ def iterate_fxn(model, layer_dict, layer_name='conv5_1'):
 	# this is a placeholder tensor that will contain our generated images
 
 	# build a loss function that maximizes the activation
-	# of the nth filter of the layer considered
+	# of the layer given by layer name
 	x = layer_dict[layer_name].output
 	shape = layer_dict[layer_name].output_shape
 
@@ -479,7 +479,7 @@ def iterate_fxn(model, layer_dict, layer_name='conv5_1'):
 	# add continuity loss (gives image local coherence, can result in an artful blur)
 	loss += loss_weight_continuity * total_variation_norm(input_tensor) / np.prod(shape[1:])
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	loss -= loss_weight_l2 * (K.sum(K.square(input_tensor)) / np.prod(shape[1:]))
+	loss += loss_weight_l2 * (K.sum(K.square(input_tensor)) / np.prod(shape[1:]))
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(loss, input_tensor)[0]
 
