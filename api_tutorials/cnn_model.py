@@ -6,7 +6,7 @@ import sys
 import theano
 from theano import tensor as T
 import theano.tensor.signal as S
-import theano.tensor.signal.downsample
+from theano.tensor.signal import pool
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -119,15 +119,15 @@ def mlp_dropout_model(X, w_h, w_h2, w_o, p_drop_input, p_drop_hidden):
 
 def cnn_model(X, w, w2, w3, w4, w_o, p_drop_conv, p_drop_hidden):
 	l1a = rectify(T.nnet.conv2d(X, w, border_mode='full'))
-	l1 = T.signal.downsample.max_pool_2d(l1a, (2, 2))
+	l1 = pool.pool_2d(l1a, (2, 2))
 	l1 = dropout(l1, p_drop_conv)
 
 	l2a = rectify(T.nnet.conv2d(l1, w2))
-	l2 = T.signal.downsample.max_pool_2d(l2a, (2, 2))
+	l2 = pool.pool_2d(l2a, (2, 2))
 	l2 = dropout(l2, p_drop_conv)
 
 	l3a = rectify(T.nnet.conv2d(l2, w3))
-	l3b = T.signal.downsample.max_pool_2d(l3a, (2, 2))
+	l3b = pool.pool_2d(l3a, (2, 2))
 	l3 = T.flatten(l3b, outdim=2)
 	l3 = dropout(l3, p_drop_conv)
 
@@ -144,7 +144,7 @@ def make_one_hot(y):
 	return ohy
 
 def run_cnn_on_mnist():
-	train, test, valid = load_data('/dsde/data/deep/mnist.pkl.gz')
+	train, test, valid = load_data('mnist.pkl.gz')
 
 	trX = train[0]
 	trY = make_one_hot(train[1])
