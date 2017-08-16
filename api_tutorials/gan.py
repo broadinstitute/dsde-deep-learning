@@ -41,7 +41,7 @@ seeds = 300
 
 
 def run():
-	gan_on_imagenet()
+	#gan_on_imagenet()
 	#gan_on_cifar()
 	#gan_on_mnist()
 

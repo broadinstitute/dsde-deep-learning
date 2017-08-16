@@ -15,6 +15,7 @@ import os
 import sys
 import gzip
 import pickle
+import random
 import numpy as np
 from keras import metrics
 import matplotlib.pyplot as plt
@@ -23,9 +24,9 @@ from keras.layers.core import Dense
 
 
 def run():
-	linear_regression()
+	#linear_regression()
 	logistic_regression()
-	multilayer_perceptron()
+	#multilayer_perceptron()
 
 
 def linear_regression():
@@ -51,17 +52,46 @@ def linear_regression():
 def logistic_regression():
 	train, test, valid = load_data('mnist.pkl.gz')
 
+	epochs = 3200
 	num_labels = 10
 	train_y = make_one_hot(train[1], num_labels)
 	valid_y = make_one_hot(valid[1], num_labels)
 	test_y = make_one_hot(test[1], num_labels)
 
 	logistic_model = Sequential()
-	logistic_model.add(Dense(10, activation='softmax', input_dim=784))
+	logistic_model.add(Dense(10, activation='softmax', input_dim=784, name='mnist_templates'))
 	logistic_model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
-	logistic_model.fit(train[0], train_y, validation_data=(valid[0],valid_y), batch_size=32, epochs=10)
+	logistic_model.summary()
+	templates = logistic_model.layers[0].get_weights()[0]
+	plot_templates(templates, 0)
+	print('weights shape:', templates.shape)
+
+	for e in range(epochs):
+		trainidx = random.sample(range(0, train[0].shape[0]), 8192)
+		x_batch = train[0][trainidx,:]
+		y_batch = train_y[trainidx]
+		logistic_model.train_on_batch(x_batch, y_batch)
+		if e % 5 == 0:
+			plot_templates(logistic_model.layers[0].get_weights()[0], e)
 
 	print('Test set loss and accuracy:', logistic_model.evaluate(test[0], test_y))
+
+
+def plot_templates(templates, epoch):
+	n = 10
+	templates = templates.reshape((28,28,n))
+	plt.figure(figsize=(16, 8))
+	for i in range(n):
+		ax = plt.subplot(2, 5, i+1)		
+		plt.imshow(templates[:, :, i])
+		plt.gray()
+		ax.get_xaxis().set_visible(False)
+		ax.get_yaxis().set_visible(False)
+
+	plot_name = "./frames/mnist/regression/templates_"+str(epoch)+".png"
+	if not os.path.exists(os.path.dirname(plot_name)):
+		os.makedirs(os.path.dirname(plot_name))		
+	plt.savefig(plot_name)
 
 
 def multilayer_perceptron():
@@ -77,7 +107,6 @@ def multilayer_perceptron():
 	mlp_model.add(Dense(10, activation='softmax'))
 	mlp_model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
 	mlp_model.fit(train[0], train_y, validation_data=(valid[0],valid_y), batch_size=32, epochs=10)
-
 	print('Test set loss and accuracy:', mlp_model.evaluate(test[0], test_y))
 
 

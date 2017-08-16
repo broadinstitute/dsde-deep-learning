@@ -3,6 +3,7 @@
 # Sam Friedman
 # sam@broadinstitute.org
 
+# Assumes Tensorflow Backend and dimension ordering throughout!
 
 # Python 2/3 friendly
 from __future__ import division
@@ -12,7 +13,7 @@ from __future__ import absolute_import
 
 # Imports
 import os
-import cv2
+#import cv2
 import random
 import argparse
 import numpy as np
@@ -28,17 +29,34 @@ from keras.layers import Input, Dense, Conv2D, MaxPooling2D, UpSampling2D, LSTM,
 
 
 def run():
-	#autoencode_faces()
-	#conv_autoencode_cifar()
-	#conv_autoencode_mnist()
-	autoencode_mnist()
-	#autoencode_cifar()
+	args = parse_args()
+	
+	if 'faces' == args.mode:
+		autoencode_faces()
+	if 'conv_cifar' == args.mode:		
+		conv_autoencode_cifar()
+	if 'conv_mnist' == args.mode:
+		conv_autoencode_mnist()
+	if 'mnist' == args.mode:
+		autoencode_mnist()
+	if 'cifar' == args.mode:
+		autoencode_cifar()
+
+
+def parse_args():
+	parser = argparse.ArgumentParser()
+
+	parser.add_argument('mode', choices=['faces', 'cifar', 'mnist', 'conv_mnist', 'conv_cifar'])
+
+	args = parser.parse_args()
+	print('Arguments are', args)	
+	return args
 
 
 def autoencode_mnist():
 	(x_train, y_train), (x_test, y_test) = load_mnist()
 	encoder, decoder, autoencoder = build_simple_autoencoder(l1_penalty=1e-7)
-	autoencoder.fit(x_train, x_train, epochs=50, batch_size=256,shuffle=True, validation_data=(x_test, x_test))
+	autoencoder.fit(x_train, x_train, epochs=50, batch_size=256, shuffle=True, validation_data=(x_test, x_test))
 
 	# encode and decode some digits
 	# note that we take them from the *test* set
@@ -134,23 +152,23 @@ def build_simple_autoencoder(input_dim=784, encoding_dim=32, l1_penalty=0.):
 def build_conv_autoencoder(input_dim=(28, 28, 1)):
 	input_img = Input(shape=input_dim)  # adapt this if using `channels_first` image data format
 
-	x = Conv2D(512, (3, 3), activation='relu', padding='same')(input_img)
+	x = Conv2D(64, (3, 3), activation='relu', padding='same')(input_img)
 	x = MaxPooling2D((2, 2), padding='same')(x)
-	x = Conv2D(256, (3, 3), activation='relu', padding='same')(x)
+	x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
 	x = MaxPooling2D((2, 2), padding='same')(x)
-	x = Conv2D(256, (3, 3), activation='relu', padding='same')(x)
+	x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
 	encoded = MaxPooling2D((2, 2), padding='same')(x)
 
 	# at this point the representation is (4, 4, 8) i.e. 128-dimensional
 
-	x = Conv2D(256, (3, 3), activation='relu', padding='same')(encoded)
+	x = Conv2D(32, (3, 3), activation='relu', padding='same')(encoded)
 	x = UpSampling2D((2, 2))(x)
-	x = Conv2D(256, (3, 3), activation='relu', padding='same')(x)
+	x = Conv2D(32, (3, 3), activation='relu', padding='same')(x)
 	x = UpSampling2D((2, 2))(x)
 	if input_dim[0] == 28:
-		x = Conv2D(512, (3, 3), activation='relu')(x)
+		x = Conv2D(64, (3, 3), activation='relu')(x)
 	else:
-		x = Conv2D(512, (3, 3), activation='relu', padding='same')(x)
+		x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
 
 	x = UpSampling2D((2, 2))(x)
 	decoded = Conv2D(input_dim[2], (3, 3), activation='sigmoid', padding='same')(x)
@@ -160,16 +178,16 @@ def build_conv_autoencoder(input_dim=(28, 28, 1)):
 	return autoencoder
 
 
-def build_lstm_autoencoder(timesteps, input_dim)
-	inputs = Input(shape=(timesteps, input_dim))
-	encoded = LSTM(latent_dim)(inputs)
+# def build_lstm_autoencoder(timesteps, input_dim)
+# 	inputs = Input(shape=(timesteps, input_dim))
+# 	encoded = LSTM(latent_dim)(inputs)
 
-	decoded = RepeatVector(timesteps)(encoded)
-	decoded = LSTM(input_dim, return_sequences=True)(decoded)
+# 	decoded = RepeatVector(timesteps)(encoded)
+# 	decoded = LSTM(input_dim, return_sequences=True)(decoded)
 
-	sequence_autoencoder = Model(inputs, decoded)
-	encoder = Model(inputs, encoded)
-	return encoder, sequence_autoencoder
+# 	sequence_autoencoder = Model(inputs, decoded)
+# 	encoder = Model(inputs, encoded)
+# 	return encoder, sequence_autoencoder
 
 
 def load_mnist(flatten=True):
