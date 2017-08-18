@@ -288,6 +288,8 @@ def bed_file_label(bed_dict, contig, pos):
 
 
 def split_data(datasets, valid_ratio=0.1, test_ratio=0.4):
+	assert(valid_ratio + test_ratio < 1.0)
+
 	samples = datasets[0].shape[0]
 	indices = range(samples)
 	shuffle(indices)
@@ -301,8 +303,8 @@ def split_data(datasets, valid_ratio=0.1, test_ratio=0.4):
 
 	for d in datasets:
 		valid.append( d[ :valid_idx] )
-		test.append(  d[valid_idx : test_idx] )
-		train.append( d[test_idx: ] )
+		test.append(  d[valid_idx : valid_idx+test_idx] )
+		train.append( d[valid_idx+test_idx: ] )
 
 	return train, valid, test
 
