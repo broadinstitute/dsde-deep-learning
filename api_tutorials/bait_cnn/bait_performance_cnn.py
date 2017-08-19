@@ -194,7 +194,8 @@ def build_small_functional_bait_model(args):
     # this creates a model that includes
     # the Input layer and three Dense layers
     model = Model(input=[input_baits, input_annotations], output=predictions)
-    model.compile(loss=gme, optimizer=sgd, metrics=my_metrics)
+    adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+    model.compile(loss=metrics.mean_squared_error, optimizer=adamo, metrics=my_metrics)
     print('model summary:\n', model.summary())
     return model
 
@@ -409,7 +410,7 @@ def rmse_log(y_true, y_pred):
 def plot_scatter(model, test_data, truth_data, title):
     y_pred = model.predict(test_data, verbose=1)
 
-    # Compute ROC curve and ROC area for each class
+    # Compute metrics:
 
     plt.figure(figsize=[4, 4])
     fig, ax = plt.subplots()
