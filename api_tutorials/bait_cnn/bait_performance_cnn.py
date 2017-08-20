@@ -10,36 +10,33 @@
 # farjoun@broadinstitute.org
 
 from __future__ import print_function
+from __future__ import division
 
-import os
-import math
-# import h5py
 import argparse
+import math
+import os
+
 import matplotlib
 import numpy as np
 
 matplotlib.use('Agg')
-from scipy import interp
 from keras import metrics
 import keras.backend as K
 from random import shuffle, seed
-from Bio import Seq, SeqIO
-from itertools import cycle
+from Bio import SeqIO
 from keras.models import Model
 import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.optimizers import SGD, Adam
 from keras.initializers import RandomNormal
-from sklearn.metrics import roc_curve, auc, roc_auc_score
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers.convolutional import Conv1D, MaxPooling1D
-from keras.layers import Input, Dense, Dropout, Flatten, Reshape, Activation
+from keras.layers import Input, Dense, Dropout, Flatten, Activation
 from keras.layers.merge import Concatenate
 
 data_path = '/Users/farjoun/exomeData/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
 bait_bed_file = data_path + 'coverage.singleton.bait.bed'
-
 
 
 def run():
@@ -83,7 +80,8 @@ def make_small_model(args):
     model = train_bait_model(model, train, valid, weight_path)
 
     title = weight_path_to_title(weight_path)
-    # plot_scatter(model, test[0], test[1], args.labels, title)
+
+    plot_scatter(model, test.baitdata, test.coverage, title)
 
 
 def make_large_model(args):
@@ -97,7 +95,7 @@ def make_large_model(args):
 
     title = weight_path_to_title(weight_path)
 
-    plot_scatter(model, [test.baitdata,test.gc], test.coverage, title)
+    plot_scatter(model, [test.baitdata, test.gc], test.coverage, title)
 
 
 def make_plots(args):
@@ -127,24 +125,23 @@ def build_small_sequential_bait_model(args):
                      activation="relu",
                      init='normal'))
 
-    model.add(MaxPooling1D(pool_length=3, stride=3))
-    model.add(Conv1D(nb_filter=64, filter_length=16, activation="relu", init='normal', border_mode='valid'))
-    model.add(Dropout(0.2))
-    model.add(MaxPooling1D(pool_length=3, stride=3))
+    model.add(Dropout(0.3))
+    model.add(Conv1D(filters=64, kernel_size=16, activation="relu", init='normal', padding='valid'))
+    model.add(Dropout(0.3))
+    model.add(MaxPooling1D(pool_size=3, strides=3))
     model.add(Flatten())
 
-    model.add(Dense(output_dim=32, init='normal'))
+    model.add(Dense(units=32, kernel_initializer='normal'))
     model.add(Activation('relu'))
 
-    model.add(Dense(output_dim=1, init=RandomNormal(mean=1.0, stddev=0.5, seed=None)))
-    model.add(Activation(None))
+    model.add(Dense(units=1, kernel_initializer=RandomNormal(mean=1.0, stddev=0.5, seed=None)))
+    model.add(Activation("relu"))
 
-    sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=0.5)
     adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
     my_metrics = [metrics.mean_squared_error, rmse_log]
 
-    model.compile(loss='mean_squared_error', optimizer=sgd, metrics=my_metrics)
-    print('model summary:\n', model.summary())
+    model.compile(loss='mean_squared_error', optimizer=adamo, metrics=my_metrics)
+    model.summary()
 
     return model
 
@@ -153,7 +150,7 @@ def build_small_functional_bait_model(args):
     bait_shape = (args.window_size, len(args.inputs),)
     annotation_shape = (len(args.annotations),)
 
-    print(bait_shape)
+    print("Bait shape: %s" % (bait_shape,))
     input_baits = Input(name="bait", shape=bait_shape)
 
     x = Conv1D(activation='relu',
@@ -162,23 +159,21 @@ def build_small_functional_bait_model(args):
                kernel_size=8,
                kernel_initializer='normal')(input_baits)
 
-    x = Dropout(0.2)(x)
-
-    x = MaxPooling1D(strides=3, pool_size=3)(x)
+    x = Dropout(0.3)(x)
 
     x = Conv1D(kernel_initializer="normal", activation="relu", padding="valid", filters=64, kernel_size=8)(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.3)(x)
     x = MaxPooling1D(pool_size=3, strides=3)(x)
 
     x = Conv1D(kernel_initializer="normal", activation="relu", padding="valid", filters=40, kernel_size=8)(x)
-    x = Dropout(0.2)(x)
+    x = Dropout(0.3)(x)
     x = MaxPooling1D(pool_size=3, strides=3)(x)
 
     x = Flatten()(x)
 
     x = Dense(units=32, kernel_initializer="normal", activation="relu")(x)
 
-    print(annotation_shape)
+    print("Annotation shape: %s" % (annotation_shape,))
 
     input_annotations = Input(name="annotation", shape=annotation_shape)
 
@@ -186,9 +181,8 @@ def build_small_functional_bait_model(args):
 
     xy = Dense(units=32, kernel_initializer="normal", activation="relu")(xy)
 
-    predictions = Dense(units=1, init=RandomNormal(mean=1.0, stddev=0.5, seed=None), activation=None)(xy)
+    predictions = Dense(units=1, init=RandomNormal(mean=1.0, stddev=0.5, seed=None), activation="relu")(xy)
 
-    sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=0.5)
     my_metrics = [metrics.mean_squared_error, rmse_log, gme]
 
     # this creates a model that includes
@@ -196,7 +190,7 @@ def build_small_functional_bait_model(args):
     model = Model(input=[input_baits, input_annotations], output=predictions)
     adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
     model.compile(loss=metrics.mean_squared_error, optimizer=adamo, metrics=my_metrics)
-    print('model summary:\n', model.summary())
+    model.summary()
     return model
 
 
@@ -206,9 +200,9 @@ def train_bait_model(model, train, valid, save_weight):
     checkpointer = ModelCheckpoint(filepath=save_weight, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=100, verbose=1)
 
-    history = model.fit([train.baitdata,train.gc], train.coverage,
+    history = model.fit([train.baitdata, train.gc], train.coverage,
                         batch_size=32, epochs=150, shuffle=True,
-                        validation_data=([valid.baitdata,valid.gc], valid.coverage),
+                        validation_data=([valid.baitdata, valid.gc], valid.coverage),
                         callbacks=[checkpointer, earlystopper])
 
     plot_metric_history(history, weight_path_to_title(save_weight))
@@ -243,11 +237,11 @@ def load_dna_and_bait_coverage(args, only_labels=None):
     record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
 
     baits_and_coverages = bed_file_to_coverage(args.bed_file)
-    print('Loaded baits and annotations from:', args.bed_file)
+    print('Loaded baits and annotations from: %s' % (args.bed_file,))
 
     train_data = Data(args.samples, args.window_size, len(args.inputs))
 
-    idx_offset = (args.window_size / 2)
+    idx_offset = (args.window_size // 2)
 
     amiguity_codes = {'K': [0, 0, 0.5, 0.5],
                       'M': [0.5, 0.5, 0, 0],
@@ -265,8 +259,11 @@ def load_dna_and_bait_coverage(args, only_labels=None):
     count = 0
     while count < args.samples:
         contig_key, start, end, coverage, gc = sample_from_bed(baits_and_coverages)
-        mid = (start + end) / 2
+        mid = (start + end) // 2
         contig = record_dict[contig_key]
+
+      #  print("%s" % ((contig_key, start, end, coverage, gc, mid, contig),))
+
         record = contig[mid - idx_offset: mid + idx_offset]
 
         train_data.coverage[count, 0] = coverage
@@ -288,8 +285,8 @@ def load_dna_and_bait_coverage(args, only_labels=None):
 
         count += 1
 
-    print('Train data shape:', train_data.baitdata.shape)
-    print('Coverage data shape:', train_data.coverage.shape)
+    print('Train data shape: %s' % (train_data.baitdata.shape,))
+    print('Coverage data shape: %s' % (train_data.coverage.shape,))
 
     # should be in the form ( 5xsize x samples tensor, 1x samples tensor)
     return train_data
@@ -303,12 +300,12 @@ def bed_file_to_coverage(bed_file):
 
     with open(bed_file) as f:
         for line in f:
-            parts  = line.split()
+            parts = line.split()
             contig = parts[0]
-            lower  = int(parts[1])
-            upper  = int(parts[2])
-            gc     = float(parts[3])
-            reads  = int(parts[4])
+            lower = int(parts[1])
+            upper = int(parts[2])
+            gc = float(parts[3])
+            reads = int(parts[4])
             total_reads += reads
             total_baits += 1
 
@@ -321,14 +318,14 @@ def bed_file_to_coverage(bed_file):
             bed_with_cov_and_gc[contig][3].append(gc)
 
     reads_per_bait = float(total_reads) / total_baits
-    print(reads_per_bait)
+    print("Reads per bait: %s" % reads_per_bait)
     for contig in bed_with_cov_and_gc.keys():
         bed_with_cov_and_gc[contig] = (
             np.array(bed_with_cov_and_gc[contig][0]),
             np.array(bed_with_cov_and_gc[contig][1]),
             np.array([x / reads_per_bait for x in bed_with_cov_and_gc[contig][2]]),
             bed_with_cov_and_gc[contig][3],)
-        print('key is:', contig, 'len ', len(bed_with_cov_and_gc[contig][0]))
+        print('key is: %s len %s' %     ( contig, len(bed_with_cov_and_gc[contig][0])))
 
     return bed_with_cov_and_gc
 
@@ -369,17 +366,12 @@ def split_data(data, valid_ratio=0.1, test_ratio=0.4):
     return train, valid, test
 
 
-# TODO: make more random (this gives too much power to the small contigs)
-def sample_from_fasta(record_dict):
-    c_idx = str(np.random.randint(1, 20))
-    contig = record_dict[c_idx]
-    p_idx = np.random.randint(len(contig))
-    return c_idx, p_idx
-
-
-# TODO: make more random (this gives too much power to the small contigs)
 def sample_from_bed(bed_dict):
-    contig_key = "" + str(np.random.randint(1, 20))
+    contig_sizes = {key: len(bed_dict[key]) for key in bed_dict.keys()}
+    total_size = sum(contig_sizes.values())
+
+    contig_key = np.random.choice(bed_dict.keys(), 1, p=[x / total_size for x in contig_sizes.values()])[0]
+
     lowers = bed_dict[contig_key][0]
     uppers = bed_dict[contig_key][1]
     coverage = bed_dict[contig_key][2]
@@ -388,14 +380,13 @@ def sample_from_bed(bed_dict):
     idx = np.random.randint(len(lowers))
     return contig_key, lowers[idx], uppers[idx], coverage[idx], gcs[idx]
 
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def gme(y_true, y_pred):
     """calculates the root (geometric) mean squared error of the values."""
-    return K.exp(K.mean(K.log(K.abs(np.divide(y_true + .001, y_pred + .001)-1))))
+    return K.exp(K.mean(K.log(K.abs(np.divide(y_true + .001, y_pred + .001) - 1))))
 
 
 def rmse_log(y_true, y_pred):
@@ -414,9 +405,9 @@ def plot_scatter(model, test_data, truth_data, title):
 
     plt.figure(figsize=[4, 4])
     fig, ax = plt.subplots()
-    ax.plot(truth_data,y_pred, color='darkorange', linestyle='', marker='.')
-    max_xy=max(ax.get_xlim()[1],ax.get_ylim()[1])
-    ax.plot([0, max_xy],[0, max_xy], ls="--", c=".3")
+    ax.plot(truth_data, y_pred, color='darkorange', linestyle='', marker='.')
+    max_xy = max(ax.get_xlim()[1], ax.get_ylim()[1])
+    ax.plot([0, max_xy], [0, max_xy], ls="--", c=".3")
     ax.set_aspect('equal')
     ax.set_xlabel('True (normalized) Coverage ')
     ax.set_ylabel('Predicted (normalized) Coverage')
@@ -427,10 +418,9 @@ def plot_scatter(model, test_data, truth_data, title):
     fig.savefig("./scatter_" + title + ".jpg")
 
 
-
 def plot_history(history, title):
     # list all data in history
-    print(history.history.keys())
+    print("History keys: " + history.history.keys())
     # summarize history for accuracy
     plt.plot(history.history['categorical_accuracy'])
     plt.plot(history.history['val_categorical_accuracy'])
@@ -451,7 +441,7 @@ def plot_history(history, title):
 
 def plot_metric_history(history, title):
     # list all data in history
-    print(history.history.keys())
+    print("History keys: " + history.history.keys())
 
     row = 0
     col = 0
