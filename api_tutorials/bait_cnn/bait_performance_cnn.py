@@ -22,17 +22,17 @@ import numpy as np
 matplotlib.use('Agg')
 from keras import metrics
 import keras.backend as K
-from random import shuffle, seed
 from Bio import SeqIO
 from keras.models import Model
 import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.optimizers import SGD, Adam
 from keras.initializers import RandomNormal
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard
 from keras.layers.convolutional import Conv1D, MaxPooling1D
 from keras.layers import Input, Dense, Dropout, Flatten, Activation
 from keras.layers.merge import Concatenate
+# import tensorflow as tf
 
 data_path = '/Users/farjoun/exomeData/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
@@ -41,7 +41,6 @@ bait_bed_file = data_path + 'coverage.singleton.bait.bed'
 
 def run():
     args = parse_args()
-    seed(0)
 
     if 'small' == args.model:
         make_small_model(args)
@@ -81,7 +80,9 @@ def make_small_model(args):
 
     title = weight_path_to_title(weight_path)
 
-    plot_scatter(model, test.baitdata, test.coverage, title)
+    plot_scatter(model, {"test": ([test.baitdata, test.gc], test.coverage),
+                         "validation": ([valid.baitdata, valid.gc], valid.coverage),
+                         "train": ([train.baitdata, train.gc], train.coverage)}, title)
 
 
 def make_large_model(args):
@@ -95,7 +96,9 @@ def make_large_model(args):
 
     title = weight_path_to_title(weight_path)
 
-    plot_scatter(model, [test.baitdata, test.gc], test.coverage, title)
+    plot_scatter(model, {"test": ([test.baitdata, test.gc], test.coverage),
+                         "validation": ([valid.baitdata, valid.gc], valid.coverage),
+                         "train": ([train.baitdata, train.gc], train.coverage)}, title)
 
 
 def make_plots(args):
@@ -108,7 +111,9 @@ def make_plots(args):
 
     title = weight_path_to_title(args.weights)
 
-    plot_scatter(model, [test.baitdata, test.gc], test.coverage, title)
+    plot_scatter(model, {"test": ([test.baitdata, test.gc], test.coverage),
+                         "validation": ([valid.baitdata, valid.gc], valid.coverage),
+                         "train": ([train.baitdata, train.gc], train.coverage)}, title)
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -157,7 +162,7 @@ def build_small_functional_bait_model(args):
                padding='valid',
                filters=100,
                kernel_size=8,
-               kernel_initializer='normal')(input_baits)
+               kernel_initializer='normal', name='conv1')(input_baits)
 
     x = Dropout(0.3)(x)
 
@@ -181,13 +186,26 @@ def build_small_functional_bait_model(args):
 
     xy = Dense(units=32, kernel_initializer="normal", activation="relu")(xy)
 
-    predictions = Dense(units=1, init=RandomNormal(mean=1.0, stddev=0.5, seed=None), activation="relu")(xy)
-
+    predictions = Dense(units=1, kernel_initializer=RandomNormal(mean=1.0, stddev=0.5, seed=None), activation="relu")(
+        xy)
     my_metrics = [metrics.mean_squared_error, rmse_log, gme]
 
     # this creates a model that includes
     # the Input layer and three Dense layers
-    model = Model(input=[input_baits, input_annotations], output=predictions)
+    model = Model(inputs=[input_baits, input_annotations], outputs=predictions)
+
+    # # add some TensorBoard annotations
+    # conv1d_1 = filter(lambda y: y.name == "conv1d_1", model.layers)[0]
+    # conv1d_1_shape = map(lambda x: x.value, conv1d_1.kernel.get_shape())
+    # conv1d_1_shape.insert(0, 1)
+    #
+    # reshaped = tf.reshape(conv1d_1.kernel, conv1d_1_shape)
+    #
+    # filters=put_kernels_on_grid(reshaped, 2)
+    #
+    # merged = tf.summary.merge_all()
+    # train_writer = tf.summary.FileWriter("./log/" + '/train')
+    #
     adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
     model.compile(loss=metrics.mean_squared_error, optimizer=adamo, metrics=my_metrics)
     model.summary()
@@ -199,11 +217,12 @@ def train_bait_model(model, train, valid, save_weight):
 
     checkpointer = ModelCheckpoint(filepath=save_weight, verbose=1, save_best_only=True)
     earlystopper = EarlyStopping(monitor='val_loss', patience=100, verbose=1)
+    tensorboard = TensorBoard(log_dir='./logs/' + save_weight, histogram_freq=1, write_graph=False, write_images=False)
 
     history = model.fit([train.baitdata, train.gc], train.coverage,
                         batch_size=32, epochs=150, shuffle=True,
                         validation_data=([valid.baitdata, valid.gc], valid.coverage),
-                        callbacks=[checkpointer, earlystopper])
+                        callbacks=[checkpointer, earlystopper, tensorboard])
 
     plot_metric_history(history, weight_path_to_title(save_weight))
 
@@ -257,12 +276,11 @@ def load_dna_and_bait_coverage(args, only_labels=None):
                       'N': [0.25, 0.25, 0.25, 0.25]}
 
     count = 0
+    np.random.seed(0)
     while count < args.samples:
         contig_key, start, end, coverage, gc = sample_from_bed(baits_and_coverages)
         mid = (start + end) // 2
         contig = record_dict[contig_key]
-
-      #  print("%s" % ((contig_key, start, end, coverage, gc, mid, contig),))
 
         record = contig[mid - idx_offset: mid + idx_offset]
 
@@ -325,7 +343,7 @@ def bed_file_to_coverage(bed_file):
             np.array(bed_with_cov_and_gc[contig][1]),
             np.array([x / reads_per_bait for x in bed_with_cov_and_gc[contig][2]]),
             bed_with_cov_and_gc[contig][3],)
-        print('key is: %s len %s' %     ( contig, len(bed_with_cov_and_gc[contig][0])))
+        print('key is: %s len %s' % (contig, len(bed_with_cov_and_gc[contig][0])))
 
     return bed_with_cov_and_gc
 
@@ -340,9 +358,11 @@ def in_bed_file(bed_dict, contig, pos):
 def split_data(data, valid_ratio=0.1, test_ratio=0.4):
     # type: (Data, float, float) -> (Data, Data, Data)
 
+    np.random.seed(0)
+
     samples = data.samples
     indices = range(samples)
-    shuffle(indices)
+    np.random.shuffle(indices)
 
     valid_idx = int(valid_ratio * float(samples))
     test_idx = int(test_ratio * float(samples))
@@ -380,6 +400,7 @@ def sample_from_bed(bed_dict):
     idx = np.random.randint(len(lowers))
     return contig_key, lowers[idx], uppers[idx], coverage[idx], gcs[idx]
 
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -398,22 +419,29 @@ def rmse_log(y_true, y_pred):
 # ~~~~~~~ Plots ~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def plot_scatter(model, test_data, truth_data, title):
-    y_pred = model.predict(test_data, verbose=1)
+def plot_scatter(model, data_dict, title):
+    # type: (Model, dict, str) -> None
+
+    fig, ax = plt.subplots()
+    plt.figure(figsize=[4, 4])
 
     # Compute metrics:
+    for key in data_dict.keys():
+        y_pred = model.predict(data_dict[key][0], verbose=1)
+        y_truth = data_dict[key][1]
 
-    plt.figure(figsize=[4, 4])
-    fig, ax = plt.subplots()
-    ax.plot(truth_data, y_pred, color='darkorange', linestyle='', marker='.')
-    max_xy = max(ax.get_xlim()[1], ax.get_ylim()[1])
-    ax.plot([0, max_xy], [0, max_xy], ls="--", c=".3")
+        ax.plot(y_truth, y_pred, linestyle='', marker='.', label=key)
+
+    ax.legend()
     ax.set_aspect('equal')
     ax.set_xlabel('True (normalized) Coverage ')
     ax.set_ylabel('Predicted (normalized) Coverage')
     ax.spines['left'].set_position('zero')
     ax.spines['bottom'].set_position('zero')
     ax.set_title("scatter" + str(title))
+
+    max_xy = max(ax.get_xlim()[1], ax.get_ylim()[1])
+    ax.plot([0, max_xy], [0, max_xy], ls="--", c=".3")
 
     fig.savefig("./scatter_" + title + ".jpg")
 
@@ -514,6 +542,64 @@ def weight_path_from_args(args):
 def weight_path_to_title(wp):
     return wp.split('/')[-1].replace('__', '-')
 
+#
+# # from gist: https://gist.github.com/kukuruza/03731dc494603ceab0c5
+# from math import sqrt
+#
+#
+# def put_kernels_on_grid(kernel, pad=1):
+#     """Visualize conv. filters as an image (mostly for the 1st layer).
+#   Arranges filters into a grid, with some paddings between adjacent filters.
+#   Args:
+#     kernel:            tensor of shape [Y, X, NumChannels, NumKernels]
+#     pad:               number of black pixels around each filter (between them)
+#   Return:
+#     Tensor of shape [1, (Y+2*pad)*grid_Y, (X+2*pad)*grid_X, NumChannels].
+#   """
+#
+#     # get shape of the grid. NumKernels == grid_Y * grid_X
+#     def factorization(n):
+#         for i in range(int(sqrt(float(n))), 0, -1):
+#             if n % i == 0:
+#                 if i == 1: print('Who would enter a prime number of filters')
+#                 return i, int(n / i)
+#
+#     (grid_Y, grid_X) = factorization(kernel.get_shape()[3].value)
+#     print('grid: %d = (%d, %d)' % (kernel.get_shape()[3].value, grid_Y, grid_X))
+#
+#     x_min = tf.reduce_min(kernel)
+#     x_max = tf.reduce_max(kernel)
+#     kernel = (kernel - x_min) / (x_max - x_min)
+#
+#     # pad X and Y
+#     x = tf.pad(kernel, tf.constant([[pad, pad], [pad, pad], [0, 0], [0, 0]]), mode='CONSTANT')
+#
+#     # X and Y dimensions, w.r.t. padding
+#     Y = kernel.get_shape()[0] + 2 * pad
+#     X = kernel.get_shape()[1] + 2 * pad
+#
+#     channels = kernel.get_shape()[2]
+#
+#     # put NumKernels to the 1st dimension
+#     x = tf.transpose(x, (3, 0, 1, 2))
+#     # organize grid on Y axis
+#     x = tf.reshape(x, tf.stack([grid_X, Y * grid_Y, X, channels]))
+#
+#     # switch X and Y axes
+#     x = tf.transpose(x, (0, 2, 1, 3))
+#     # organize grid on X axis
+#     x = tf.reshape(x, tf.stack([1, X * grid_X, Y * grid_Y, channels]))
+#
+#     # back to normal order (not combining with the next step for clarity)
+#     x = tf.transpose(x, (2, 1, 3, 0))
+#
+#     # to tf.image_summary order [batch_size, height, width, channels],
+#     #   where in this case batch_size == 1
+#     x = tf.transpose(x, (3, 0, 1, 2))
+#
+#     # scaling to [0, 255] is not necessary for tensorboard
+#     return x
+#
 
 if '__main__' == __name__:
     run()
