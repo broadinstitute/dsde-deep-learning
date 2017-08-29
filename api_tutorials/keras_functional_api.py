@@ -125,51 +125,6 @@ def train_cnn_on_mnist(args, model):
 
 
 
-def gtf_labels_from_cnn(args):
-	bed_dict, bed_labels = td.gtf_to_bed_with_labels(defines.encode_gtf_file)
-	d1 = td.load_dna_and_gtf_label(args, bed_dict, bed_labels, ['gene', 'protein_coding'])
-	labels2 = ['exon', 'transcript', 'processed_transcript', 'pseudogene', 'lincRNA', 'antisense']
-	d2 = td.load_dna_and_gtf_label(args, bed_dict, bed_labels, labels2)
-	labels3 = ['start_codon', 'UTR', 'stop_codon', 'CDS', 'antisense']
-	d3 = td.load_dna_and_gtf_label(args, bed_dict, bed_labels, labels3)
-	labels4 = ['miRNA', 'misc_RNA', 'snRNA', 'snoRNA', 'sense_intronic', 'polymorphic_pseudogene', 'processed_transcript']
-	d4 = td.load_dna_and_gtf_label(args, bed_dict, bed_labels, labels4)
-
-	d5 = td.concat_and_shuffle_all(d1, d2)
-	d6 = td.concat_and_shuffle_all(d3, d4)
-	all_data = td.concat_and_shuffle_all(d5, d6)
-	train, valid, test = td.split_data(all_data)
-	
-	weight_path = weight_path_from_args(args)
-	model = models.build_multi_label_dna_cnn(args)
-	model = models.train_dna_multi_labeller(model, train, valid, weight_path)
-	y_pred = model.predict(test[0], batch_size=32, verbose=0)	
-
-	title = plots.weight_path_to_title(weight_path)
-	plots.plot_roc_pred(y_pred[0], test[1], defines.feature_type_labels, title)
-	plots.plot_roc_per_class_pred(y_pred[0], test[1], defines.feature_type_labels, title)
-	
-	title = 'gene_label_' + title
-	plots.plot_roc_pred(y_pred[1], test[2], defines.bio_type_labels, title)
-	plots.plot_roc_per_class_pred(y_pred[1], test[2], defines.bio_type_labels, title)
-	
-
-def chrom_labels_from_cnn(args):
-	train_data1 = td.load_dna_and_chrom_label(args, ['T', 'R'])
-	args.samples *= 2
-	train_data2 = td.load_dna_and_chrom_label(args, ['PF', 'E', 'TSS', 'CTCF', 'WE'])
-	train_data = td.concat_and_shuffle(train_data1, train_data2)
-
-	train, valid, test = td.split_data(train_data)
-
-	weight_path = weight_path_from_args(args)
-	model = models.build_sequential_chrom_label(args)
-	model = models.train_chrom_labeller(model, train, valid, weight_path)
-
-	title = plots.weight_path_to_title(weight_path)
-	plots.plot_roc(model, test[0], test[1], defines.chrom_hmm_labels, title)
-	plots.plot_roc_per_class(model, test[0], test[1], defines.chrom_hmm_labels, title)
-
 
 def load_data(dataset):
     ''' Loads the dataset
