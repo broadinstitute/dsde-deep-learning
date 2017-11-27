@@ -1,10 +1,20 @@
+# November 2017
+# Sam Friedman 
+# sam@broadinstitute.org
+
+# Python 2/3 friendly
+from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+
+# Imports
 import os
 import cv2
 import h5py
 import time
+import scipy
 import argparse
 import numpy as np
-import scipy.ndimage as nd
 from scipy import interpolate
 import matplotlib.pyplot as plt
 
@@ -12,11 +22,11 @@ from keras import metrics
 from vgg_16 import vgg_16
 from scipy.misc import imsave
 from keras import backend as K
-from keras.models import Sequential
-from inception_v3 import inception_v3
+from keras.models import Sequential, load_model
 from scipy.optimize import fmin_l_bfgs_b
 from keras.preprocessing.image import load_img, img_to_array
 from keras.layers import Convolution2D, Input, ZeroPadding2D, MaxPooling2D
+from keras.applications import inception_v3
 
 data_root = '/Users/sam/Dropbox'
 data_root = '/home/sam/Dropbox/'
@@ -24,12 +34,28 @@ data_path = data_root+'Code/python/cnn/saved_networks/'
 
 inception_weights = data_path + 'inception_v3_weights_th_dim_ordering_th_kernels.h5'
 vgg_weights = data_path + 'vgg16_weights_th_dim_ordering_th_kernels.h5'
+vgg_weights_tf ='/home/sam/weights/vgg16_weights_tf_dim_ordering_tf_kernels_notop.h5'
+inception_weights_tf = '/home/sam/weights/inception_v3_weights_tf_dim_ordering_tf_kernels.h5'
 
+
+settings = {
+    'features': {
+        'mixed2': 0.2,
+        'mixed3': 0.5,
+        'mixed4': 2.,
+        'mixed5': 1.5,
+    },
+}
 
 def run():
 	args = parse_args()
 
-	model = model_from_args(args)
+	# model = model_from_args(args)
+	# model.save('my_inception.hd5')
+	#model = load_model(args.architecture)
+	
+	model = inception_v3.InceptionV3(weights='imagenet', include_top=False)
+	model.summary()
 
 	if 'write_filters' == args.mode:
 		write_filters(args, model)
@@ -56,8 +82,9 @@ def parse_args():
 
 	parser.add_argument('mode')
 
-	parser.add_argument('--weights', default=vgg_weights)
-	parser.add_argument('--model', default='vgg')
+	parser.add_argument('--architecture', default='my_inception.hd5')
+	parser.add_argument('--weights', default=inception_weights_tf)
+	parser.add_argument('--model', default='inception')
 	parser.add_argument('--labels', default=1000, type=int)
 	parser.add_argument('--width', default=512, type=int)
 	parser.add_argument('--height', default=512, type=int)
@@ -72,6 +99,14 @@ def parse_args():
 	parser.add_argument('--video_writer', default=None)
 	parser.add_argument('--maxfun', default=9, type=int)
 	parser.add_argument('--fps', default=1, type=int)
+	parser.add_argument('--input_shape', default=None)
+	parser.add_argument('--learning_rate', default=0.1, type=float)
+	parser.add_argument('--jitter', default=0.1, type=float)
+	parser.add_argument('--l2', default=0.1, type=float)
+	parser.add_argument('--l1', default=0.1, type=float)
+	parser.add_argument('--activity_weight', default=1.0, type=float)
+	parser.add_argument('--total_variation', default=0.00001, type=float)
+
 
 	args = parser.parse_args()
 	print('Arguments are', args)	
@@ -80,8 +115,13 @@ def parse_args():
 
 
 def model_from_args(args):
-	input_image = Input(shape=(args.channels, args.height, args.width), name='input_image')
-
+	if K.image_data_format()== 'channels_first':
+		args.input_shape = (args.channels, args.height, args.width)
+		input_image = Input(shape=args.input_shape, name='input_image')
+	else:
+		args.input_shape = (args.height, args.width, args.channels)
+		input_image = Input(shape=args.input_shape, name='input_image')		
+	
 	if 'inception' == args.model:
 		model = inception_v3(args.labels, args.weights, input_image)
 	elif 'vgg' == args.model:
@@ -132,102 +172,113 @@ def get_video_writer(args):
 	fourcc = cv2.VideoWriter_fourcc('P','I','M','1')
 	return cv2.VideoWriter(args.video_path, fourcc, args.fps, (args.width, args.height))
 
+def resize_img(img, size):
+	img = np.copy(img)
+	if K.image_data_format() == 'channels_first':
+		factors = (1, 1, float(size[0]) / img.shape[2], float(size[1]) / img.shape[3])
+	else:
+		factors = (1, float(size[0]) / img.shape[1], float(size[1]) / img.shape[2], 1)
+	return scipy.ndimage.zoom(img, factors, order=1)
 
-def sam_deep_dream(args, model, octave_n=4, octave_scale=2, target_layer_name='block5_conv3', clip=True, **step_params):
+
+def sam_deep_dream(args, model, target_layer_name='conv2d_88', clip=True, **step_params):
+	K.set_learning_phase(0)
+
+	# Playing with these hyperparameters will also allow you to achieve new effects
+	step = 0.01  # Gradient ascent step size
+	num_octave = 3  # Number of scales at which to run gradient ascent
+	octave_scale = 1.4  # Size ratio between scales
+	max_loss = 10.
+
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	img_size = (args.channels, args.height, args.width)
-	
-	for it in range(args.iterations):
 
-		iterate = iterate_fxn(model, layer_dict, target_layer_name)
-		if os.path.exists(args.image_path):
-			img = cv2.resize(cv2.imread(args.image_path ), (args.width, args.height))
-			img = np.array(img.transpose((2,0,1)), np.float32)
-			img -= img.mean()
-			img /= (img.std() + 1e-5)
-			out_file = args.save_path + '%s/%s/%s/iter_%d.png' % (os.path.basename(args.weights), os.path.basename(args.image_path), target_layer_name, it)
-		else:
-			input_img_data = np.random.random((1, args.channels, args.width, args.height)) * 20 + 128.
-			img = np.random.random((args.channels, args.width, args.height)) * 20 + 128.
-			out_file = args.save_path + 'excite_softmax_%d.png' % (it)
-
-		print("Base img shape:", img.shape)
-		octaves = [np.float32(img)] #np.rollaxis(img, 2)[::-1])]
-
-		for i in xrange(1, octave_n-1):
-			octave_inv = 1.0/octave_scale
-			print('Adding octave:', i, ' octave inv', octave_inv, "octave img shape:", octaves[-1].shape)
-			octaves.append(nd.zoom(octaves[-1], (1, octave_inv, octave_inv), order=1))
-			# imgplt = np.rollaxis(octaves[-1], 0, 3)
-			# plt.imshow(imgplt)
-			# plt.show()
-		
-		detail = np.zeros_like(octaves[-1]) # allocate image for network-produced details
-		
-		for octave, octave_base in enumerate(octaves[::-1]):
-			h, w = octave_base.shape[-2:]
-			if octave > 0:
-				h1, w1 = detail.shape[-2:]
-				detail = nd.zoom(detail, (1, 1.0*h/h1,1.0*w/w1), order=1)
-
-			# run gradient ascent
-			lr = 0.3
-			last_x = octave_base+detail
-			#print 'cur x shape is', last_x.shape
-			x = last_x.transpose((1, 2, 0))
-			#print 'transposed x shape is', x.shape
-			x = cv2.resize(x, (args.width, args.height))
-			#print 'resized x shape is', x.shape
-			x = x.transpose((2, 0, 1))
-			#print 'cur x shape is', x.shape
-
-			input_img_data = np.expand_dims(x, axis=0)
-			#print 'after trnaspose x shape is', x.shape			
-			for i in range(args.iterations):
-				random_jitter = 0.1 * (np.random.random(input_img_data.shape) - 0.5)
-				input_img_data += random_jitter
-				loss_value, grads_value = iterate([input_img_data, 1])
-				input_img_data -= random_jitter
-				input_img_data += grads_value * lr
-				if i % 4 == 0:
-					print("After iteration:", i, "loss is:", loss_value, "filter index:", it)
-			
-			detail = last_x-octave_base
-		img = input_img_data[0]
-		img = deprocess_image(img)
-		imsave(out_file, img)
-
-
-def excite_neuron(args, model, neuron=10):
-	
-	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	img_size = (args.channels, args.height, args.width)
-	target_layer_name ='predictions'# 'block5_conv3'# 
-
-	iterate = iterate_neuron(model, layer_dict, neuron, target_layer_name)
+	dream_fxn = iterate_dream(args, model)
 
 	if os.path.exists(args.image_path):
-		im = cv2.resize(cv2.imread(args.image_path ), (args.width, args.height))
-		im = np.array(im.transpose((2,0,1)), np.float32)
+		img = preprocess_image(args.image_path)
+	else:
+		img = np.random.random((1,)+args.input_shape) * 20 + 128.
+
+	if K.image_data_format()== 'channels_first':
+		original_shape = img.shape[2:]
+	else:
+		original_shape = img.shape[1:3]
+
+
+	print("Base img shape:", img.shape)
+	successive_shapes = [original_shape]
+	for i in range(1, num_octave):
+		shape = tuple([int(dim / (octave_scale ** i)) for dim in original_shape])
+		successive_shapes.append(shape)
+	successive_shapes = successive_shapes[::-1]
+	original_img = np.copy(img)
+	shrunk_original_img = resize_img(img, successive_shapes[0])
+
+	for shape in successive_shapes:
+		print('Processing image shape', shape)
+		img = resize_img(img, shape)
+		img = gradient_ascent(img, dream_fxn, iterations=args.iterations, step=args.learning_rate, max_loss=max_loss)
+		
+		upscaled_shrunk_original_img = resize_img(shrunk_original_img, shape)
+		same_size_original = resize_img(original_img, shape)
+		lost_detail = same_size_original - upscaled_shrunk_original_img
+
+		img += lost_detail
+		shrunk_original_img = resize_img(original_img, shape)
+
+	pil_img = deprocess_image(np.copy(img))
+	out_file = args.save_path + '%s/%s/deep_dreamed.png' % (plain_name(args.weights), plain_name(args.image_path))
+	scipy.misc.imsave(fname, pil_img)
+
+
+def gradient_ascent(x, k_fxn, iterations, step, max_loss=None):
+	for i in range(iterations):
+		loss_value, grad_values = eval_loss_and_grads(x, k_fxn)
+		if max_loss is not None and loss_value > max_loss:
+			break
+		print('..Loss value at', i, ':', loss_value)
+		x += step * grad_values
+	return x
+
+
+def eval_loss_and_grads(x, k_fxn):
+	outs = k_fxn([x])
+	loss_value = outs[0]
+	grad_values = outs[1]
+	return loss_value, grad_values
+
+
+def excite_neuron(args, model, neuron=[0,0,0]):
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+	target_layer_name = 'conv2d_88' #'block5_conv3'
+
+	iterate = iterate_neuron(args, model, layer_dict, neuron, target_layer_name)
+
+	if os.path.exists(args.image_path):
+		im = cv2.resize(cv2.imread(args.image_path), (args.width, args.height))
+		if K.image_data_format()== 'channels_first':
+			im = np.array(im.transpose((2,0,1)))
+		im = np.array(im, np.float32)
 		im -= im.mean()
 		im /= (im.std() + 1e-5)
 		input_img_data = np.expand_dims(im, axis=0)
 	else:
-		input_img_data = np.random.random((1, args.channels, args.width, args.height)) * 20 + 128.
+		input_img_data = np.random.random((1,)+args.input_shape) * 20 + 128.
 
 	# run gradient ascent
-	lr = 0.01
+	K.set_learning_phase(1) #set learning phase
 	for i in range(args.iterations):
-		random_jitter = 0.1 * (np.random.random(img_size) - 0.5)
+		random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
 		input_img_data += random_jitter
-		loss_value, grads_value = iterate([input_img_data])
+		loss_value, grads_value = iterate([input_img_data, K.learning_phase()])
 		input_img_data -= random_jitter
-		input_img_data += grads_value * lr
+		input_img_data += grads_value * args.learning_rate
 		if i % args.fps == args.fps-1:
 	
 			img = input_img_data[0]
 			img = deprocess_image(img)
-			out_file = args.save_path + '%s/%s/%s/iter_%d_neuron_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name, i, neuron)
+			out_file = args.save_path + '%s/%s/%s/iter_%d_neuron_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name, i, neuron[0])
 			if not os.path.exists(os.path.dirname(out_file)):
 				os.makedirs(os.path.dirname(out_file))
 			imsave(out_file, img)
@@ -239,7 +290,7 @@ def excite_layer(args, model, target_layer_name='block5_conv2'):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	img_size = (args.channels, args.height, args.width)	
 
-	iterate = iterate_fxn(model, layer_dict, target_layer_name)
+	iterate = iterate_channel(args, model, layer_dict, target_layer_name)
 
 	if os.path.exists(args.image_path):
 		im = cv2.resize(cv2.imread(args.image_path ), (args.width, args.height))
@@ -259,7 +310,7 @@ def excite_layer(args, model, target_layer_name='block5_conv2'):
 		input_img_data -= random_jitter
 		input_img_data += grads_value * lr
 		if i % args.fps == args.fps-1:
-			print ("After iteration:", i, "loss is:", loss_value)
+			print("After iteration:", i, "loss is:", loss_value)
 	
 			img = input_img_data[0]
 			img = deprocess_image(img)
@@ -453,45 +504,41 @@ def total_variation_norm(x):
 	return tv
 
 
-def iterate_fxn(model, layer_dict, layer_name='conv5_1'):
+def iterate_channel(args, model, layer_dict, layer_name='conv5_1', channel=0):
 	input_tensor = model.input
+	if K.image_data_format()== 'channels_first':
+		x = layer_dict[layer_name].output[:,channel,:,:]
+	else:
+		x = layer_dict[layer_name].output[:,:,:,channel]
 
-	# this is a placeholder tensor that will contain our generated images
-
-	# build a loss function that maximizes the activation
-	# of the layer given by layer name
-	x = layer_dict[layer_name].output
 	shape = layer_dict[layer_name].output_shape
+	print('X shape', x.shape)
 
 	loss = K.variable(0.)
-	# we avoid border artifacts by only involving non-border pixels in the loss
-	loss_weight_activity = 1.0
-	loss_weight_continuity = 1.0
-	loss_weight_l2 = 1.0
 
 	if K.image_data_format()== 'channels_first':
 		#loss -= loss_weight_activity*K.sum(K.square(x[:, :, 2: shape[2] - 2, 2: shape[3] - 2])) / np.prod(shape[1:])
-		loss += loss_weight_activity*K.sum(K.square(x)) / np.prod(shape[1:])
+		loss += args.activity_weight*K.sum(K.square(x))# / np.prod(x.shape[1:])
 	else:
 		#loss -= loss_weight_activity*K.sum(K.square(x[:, 2: shape[1] - 2, 2: shape[2] - 2, :])) / np.prod(shape[1:])
-		loss += loss_weight_activity*K.sum(K.square(x)) / np.prod(shape[1:])
+		loss += args.activity_weight*K.sum(K.square(x)) #/ np.prod(x.shape[1:])
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	loss += loss_weight_continuity * total_variation_norm(input_tensor) / np.prod(shape[1:])
+	loss += args.total_variation * total_variation_norm(input_tensor) #/ np.prod(x.shape[1:])
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	loss += loss_weight_l2 * (K.sum(K.square(input_tensor)) / np.prod(shape[1:]))
+	loss += args.l2 * K.sum(K.square(input_tensor))# / np.prod(x.shape[1:])
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(loss, input_tensor)[0]
 
 	# normalization trick: we normalize the gradient
-	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
 	iterate = K.function([input_tensor, K.learning_phase()], [loss, grads])
 	return iterate
 
 
-def iterate_neuron(model, layer_dict, neuron, layer_name='conv5_1'):
+def iterate_neuron(args, model, layer_dict, neuron, layer_name='conv5_1'):
 	input_tensor = model.input
 
 	# this is a placeholder tensor that will contain our generated images
@@ -499,26 +546,28 @@ def iterate_neuron(model, layer_dict, neuron, layer_name='conv5_1'):
 	# build a loss function that maximizes the activation
 	# of the nth filter of the layer considered
 	print('X shape', layer_dict[layer_name].output_shape)
+	shape = layer_dict[layer_name].output_shape
+
 	#fc1_in =  layer_dict['fc1'].input
-	x = layer_dict[layer_name].output[:,neuron,:,:]
+	if K.image_data_format()== 'channels_first':
+		x = layer_dict[layer_name].output[:,:,neuron[1], neuron[2]]
+	else:
+		x = layer_dict[layer_name].output[:,neuron[0],neuron[1],:]
 
 	loss = K.variable(0.)
-	loss_weight_activity = 1.0
-	loss_weight_continuity = 1.0
-	loss_weight_l2 = 0.0
 
 	if K.image_data_format()== 'channels_first':
 		# we avoid border artifacts by only involving non-border pixels in the loss
-		#loss -= loss_weight_activity*K.sum(K.square(x[:, :, 2: shape[2] - 2, 2: shape[3] - 2])) / np.prod(shape[1:])
-		loss += loss_weight_activity*K.sum(K.square(x)) 
+		#loss -= args.activity_weight*K.sum(K.square(x[:, :, 2: shape[2] - 2, 2: shape[3] - 2])) / np.prod(shape[1:])
+		loss -= args.activity_weight*K.sum(K.square(x)) 
 	else:
-		#loss -= loss_weight_activity*K.sum(K.square(x[:, 2: shape[1] - 2, 2: shape[2] - 2, :])) / np.prod(shape[1:])
-		loss += loss_weight_activity*K.sum(K.square(x))
+		#loss -= args.activity_weight*K.sum(K.square(x[:, 2: shape[1] - 2, 2: shape[2] - 2, :])) / np.prod(shape[1:])
+		loss -= args.activity_weight*K.sum(K.square(x))
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	#loss += loss_weight_continuity * total_variation_norm(input_tensor)
+	loss += args.total_variation  * total_variation_norm(input_tensor)
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	#loss -= loss_weight_l2 * (K.sum(K.square(input_tensor)))
+	loss +=  K.sum(args.l2  * K.square(x))
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(loss, input_tensor)[0]
 
@@ -528,6 +577,38 @@ def iterate_neuron(model, layer_dict, neuron, layer_name='conv5_1'):
 	# this function returns the loss and grads given the input picture
 	iterate = K.function([input_tensor], [loss, grads])
 	return iterate
+
+
+def iterate_dream(args, model):
+	dream = model.input
+	print('Model loaded.')
+
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+
+	# Define the loss.
+	loss = K.variable(0.)
+	for layer_name in settings['features']:
+		# Add the L2 norm of the features of a layer to the loss.
+		assert layer_name in layer_dict.keys(), 'Layer ' + layer_name + ' not found in model.'
+		coeff = settings['features'][layer_name]
+		x = layer_dict[layer_name].output
+		# We avoid border artifacts by only involving non-border pixels in the loss.
+		scaling = K.prod(K.cast(K.shape(x), 'float32'))
+		if K.image_data_format() == 'channels_first':
+			loss += coeff * K.sum(K.square(x[:, :, 2: -2, 2: -2])) / scaling
+		else:
+			loss += coeff * K.sum(K.square(x[:, 2: -2, 2: -2, :])) / scaling
+
+	# Compute the gradients of the dream wrt the loss.
+	grads = K.gradients(loss, dream)[0]
+	# Normalize gradients.
+	grads /= K.maximum(K.mean(K.abs(grads)), 1e-7)
+
+	# Set up function to retrieve the value
+	# of the loss and gradients given an input image.
+	outputs = [loss, grads]
+	return K.function([dream], outputs)
+
 
 def iterate_softmax(model, neuron):
 	input_tensor = model.input
@@ -618,45 +699,67 @@ def net_grad_towards_input(model, desired_input, layer_dict, layer_name='conv5_1
 	return iterate
 
 
-# util function to convert a tensor into a valid image
-def deprocess_image(x):
-	# normalize tensor: center on 0., ensure std is 0.1
-	x -= x.mean()
-	x /= (x.std() + 1e-5)
-	x *= 0.3
+# # util function to convert a tensor into a valid image
+# def deprocess_image(x):
+# 	# normalize tensor: center on 0., ensure std is 0.1
+# 	x -= x.mean()
+# 	x /= (2*x.std() + 1e-5)
 
-	# clip to [0, 1]
-	x += 0.5
-	x = np.clip(x, 0, 1)
+# 	# clip to [0, 1]
+# 	x += 0.5
+# 	x = np.clip(x, 0, 1)
 
-	# convert to RGB array
-	x *= 255
-	#print 'cur x shape is', x.shape
-	x = x.transpose((1, 2, 0))
-	#print 'after trnaspose x shape is', x.shape
-	x = x[:,:,::-1]
-	#print 'after bgr x shape is', x.shape
+# 	# convert to RGB array
+# 	x *= 255
+# 	#print 'cur x shape is', x.shape
+# 	if K.image_data_format()== 'channels_first':
+# 		x = x.transpose((1, 2, 0))
+# 	#print 'after trnaspose x shape is', x.shape
+# 	x = x[:,:,::-1]
+# 	#print 'after bgr x shape is', x.shape
 
-	#x = np.clip(x, 0, 255).astype('uint8')
-	x = x.astype('uint8')
-	return x
-
-
+# 	#x = np.clip(x, 0, 255).astype('uint8')
+# 	x = x.astype('uint8')
+# 	return x
 
 
-def preprocess_image(args, image_path):
-	img = load_img(image_path, target_size=(args.height, args.width))
-	img = img_to_array(img)
 
-	#print 'cur x shape is', img.shape
-#	img = img.transpose((1, 2, 0))
-	#print 'after transpose x shape is', img.shape
-	#img = img[:,:,::-1]
-	#print 'after bgr rotate x shape is', img.shape
+
+# def preprocess_image(args, image_path):
+# 	img = load_img(image_path, target_size=(args.height, args.width))
+# 	img = img_to_array(img)
+
+# 	#print 'cur x shape is', img.shape
+# #	img = img.transpose((1, 2, 0))
+# 	#print 'after transpose x shape is', img.shape
+# 	#img = img[:,:,::-1]
+# 	#print 'after bgr rotate x shape is', img.shape
   
-#	img = np.expand_dims(img, axis=0)
-	img = normalize_pixels(img)
-	return img
+# #	img = np.expand_dims(img, axis=0)
+# 	img = normalize_pixels(img)
+# 	return img
+def preprocess_image(image_path):
+    # Util function to open, resize and format pictures
+    # into appropriate tensors.
+    img = load_img(image_path)
+    img = img_to_array(img)
+    img = np.expand_dims(img, axis=0)
+    img = inception_v3.preprocess_input(img)
+    return img
+
+
+def deprocess_image(x):
+    # Util function to convert a tensor into a valid image.
+    if K.image_data_format() == 'channels_first':
+        x = x.reshape((3, x.shape[2], x.shape[3]))
+        x = x.transpose((1, 2, 0))
+    else:
+        x = x.reshape((x.shape[1], x.shape[2], 3))
+    x /= 2.
+    x += 0.5
+    x *= 255.
+    x = np.clip(x, 0, 255).astype('uint8')
+    return x
 
 
 def normalize_pixels(x):

@@ -9,7 +9,7 @@
  */
 
 PImage img;
-int w = 80;
+int w = 310;
 
 // It's possible to convolve the image with 
 // many different matrices
@@ -43,6 +43,13 @@ float[][] toeplitz = {{0, 1, 0, 0, 0 },
                      { 0, 0, -1, 0, 1 },
                      { 0, 0, 0, -1, 0 }};                      
 
+
+float[][] hankel =  {{ 0,  0,  0,  1,  0 },
+                     { 0,  0,  1,  0, -1 },
+                     { 0,  1,  0, -1,  0 },
+                     { 1,  0, -1,  0,  0 },
+                     { 0, -1,  0,  0,  0 }};    
+
 float[][] block_avg = {{ 0.04, 0.04, 0.04, 0.04, 0.04 },
                      { 0.04, 0.04, 0.04, 0.04, 0.04 },
                      { 0.04, 0.04, 0.04, 0.04, 0.04 },
@@ -52,15 +59,17 @@ float[][] block_avg = {{ 0.04, 0.04, 0.04, 0.04, 0.04 },
 float[][] matrix;
 
 void setup() {
-  size(200, 200);
+  size(1600, 800);
+  textSize(38);
   frameRate(30);
-  img = loadImage("sunflower.jpg");
-  matrix = block_avg;
+  img = loadImage("basenji.jpg");
+  matrix = sobel_y;
 }
 
 void draw() {
   // We're only going to process a portion of the image
   // so let's set the whole image as the background first
+  background(80);
   image(img,0,0);
   // Where is the small rectangle we will process
   int xstart = constrain(mouseX-w/2,0,img.width);
@@ -73,12 +82,12 @@ void draw() {
   for (int x = xstart; x < xend; x++) {
     for (int y = ystart; y < yend; y++ ) {
       color c = convolution(x,y,matrix,matrixsize,img);
-      int loc = x + y*img.width;
+      int loc = x + y* width;
       pixels[loc] = c;
     }
   }
   updatePixels();
-  
+  show_kernel(img.width+40, 50, matrix, matrixsize);
   if (keyPressed) {
     if (key == '1' ) {
       matrix = block_avg;
@@ -91,7 +100,7 @@ void draw() {
     } else if (key == '5' ){
         matrix = toeplitz;
     } else if (key == '6' ){
-        matrix = toeplitz;
+        matrix = hankel;
     } else if (key == '7' ){
         matrix = gauss;
     }
@@ -100,6 +109,8 @@ void draw() {
       img = loadImage("sunflower.jpg");
     } else if (key == 'd'){
       img = loadImage("end.jpg");
+    } else if (key == 'b'){
+      img = loadImage("basenji.jpg");
     }
   }
 }
@@ -130,4 +141,17 @@ color convolution(int x, int y, float[][] matrix,int matrixsize, PImage img)
   btotal = constrain(btotal,0,255);
   // Return the resulting color
   return color(rtotal,gtotal,btotal);
+}
+
+void show_kernel(float x, float y, float[][] matrix,int matrixsize){
+  float textx = 170;
+  float texty = 100;
+  for (int i = 0; i < matrixsize; i++){
+    for (int j= 0; j < matrixsize; j++){
+      // What pixel are we testing
+      float xloc = x+i*textx;
+      float yloc = y+j*texty;
+      text(matrix[i][j], xloc, yloc);
+    }
+  }
 }
