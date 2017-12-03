@@ -46,7 +46,9 @@ def run():
 	elif 'excite_neuron' == args.mode:
 		excite_neuron(args, model)
 	elif 'excite_layer' == args.mode:
-		excite_layer(args, model)		
+		excite_layer(args, model)
+	elif 'excite_softmax' == args.mode:
+		excite_softmax(args, model)			
 	elif 'deep_dream' == args.mode:
 		deep_dream(args, model)		
 	elif 'recover' == args.mode:
@@ -71,8 +73,8 @@ def parse_args():
 	parser.add_argument('--weights', default=inception_weights_tf)
 	parser.add_argument('--model', default='inception')
 	parser.add_argument('--labels', default=1000, type=int)
-	parser.add_argument('--width', default=512, type=int)
-	parser.add_argument('--height', default=512, type=int)
+	parser.add_argument('--width', default=299, type=int)
+	parser.add_argument('--height', default=299, type=int)
 	parser.add_argument('--channels', default=3, type=int)
 	parser.add_argument('--batch_size', default=32, type=int)
 	parser.add_argument('--iterations', default=30, type=int)
@@ -91,6 +93,9 @@ def parse_args():
 	parser.add_argument('--l1', default=0.0, type=float)
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=0.00001, type=float)
+	parser.add_argument('--continuity_loss', default=0.00001, type=float)
+	parser.add_argument('--neuron', default=58, type=int)
+
 
 	args = parser.parse_args()
 	print('Arguments are', args)	
@@ -109,7 +114,7 @@ def model_from_args(args):
 		input_image = Input(shape=args.input_shape, name='input_image')		
 	
 	if 'inception' == args.model:
-		model = inception_v3.InceptionV3(weights='imagenet', input_shape=args.input_shape, include_top=False)
+		model = inception_v3.InceptionV3(weights='imagenet', input_shape=args.input_shape, include_top=True)
 	elif 'vgg' == args.model:
 		model = vgg_16(args.labels, args.weights, input_image)
 	else:
@@ -222,25 +227,21 @@ def excite_neuron(args, model):
 			print("After iteration:", i, "loss is:", loss_value, '\n\nImage saved at:', out_file)
 
 
-def excite_layer(args, model, target_layer_name='block5_conv2'):
-	
+def excite_layer(args, model, target_layer_name='conv2d_42'):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	img_size = (args.channels, args.height, args.width)	
-
-	iterate = iterate_channel(args, model, layer_dict, target_layer_name)
+	iterate = iterate_layer(args, model, layer_dict, target_layer_name)
 
 	if os.path.exists(args.image_path):
-		im = cv2.resize(cv2.imread(args.image_path ), (args.width, args.height))
-		im = np.array(im.transpose((2,0,1)), np.float32)
-		im -= im.mean()
-		im /= (im.std() + 1e-5)
-		input_img_data = np.expand_dims(im, axis=0)
+		input_img_data = cv2_image_load(args, args.image_path)
 	else:
-		input_img_data = np.random.random((1, args.channels, args.width, args.height))
+		if K.image_data_format()== 'channels_first':
+			input_img_data = np.random.random((1, 3, args.width, args.height))
+		else:
+			input_img_data = np.random.random((1, args.width, args.height, 3)) 
 
 	# run gradient ascent
 	for i in range(args.iterations):
-		random_jitter = 0.1 * (np.random.random(img_size) - 0.5)
+		random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
 		input_img_data += random_jitter
 		loss_value, grads_value = iterate([input_img_data, 1])
 		input_img_data -= random_jitter
@@ -248,9 +249,37 @@ def excite_layer(args, model, target_layer_name='block5_conv2'):
 
 		if i % args.fps == args.fps-1:
 			print("After iteration:", i, "loss is:", loss_value)
-			img = input_img_data[0]
-			img = deprocess_image(img)
-			out_file = args.save_path + '%s/%s/%s/iter_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name, i)
+			img = deprocess_image(input_img_data.copy())
+			out_file = args.save_path + '%s/%s/excite_layer_%s/iter_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name, i)
+			if not os.path.exists(os.path.dirname(out_file)):
+				os.makedirs(os.path.dirname(out_file))
+			imsave(out_file, img)
+
+
+def excite_softmax(args, model, target_layer_name='predictions'):
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+	iterate = iterate_softmax(args, model, layer_dict, target_layer_name, args.neuron)
+
+	if os.path.exists(args.image_path):
+		input_img_data = cv2_image_load(args, args.image_path)
+	else:
+		if K.image_data_format()== 'channels_first':
+			input_img_data = np.random.random((1, 3, args.width, args.height))
+		else:
+			input_img_data = np.random.random((1, args.width, args.height, 3)) 
+
+	# run gradient ascent
+	for i in range(args.iterations):
+		random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
+		input_img_data += random_jitter
+		loss_value, grads_value = iterate([input_img_data, 1])
+		input_img_data -= random_jitter
+		input_img_data += grads_value * args.learning_rate
+
+		if i % args.fps == args.fps-1:
+			print("After iteration:", i, "loss is:", loss_value)
+			img = deprocess_image(input_img_data.copy())
+			out_file = args.save_path + '%s/%s/excite_softmax_%s/neuron_%d/iter_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name, args.neuron, i)
 			if not os.path.exists(os.path.dirname(out_file)):
 				os.makedirs(os.path.dirname(out_file))
 			imsave(out_file, img)
@@ -495,29 +524,63 @@ def iterate_neuron(args, model, layer_dict, neuron, layer_name='conv5_1'):
 	return iterate
 
 
-def iterate_softmax(model, neuron):
+def iterate_layer(args, model, layer_dict, layer_name):
 	input_tensor = model.input
 
 	# this is a placeholder tensor that will contain our generated images
 
 	# build a loss function that maximizes the activation
 	# of the nth filter of the layer considered
-	print('X shape', model.output[:, neuron])
-	x = model.output
 
-	loss_weight_continuity = 0.0
-	loss_weight_activity = 1.0
+	x = layer_dict[layer_name].output
+	w = x.shape[1]
+	h = x.shape[2]
+	shape = layer_dict[layer_name].output_shape
 
-	loss = K.mean(x)
-	#loss += loss_weight_continuity * total_variation_norm(input_tensor)
+	objective = K.variable(0.)
+
+	objective += args.activity_weight* K.sum(K.square(x[:, 2: w-2, 2:h-2])) / np.prod(shape[1:])
+
+	# add continuity loss (gives image local coherence, can result in an artful blur)
+	objective -= args.total_variation * total_variation_norm(input_tensor)
+	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
+	objective -= args.l2 * K.sum(K.square(input_tensor))
 
 	# compute the gradient of the input picture wrt this loss
-	grads = K.gradients(loss, input_tensor)[0]
+	grads = K.gradients(objective, input_tensor)[0]
+
 	# normalization trick: we normalize the gradient
-	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
-	return K.function([input_tensor], [loss, grads])
+	iterate = K.function([input_tensor], [objective, grads])
+	return iterate
+
+
+def iterate_softmax(args, model, layer_dict, layer_name, neuron):
+	input_tensor = model.input
+
+	x = layer_dict[layer_name].output[:, neuron]
+
+	objective = K.variable(0.)
+
+	objective += args.activity_weight*K.sum(K.square(x)) 
+
+	# add continuity loss (gives image local coherence, can result in an artful blur)
+	objective -= args.total_variation * total_variation_norm(input_tensor)
+	objective -= args.continuity_loss * continuity_loss(input_tensor)
+	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
+	objective -= args.l2 * K.sum(K.square(input_tensor))
+
+	# compute the gradient of the input picture wrt this loss
+	grads = K.gradients(objective, input_tensor)[0]
+
+	# normalization trick: we normalize the gradient
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
+
+	# this function returns the loss and grads given the input picture
+	iterate = K.function([input_tensor], [objective, grads])
+	return iterate
 
 
 def grad_towards_input(model, desired_input, layer_dict, layer_name='conv5_1'):
@@ -626,18 +689,18 @@ def dream_fxn(model):
 ##############################
 
 # continuity loss util function
-def continuity_loss(args, x):
+def continuity_loss(x):
 	assert K.ndim(x) == 4
 	if K.image_data_format()== 'channels_first':
-		a = K.square(x[:, :, :args.width - 1, :args.height - 1] -
-					 x[:, :, 1:, :args.height - 1])
-		b = K.square(x[:, :, :args.width - 1, :args.height - 1] -
-					 x[:, :, :args.width - 1, 1:])
+		a = K.square(x[:, :, :-2, :-2] -
+					 x[:, :, 2:, :-2])
+		b = K.square(x[:, :, :-2, :-2] -
+					 x[:, :, :-2, 2:])
 	else:
-		a = K.square(x[:, :args.width - 1, :args.height-1, :] -
-					 x[:, 1:, :args.height - 1, :])
-		b = K.square(x[:, :args.width - 1, :args.height-1, :] -
-					 x[:, :args.width - 1, 1:, :])
+		a = K.square(x[:, :-2, :-2, :] -
+					 x[:, 2: , :-2, :])
+		b = K.square(x[:, :-2, :-2, :] -
+					 x[:, :-2, 2: , :])
 	return K.sum(K.pow(a + b, 1.25))
 
 
@@ -648,8 +711,14 @@ def alpha_norm(x, alpha=6, lambdaa=0.05):
 
 def total_variation_norm(x):
 	x -= K.mean(x)
-	a = K.square(x[:, :, 1:, :-1] - x[:, :, :-1, :-1])
-	b = K.square(x[:, :, :-1, 1:] - x[:, :, :-1, :-1])
+
+	if K.image_data_format()== 'channels_first':
+		a = K.square(x[:, :, 1:, :-1] - x[:, :, :-1, :-1])
+		b = K.square(x[:, :, :-1, 1:] - x[:, :, :-1, :-1])
+	else:
+		a = K.square(x[:, 1:, :-1, :] - x[:, :-1, :-1, :])
+		b = K.square(x[:, :-1, 1:, :] - x[:, :-1, :-1, :])
+
 	tv = K.sum(K.pow(a + b, 1.25))
 
 	return tv
