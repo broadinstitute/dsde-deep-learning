@@ -9,7 +9,8 @@
  */
 
 PImage img;
-int w = 310;
+int w = 260;
+int margin = 10;
 
 // It's possible to convolve the image with 
 // many different matrices
@@ -59,18 +60,18 @@ float[][] block_avg = {{ 0.04, 0.04, 0.04, 0.04, 0.04 },
 float[][] matrix;
 
 void setup() {
-  size(1600, 800);
-  textSize(38);
+  size(2200, 900);
+  textSize(30);
   frameRate(30);
   img = loadImage("basenji.jpg");
-  matrix = sobel_y;
+  matrix = block_avg;
 }
 
 void draw() {
   // We're only going to process a portion of the image
   // so let's set the whole image as the background first
   background(80);
-  image(img,0,0);
+  image(img,margin,margin);
   // Where is the small rectangle we will process
   int xstart = constrain(mouseX-w/2,0,img.width);
   int ystart = constrain(mouseY-w/2,0,img.height);
@@ -87,7 +88,7 @@ void draw() {
     }
   }
   updatePixels();
-  show_kernel(img.width+40, 50, matrix, matrixsize);
+  show_kernel(img.width+50, 50, matrix, matrixsize);
   if (keyPressed) {
     if (key == '1' ) {
       matrix = block_avg;
@@ -111,6 +112,10 @@ void draw() {
       img = loadImage("end.jpg");
     } else if (key == 'b'){
       img = loadImage("basenji.jpg");
+    } else if (key == 'p'){
+      img = loadImage("palantir.png");
+    } else if (key == 'c'){
+      img = loadImage("sunflowerfield.jpg");
     }
   }
 }
@@ -144,14 +149,14 @@ color convolution(int x, int y, float[][] matrix,int matrixsize, PImage img)
 }
 
 void show_kernel(float x, float y, float[][] matrix,int matrixsize){
-  float textx = 170;
-  float texty = 100;
+  float textx = 160;
+  float texty = 90;
   for (int i = 0; i < matrixsize; i++){
     for (int j= 0; j < matrixsize; j++){
       // What pixel are we testing
       float xloc = x+i*textx;
       float yloc = y+j*texty;
-      text(matrix[i][j], xloc, yloc);
+      if(matrix[i][j] != 0.0) text(nf(matrix[i][j],0,0), xloc, yloc);
     }
   }
 }
