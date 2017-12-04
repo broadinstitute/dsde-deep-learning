@@ -316,60 +316,46 @@ def recover_image(args, model):
 
 
 
-def image_journey(args, model,):
+def image_journey(args, model):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	img_size = (args.channels, args.height, args.width)
-	target_layer_name = 'block4_conv3'#'conv2d_27'
+	target_layer_name = ['conv2d_27', 'conv2d_42', 'conv2d_88']
 	
 	im = cv2_image_load(args, args.image_path)
 	im2 = cv2_image_load(args, args.image_path_2)
-	input_img_data = np.expand_dims(im2, axis=0)
+	input_img_data = im2
 
-	iterate_in = grad_towards_input(model, im, layer_dict, target_layer_name)
-	iterate_in2 = grad_towards_input(model, im2, layer_dict, target_layer_name)
-	iterate_dream = iterate_fxn(model, layer_dict, target_layer_name)
-	iterate_dream2 = iterate_fxn(model, layer_dict, 'block5_conv2')
-	iterate_dream3 = iterate_fxn(model, layer_dict, 'block5_conv3')
+	iterate_in = grad_towards_input(args, model, im, layer_dict, target_layer_name[0])
+	iterate_in2 = grad_towards_input(args, model, im2, layer_dict, target_layer_name[0])
+	iterate_dream = iterate_layer(args, model, layer_dict, target_layer_name[0])
+	iterate_dream2 = iterate_layer(args, model, layer_dict, target_layer_name[1])
+	iterate_dream3 = iterate_layer(args, model, layer_dict, target_layer_name[2])
 
 	# run gradient ascent
 	outer_loops = 12
+	objective_switch = 20 
 	counter = 0
 	for loop in range(outer_loops):
-		jitter_size = 0.01
-		lr = 0.15
 		for i in range(args.iterations):
-			random_jitter = jitter_size * (np.random.random(img_size) - 0.5)
+			random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
 			input_img_data += random_jitter
 			
-			if loop % 5 == 0:
-				lr = 0.01
-				jitter_size = 0.01
-				loss_value, grads_value = iterate_dream2([input_img_data, 1])
-			elif loop % 5 == 1:
-				lr = 0.02
-				jitter_size = 0.01
-
-				loss_value, grads_value = iterate_dream3([input_img_data, 1])
-			elif loop % 5 == 2:
-				lr = 1.7
-				jitter_size = 0.0001
-				loss_value, grads_value = iterate_in([input_img_data, 1])
-			elif loop % 5 == 3:
-				lr = 0.05
-				jitter_size = 0.01
-				loss_value, grads_value = iterate_dream([input_img_data, 1])
+			if loop % objective_switch == 0:
+				loss_value, grads_value = iterate_dream2([im, 1])
+			elif loop % objective_switch == 1:
+				loss_value, grads_value = iterate_in([input_img_data])
+			elif loop % objective_switch == 2:
+				loss_value, grads_value = iterate_in2([input_img_data])
+			elif loop % objective_switch == 3:
+				loss_value, grads_value = iterate_dream([im2])
 			else:
-				lr = 1.8
-				jitter_size = 0.0001				
-				loss_value, grads_value = iterate_in2([input_img_data, 1])
+				loss_value, grads_value = iterate_dream3([im])
 
 			input_img_data -= random_jitter
-			input_img_data += grads_value * lr
+			input_img_data += args.learning_rate * grads_value
 
 			if i % args.fps == args.fps-1:
-				img = input_img_data[0]
-				img = deprocess_image(img)
-				out_file = args.save_path + '%s/%s/%s/recover/loop%d_counter_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name, loop, counter)
+				img = deprocess_image(input_img_data.copy())
+				out_file = args.save_path + '%s/%s/%s/recover/loop%d_counter_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name[0], loop, counter)
 				if not os.path.exists(os.path.dirname(out_file)):
 					os.makedirs(os.path.dirname(out_file))
 				imsave(out_file, img)
@@ -583,7 +569,7 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 	return iterate
 
 
-def grad_towards_input(model, desired_input, layer_dict, layer_name='conv5_1'):
+def grad_towards_input(args, model, desired_input, layer_dict, layer_name='conv5_1'):
 	input_tensor = model.input
 
 	# this is a placeholder tensor that will contain our generated images
@@ -593,26 +579,22 @@ def grad_towards_input(model, desired_input, layer_dict, layer_name='conv5_1'):
 	x = layer_dict[layer_name].output
 	shape = layer_dict[layer_name].output_shape
 
-	loss = K.variable(0.)
-	# we avoid border artifacts by only involving non-border pixels in the loss
-	loss_weight_activity = 1.0
-	loss_weight_continuity = 0.0
-	loss_weight_l2 = 0.0
+	objective = K.variable(0.)
 
-	loss -= loss_weight_activity*K.sum(K.square(desired_input-input_tensor)) / np.prod(shape[1:])
+	objective -= args.activity_weight*K.sum(K.square(desired_input-input_tensor)) / np.prod(shape[1:])
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	loss += loss_weight_continuity * total_variation_norm(input_tensor) / np.prod(shape[1:])
+	objective -= args.total_variation * total_variation_norm(input_tensor) / np.prod(shape[1:])
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	loss += loss_weight_l2 * (K.sum(K.square(input_tensor)) / np.prod(shape[1:]))
+	objective -= args.l2 * (K.sum(K.square(input_tensor)) / np.prod(shape[1:]))
 	# compute the gradient of the input picture wrt this loss
-	grads = K.gradients(loss, input_tensor)[0]
+	grads = K.gradients(objective, input_tensor)[0]
 
 	# normalization trick: we normalize the gradient
 	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
 
 	# this function returns the loss and grads given the input picture
-	iterate = K.function([input_tensor, K.learning_phase()], [loss, grads])
+	iterate = K.function([input_tensor], [objective, grads])
 	return iterate
 
 
