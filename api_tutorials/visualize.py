@@ -172,7 +172,7 @@ def write_filters(args, model):
 					input_img_data = np.random.random((1, 3, args.width, args.height))
 				else:
 					input_img_data = np.random.random((1, args.width, args.height, 3)) 
-				out_file = args.save_path + '%s/random_%s_filter_%d.png' % (plain_name(args.weights), layer.name, filter_index)
+				out_file = args.save_path + '%s/random/write_filters/%s_filter_%d.png' % (plain_name(args.weights), layer.name, filter_index)
 
 			# run gradient ascent
 			for i in range(args.iterations):
