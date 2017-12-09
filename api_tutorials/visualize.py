@@ -132,7 +132,7 @@ def draw_loop(args, model):
 		canvas = np.zeros((1090, 1090, 3), np.uint8)
 		canvas[:cur_img.shape[0],:cur_img.shape[1],:] = cur_img
 		cv2.imshow('Canvas', canvas)
-
+  
 		char = cv2.waitKey(1) & 0xFF
 		if char > 31 and char < 127: # Ascii text
 			pass 
@@ -149,10 +149,10 @@ def draw_loop(args, model):
 
 
 ################################################
-###### High-Level Image Making Functions #######
+###### High-Level Image-Making Functions #######
 ################################################
 
-def write_filters(args, model):
+def write_filters(args, model): 
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 
 	for filter_index in range(2, 25, 4):
@@ -379,20 +379,18 @@ def deep_dream(args, model):
 	and compare the result to the (resized) original image.
 	"""
 
-	# Playing with these hyperparameters will also allow you to achieve new effects
-	step = 0.01  # Gradient ascent step size
 	num_octave = 3  # Number of scales at which to run gradient ascent
 	octave_scale = 1.2  # Size ratio between scales
-	iterations = 10  # Number of ascent steps per scale
 	max_loss = 15.
-
-	K.set_learning_phase(0)
+	target_layers = {'mixed2': 0.2, 'mixed3': 0.3, 'mixed4': 0.2, 'mixed5': 0.4}
+	
 	model = inception_v3.InceptionV3(weights='imagenet', include_top=False)
 	model.summary()
+	img = preprocess_image(args.image_path)
+	k_fxn = dream_fxn(model, target_layers)
 
-	k_fxn = dream_fxn(model)
+	#img = cv2_image_load(args, args.image_path)
 
-	img = preprocess_image(base_image_path)
 	if K.image_data_format() == 'channels_first':
 		original_shape = img.shape[2:]
 	else:
@@ -409,8 +407,8 @@ def deep_dream(args, model):
 		print('Processing image shape', shape)
 		img = resize_img(img, shape)
 		img = gradient_ascent(img, k_fxn,
-							  iterations=iterations,
-							  step=step,
+							  iterations=args.iterations,
+							  step=args.learning_rate,
 							  max_loss=max_loss)
 		upscaled_shrunk_original_img = resize_img(shrunk_original_img, shape)
 		same_size_original = resize_img(original_img, shape)
@@ -419,7 +417,11 @@ def deep_dream(args, model):
 		img += lost_detail
 		shrunk_original_img = resize_img(original_img, shape)
 
-	save_img(img, fname=result_prefix + '.png')
+	out_file = args.save_path + '%s/%s/deep_dream/dreamy.png' % (plain_name(args.weights), plain_name(args.image_path))
+	if not os.path.exists(os.path.dirname(out_file)):
+		os.makedirs(os.path.dirname(out_file))
+	im = deprocess_image(img, convert_bgr2rgb=False)
+	imsave(out_file, im)
 
 
 
@@ -629,7 +631,7 @@ def net_grad_towards_input(model, desired_input, layer_dict, layer_name='conv5_1
 	return iterate
 
 
-def dream_fxn(model):
+def dream_fxn(model, target_layer_dict):
 	K.set_learning_phase(0)
 
 	# Build the InceptionV3 network with our placeholder.
@@ -643,10 +645,10 @@ def dream_fxn(model):
 
 	# Define the loss.
 	loss = K.variable(0.)
-	for layer_name in settings['features']:
+	for layer_name in target_layer_dict:
 		# Add the L2 norm of the features of a layer to the loss.
 		assert layer_name in layer_dict.keys(), 'Layer ' + layer_name + ' not found in model.'
-		coeff = settings['features'][layer_name]
+		coeff = target_layer_dict[layer_name]
 		x = layer_dict[layer_name].output
 		# We avoid border artifacts by only involving non-border pixels in the loss.
 		scaling = K.prod(K.cast(K.shape(x), 'float32'))
@@ -720,7 +722,7 @@ def preprocess_image(image_path):
 	return img
 
 
-def deprocess_image(x):
+def deprocess_image(x, convert_bgr2rgb=True):
 	# Util function to convert a tensor into a valid image.
 	if K.image_data_format() == 'channels_first':
 		x = x.reshape((3, x.shape[2], x.shape[3]))
@@ -731,7 +733,8 @@ def deprocess_image(x):
 	x += 0.5
 	x *= 255.
 	x = np.clip(x, 0, 255).astype('uint8')
-	x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
+	if convert_bgr2rgb:
+		x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
 	return x
 
 
