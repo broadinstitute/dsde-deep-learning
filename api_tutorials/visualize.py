@@ -106,7 +106,7 @@ def model_from_args(args):
 	'''Return a model as specified by the command line/ default arguments'''
 	K.set_learning_phase(0)
 
-	if K.image_data_format()== 'channels_first':
+	if K.image_data_format() == 'channels_first':
 		args.input_shape = (args.channels, args.height, args.width)
 		input_image = Input(shape=args.input_shape, name='input_image')
 	else:
