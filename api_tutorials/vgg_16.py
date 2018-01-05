@@ -46,6 +46,7 @@ def vgg_16(num_labels=0, weights_path=None, input_tensor=None):
 		A Keras model instance.
 	'''
 	# Determine proper input shape
+	print('K.image_data_format:', K.image_data_format())
 	if  K.image_data_format() == 'channels_first':
 		if num_labels > 0:
 			input_shape = (3, 224, 224)
@@ -108,9 +109,7 @@ def vgg_16(num_labels=0, weights_path=None, input_tensor=None):
 
 	# load weights
 	if weights_path:
-		print('K.image_data_format:', K.image_data_format())
 		model.load_weights(weights_path, by_name=True)
-		convert_all_kernels_in_model(model)
 
 	model.summary()
 
