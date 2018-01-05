@@ -68,15 +68,17 @@ def parse_args():
 	parser.add_argument('--dropout', default=0.2, type=float)
 	parser.add_argument('--in_shape', default=(28,28,1))
 	parser.add_argument('--pretrain', default=0, type=int)
-	parser.add_argument('-gl',  '--generator_loops', default=4, type=int)
-	parser.add_argument('-glr', '--generator_learning_rate', default=1e-4, type=float)	
-	parser.add_argument('-dl',  '--discriminator_loops', default=6, type=int)
-	parser.add_argument('-dlr', '--discriminator_learning_rate', default=1e-4, type=float)
 	parser.add_argument('--l2', default=0.0, type=float)
 	parser.add_argument('--l1', default=0.0, type=float)
 	parser.add_argument('--activity_weight', default=1.0, type=float)
-	parser.add_argument('--total_variation', default=0.00001, type=float)
-	parser.add_argument('--continuity_loss', default=0.00001, type=float)
+	parser.add_argument('--total_variation', default=1e-5, type=float)
+	parser.add_argument('--continuity_loss', default=0, type=float)
+
+	parser.add_argument('-bn',  '--batch_normalize', default=False, action='store_true')
+	parser.add_argument('-gl',  '--generator_loops', default=5, type=int)
+	parser.add_argument('-glr', '--generator_learning_rate', default=1e-4, type=float)	
+	parser.add_argument('-dl',  '--discriminator_loops', default=6, type=int)
+	parser.add_argument('-dlr', '--discriminator_learning_rate', default=1e-4, type=float)
 
 	args = parser.parse_args()
 	print('Arguments are', args)	
@@ -84,7 +86,7 @@ def parse_args():
 
 
 def gan_on_imagenet(args):
-	args.in_shape = (128,128,3)
+	args.in_shape = (256,256,3)
 	generator = build_imagenet_generative_model(args)
 	discriminator = build_imagenet_discriminative(args)
 	gan = build_stacked_gan_imagenet(args, generator, discriminator)	
@@ -160,11 +162,11 @@ def load_cifar():
 	return (x_train, y_train), (x_test, y_test)
 
 
-def load_imagenet(num_labels=24):
+def load_imagenet(num_labels=24,shape=(128,128)):
 
 	imagenet_path = '/home/sam/big_data/imagenet/ILSVRC2014_DET_train/'
 	train_paths = [ imagenet_path + tp for tp in sorted(os.listdir(imagenet_path)) if os.path.isdir(imagenet_path + tp)  ]
-	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=(128,128))
+	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=shape)
 
 	x_train = x_train.astype('float32')
 	x_test = x_test.astype('float32')
@@ -247,6 +249,8 @@ def image_as_matrix(image_path, expand_dims=False, shape=(224,224)):
 	img = cv2.resize(cv2.imread(image_path), shape).astype(np.float32)
 	img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 	img /= 255.0
+	#img -= 0.5
+
 	if K.image_data_format() == 'channels_first':
 		img = img.transpose((2,0,1))
 	return img
@@ -270,9 +274,6 @@ def categorical_crossentropy(y_true, y_pred):
 def negative_categorical_crossentropy(y_true, y_pred):
     return -1*K.categorical_crossentropy(y_pred, y_true)
 
-def generator_loss(y_true, y_pred):
-	return K.mean(K.binary_crossentropy(y_pred, y_true), axis=-1)	
-
 def generator_loss(args, pre_logit):
 	"""Get a custom loss function for a generative model
 
@@ -290,7 +291,9 @@ def generator_loss(args, pre_logit):
 		loss = -K.sum(loss, -1)
 
 		loss -= args.total_variation * total_variation_norm(pre_logit)
-		loss -= args.l2 * K.sum(K.square(pre_logit))
+		loss -= args.continuity_loss * continuity_loss(pre_logit)
+
+		loss -= args.l2 * K.sum(K.square(pre_logit)) / np.prod(args.in_shape)
 
 		return loss
 
@@ -338,36 +341,34 @@ def total_variation_norm(x):
 
 def build_imagenet_generative_model(args):
 	# Build Generative model ...
-	nch = 40
-	dense_channels = 40
-	inner_dim = 8
+	nch = 50
+	dense_channels = 24
+	inner_dim = 16
 	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(dense_channels*inner_dim*inner_dim, kernel_initializer='glorot_normal')(g_input)
-	#H = BatchNormalization(scale=False, axis=channel_axis)(H)
 	H = Activation('relu')(H)
 	H = Reshape( [inner_dim, inner_dim, dense_channels] )(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Conv2D(nch*6, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = BatchNormalization(scale=False, axis=channel_axis)(H)
-	H = Activation('relu')(H)
-	H = UpSampling2D(size=(2, 2))(H)
-	H = Conv2D(nch*5, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = BatchNormalization(scale=False, axis=channel_axis)(H)
-	H = Activation('relu')(H)	
-	H = UpSampling2D(size=(2, 2))(H)	
 	H = Conv2D(nch*4, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = BatchNormalization(scale=False, axis=channel_axis)(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Conv2D(nch*3, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = BatchNormalization(scale=False, axis=channel_axis)(H)
+	H = Conv2D(nch*4, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
+	H = Activation('relu')(H)
+	H = UpSampling2D(size=(2, 2))(H)
+	H = Conv2D(nch*4, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
+	H = Activation('relu')(H)
+	H = UpSampling2D(size=(2, 2))(H)
+	H = Conv2D(nch*4, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)	
 	pre_logit = Conv2D(3, (1, 1), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = ActivityRegularization(l1=0, l2=1e-8)(H)
+
 	generation = Activation('sigmoid')(pre_logit)
 	generator = Model(g_input, generation)
-	#opt = Adam(lr=1e-4)		
 	opt = RMSprop(lr=args.generator_learning_rate)		
 	
 
@@ -377,25 +378,31 @@ def build_imagenet_generative_model(args):
 	return generator
 
 
+def batch_normalize_or_not(args, x, channel_axis):
+	if args.batch_normalize:
+		return BatchNormalization(scale=False, axis=channel_axis)(x)
+	return x
+
+
 def build_imagenet_discriminative(args):
 	# Build Discriminative model ...
 	d_input = Input(shape=args.in_shape)
-	H = Conv2D(316, (5, 5), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
+	H = Conv2D(216, (5, 5), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
+	H = Dropout(args.dropout)(H)
 	H = LeakyReLU(0.2)(H)
 	H = Conv2D(256,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform', activation='relu')(d_input)
+	H = Dropout(args.dropout)(H)
 	H = LeakyReLU(0.2)(H)
-	# H = Dropout(dropout_rate)(H)
 	H = Conv2D(128,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Dropout(args.dropout)(H)
 	H = LeakyReLU(0.2)(H)
-	#H = Dropout(dropout_rate)(H)	
-	H = Conv2D(64,  (3, 3),  padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Conv2D(64,  (3, 3), strides=(2, 2),  padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Dropout(args.dropout)(H)
 	H = LeakyReLU(0.2)(H)
-	#H = Dropout(dropout_rate)(H)
 	H = Flatten()(H)
 	H = Dense(32)(H)
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
-	H = LeakyReLU(0.2)(H)
 	discriminator = Model(d_input, probability_out)
 	dopt = RMSprop(lr=args.discriminator_learning_rate)	
 	discriminator.compile(loss='binary_crossentropy', optimizer=dopt)
@@ -539,7 +546,7 @@ def build_stacked_gan(args, generator, discriminator):
 
 
 def train_imagenet_gan(args, generator, discriminator, gan):
-	imagenet_data = load_faces()
+	imagenet_data = load_faces(shape=(args.in_shape[0], args.in_shape[1]))
 	(x_train, y_train), (x_test, y_test) = imagenet_data
 	#plot_color(x_train)
 
