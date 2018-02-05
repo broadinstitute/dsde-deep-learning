@@ -17,15 +17,16 @@ import java.util.stream.Collectors;
 public class MainApp extends PApplet {
     private static String fname  = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/generated_1d/excite_conv1d_2/filter_22.hd5";
 
-    //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g71602_na12877_allele_specific2/valid";
-    //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_allele_specific/valid";
+    //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_ref_read_tf/valid";
+    //private static String data_path  = "/Users/sam/vqsr_data/tensors/balancer_2d_tensors/train";
+    //private static String data_path  = "/dsde/data/deep/vqsr/tensors/exome_scratch/train";
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_paired_read/train" ;
-    //private static String data_path  =  "/dsde/data/deep/vqsr/tensors/g94794_chm_wgs1_flag_stretch/train";
+    private static String data_path  =  "/dsde/data/deep/vqsr/tensors/g94794_chm_wgs1_flag_stretch/train";
 
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_calling_tensors3";
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_calling_tensors_indel_only/";
-    private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_calling_tensors_variant_sort/";
-    boolean calling_tensors = true;
+    //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_calling_tensors_variant_sort/";
+    boolean calling_tensors = false;
 
     private static String weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_g94982_mq_train__window_size_128__read_limit_128__random_seed_12878__tensor_map_2d_mapping_quality__mode_ref_read_anno.hd5";
 
@@ -33,31 +34,32 @@ public class MainApp extends PApplet {
     private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_dna_only_long_kernels__window_size_71__read_limit_128__random_seed_12878__tensor_map_1d_dna__mode_reference.hd5";
     //private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_hg38_1d__window_size_128__read_limit_128__random_seed_12878__tensor_map_1d_dna__mode_reference.hd5";
 
-
-
     int cur_label = 0;
     int cur_tensor = 0;
     float cur_scale = 100;
     float max_scale = 1080;
     float min_scale = 10;
 
-
     List<List<Path>> tensor_files;
     float[] annotations;
-    int[] tensor_shape = {17, 128, 128};
+    int[] tensor_shape = {15, 128, 128};
+    //int[] tensor_shape = {128, 128, 15};
+
+    int channel_idx = 0;
+    int seq_idx = 1;
+    int cur_channel = 0;
+
     int[] channel_colors = {color(0, 255, 0), color(0, 0, 255), color(155, 105, 0), color(255, 0, 0), color(155, 0, 155),
-                            color(0, 155, 0), color(120, 120, 255), color(105, 55, 0),  color(205, 0, 55), color(255, 0, 255),
-                            color(0, 0, 128), color(128, 0, 0), color(128, 128, 0), color(0, 128, 128), color(128, 0, 128),
-                            color(0, 0, 68), color(68, 0, 0), color(68, 68, 0)};
+            color(0, 155, 0), color(120, 120, 255), color(105, 55, 0),  color(205, 0, 55), color(255, 0, 255),
+            color(0, 0, 128), color(128, 0, 0), color(128, 128, 0), color(0, 128, 128), color(128, 0, 128),
+            color(0, 0, 68), color(68, 0, 0), color(68, 68, 0)};
 
     String[] channel_names = {"Read A", "Read C", "Read G", "Read T", "DELETION",
             "Reference A", "Reference C", "Reference G", "Reference T", "INSERTION",
             "Read Reverse Strand", "Mate Reverse Strand", "First in Pair", "Second in Pair",
             "Fails QC",  "PCR or Optical Duplicate", "Mapping Quality"};
 
-
     String[] calling_labels = { "Reference", "Heterozygous SNP", "Homozygous SNP", "Heterozygous Deletion", "Homozygous Deletion", "Heterozygous Insertion", "Homozygous Insertion" };
-    int cur_channel = 0;
 
     int[] reference_shape = {71,4};
 
@@ -92,10 +94,7 @@ public class MainApp extends PApplet {
         if (calling_tensors){
             th.load_label_tensor(tensor_files.get(cur_label).get(cur_tensor), "site_labels", tensor_shape[1]);
         }
-
     }
-
-
 
     private List<List<Path>> getTensorFiles(String data_path){
         List<List<Path>> tensor_files = new ArrayList<List<Path>>();
@@ -113,7 +112,6 @@ public class MainApp extends PApplet {
             e.printStackTrace();
         }
         return tensor_files;
-
     }
 
     private List<Path> getFileList(Path tensor_path, int max_files){
@@ -148,7 +146,8 @@ public class MainApp extends PApplet {
             int text_line_height = 48;
             textSize(26);
 
-            for (int i = 0; i < tensor_shape[0]; i++) {
+            for (int i = 0; i < tensor_shape[channel_idx]; i++) {
+
                 fill(channel_colors[i]);
                 if (highlight_channel && cur_channel != i) fill(channel_colors[i], 45);
                 if (highlight_channel && cur_channel == i) textSize(32);
@@ -260,17 +259,17 @@ public class MainApp extends PApplet {
 
         float x_inc = sizer / (float)th.kernel_shape[0];
         float y_inc = sizer / (float)th.kernel_shape[3];
-        float z_inc = sizer / (float)th.kernel_shape[2];
-
-        if(th.kernel_shape[1] == 1) {
+        float z_inc = sizer / (float) th.kernel_shape[2];
+        if (th.kernel_shape[1] == 1) {
 
             for (int i = 0; i < th.kernel_shape[0]; i++) {
                 for (int j = 0; j < th.kernel_shape[3]; j++) {
                     for (int k = 0; k < th.kernel_shape[2]; k++) {
 
                         if (abs(th.convolution_kernels[i][0][k][j]) < eps) continue;
-                        int cur_color = channel_colors[min(channel_colors.length-1,k)];
-                        if (th.kernel_shape[2] != channel_colors.length) cur_color = channel_colors[min(channel_colors.length-1, i)];
+                        int cur_color = channel_colors[min(channel_colors.length - 1, k)];
+                        if (th.kernel_shape[2] != channel_colors.length)
+                            cur_color = channel_colors[min(channel_colors.length - 1, i)];
 
                         float new_red = constrain(weight_scalar * red(cur_color) * th.convolution_kernels[i][0][k][j], 0, 255);
                         float new_blue = constrain(weight_scalar * blue(cur_color) * th.convolution_kernels[i][0][k][j], 0, 255);
@@ -287,14 +286,14 @@ public class MainApp extends PApplet {
                     }
                 }
             }
-        } else if(th.kernel_shape[0] == 1){
-            x_inc = sizer / (float)th.kernel_shape[1];
+        } else if (th.kernel_shape[0] == 1) {
+            x_inc = sizer / (float) th.kernel_shape[1];
             for (int i = 0; i < th.kernel_shape[1]; i++) {
                 for (int j = 0; j < th.kernel_shape[3]; j++) {
                     for (int k = 0; k < th.kernel_shape[2]; k++) {
 
                         if (abs(th.convolution_kernels[0][i][k][j]) < eps) continue;
-                        int cur_color = channel_colors[min(channel_colors.length-1,i)];
+                        int cur_color = channel_colors[min(channel_colors.length - 1, i)];
 
                         float new_red = constrain(weight_scalar * red(cur_color) * th.convolution_kernels[0][i][k][j], 0, 255);
                         float new_blue = constrain(weight_scalar * blue(cur_color) * th.convolution_kernels[0][i][k][j], 0, 255);
@@ -314,34 +313,72 @@ public class MainApp extends PApplet {
             }
         }
     }
+    private boolean hasReads(int depth){
+        float nonRefSum = 0.0f;
+        for (int j = 0; j < tensor_shape[channel_idx]; j++) {
+            for (int k = 0; k < tensor_shape[seq_idx]; k++) {
 
+                if (j > 4) continue;
+
+                if (channel_idx == 0) {
+                    nonRefSum += abs(th.read_tensor[j][depth][k]);
+                } else if(channel_idx ==2){
+                    nonRefSum += abs(th.read_tensor[depth][k][j]);
+
+                }
+            }
+        }
+        return nonRefSum > 0.0;
+
+    }
 
     public void showTensor(){
         float eps = 0.01f;
         float sizer = 2.0f;
-        float x_inc = 0.1f*sizer / (float)tensor_shape[0];
+        float smaller = 0.1f;
+        float x_inc = sizer / (float)tensor_shape[0];
         float y_inc = sizer / (float)tensor_shape[1];
         float z_inc = sizer / (float)tensor_shape[2];
 
+        if (channel_idx == 0){
+            x_inc *= smaller;
+        } else if(channel_idx == 2){
+            z_inc *= smaller;
+            rotateX(PI/2.0f);
+        }
+        box(.10f, .20f, .40f);
         for (float i = 0; i < tensor_shape[0]; i++) {
             for (float j = 0; j < tensor_shape[1]; j++) {
+
+
                 for (float k = 0; k < tensor_shape[2]; k++) {
 
                     if (abs(th.read_tensor[(int)i][(int)j][(int)k] ) < eps) continue;
 
-                    float new_red = constrain(red(channel_colors[(int)i]) * th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
-                    float new_blue = constrain(blue(channel_colors[(int)i]) * th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
-                    float new_green = constrain(green(channel_colors[(int)i]) * th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
+
+                    int color_idx = 0;
+                    if (channel_idx == 0){
+                        if (!hasReads((int)j)) continue;
+                        color_idx =  (int)i;
+                    }else if (channel_idx == 2){
+                        if (!hasReads((int)i)) continue;
+                        color_idx =  (int)k;
+                    }
+
+
+                    float new_red = constrain(red(channel_colors[color_idx]) * th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
+                    float new_blue = constrain(blue(channel_colors[color_idx]) * th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
+                    float new_green = constrain(green(channel_colors[color_idx]) * th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
                     float alpha = constrain( 255.0f*th.read_tensor[(int)i][(int)j][(int)k], 0, 255);
-                    int my_color = color(new_red, new_green, new_blue);
+                    int my_color = color(new_red, new_green, new_blue, alpha);
 
                     if(highlight_channel && i != cur_channel){
                         my_color = color(new_red, new_green, new_blue, 35);
                     }
                     fill(my_color);
                     pushMatrix();
-                        translate(-sizer/2+i*x_inc, -sizer/2+j*y_inc, -sizer/2+k*z_inc);
-                        box(x_inc, y_inc, z_inc);
+                    translate(-sizer/2+i*x_inc, -sizer/2+j*y_inc, -sizer/2+k*z_inc);
+                    box(x_inc, y_inc, z_inc);
                     popMatrix();
 
 
