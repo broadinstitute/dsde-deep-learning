@@ -21,7 +21,9 @@ public class MainApp extends PApplet {
     //private static String data_path  = "/Users/sam/vqsr_data/tensors/balancer_2d_tensors/train";
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/exome_scratch/train";
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_paired_read/train" ;
-    private static String data_path  =  "/dsde/data/deep/vqsr/tensors/g94794_chm_wgs1_flag_stretch/train";
+    //private static String data_path  =  "/dsde/data/deep/vqsr/tensors/g94794_chm_wgs1_flag_stretch/train";
+    //private static String data_path  =  "/dsde/data/deep/vqsr/tensors/mix_big_ref_read_anno/train";
+    private static String data_path  =  "/dsde/working/sam/dsde-deep-learning/api_tutorials/weights";
 
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_calling_tensors3";
     //private static String data_path  = "/dsde/data/deep/vqsr/tensors/g94982_calling_tensors_indel_only/";
@@ -31,8 +33,9 @@ public class MainApp extends PApplet {
     private static String weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_g94982_mq_train__window_size_128__read_limit_128__random_seed_12878__tensor_map_2d_mapping_quality__mode_ref_read_anno.hd5";
 
     //private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_dna_only_small_kernels__window_size_71__read_limit_128__random_seed_12878__tensor_map_1d_dna__mode_reference.hd5";
-    private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_dna_only_long_kernels__window_size_71__read_limit_128__random_seed_12878__tensor_map_1d_dna__mode_reference.hd5";
+    //private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_dna_only_long_kernels__window_size_71__read_limit_128__random_seed_12878__tensor_map_1d_dna__mode_reference.hd5";
     //private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/m__base_quality_mode_phot__channels_last_False__id_hg38_1d__window_size_128__read_limit_128__random_seed_12878__tensor_map_1d_dna__mode_reference.hd5";
+    private static String dna_weights_path = "/dsde/working/sam/palantir_cnn/Analysis/vqsr_cnn/weights/1d_ref_anno_skip2.hd5";
 
     int cur_label = 0;
     int cur_tensor = 0;
@@ -70,7 +73,7 @@ public class MainApp extends PApplet {
     int samples = 30;
     String[] annotation_names = {"MQ", "DP", "SOR", "FS", "QD", "MQRankSum", "ReadPosRankSum"};
     boolean load_annotations = false;
-    int cur_mode = 0;
+    int cur_mode = 2;
     boolean highlight_channel = false;
     boolean max_logo_only = true;
     String[] modes = {"tensor", "weights", "logos", "reference"};
@@ -346,7 +349,6 @@ public class MainApp extends PApplet {
             z_inc *= smaller;
             rotateX(PI/2.0f);
         }
-        box(.10f, .20f, .40f);
         for (float i = 0; i < tensor_shape[0]; i++) {
             for (float j = 0; j < tensor_shape[1]; j++) {
 
@@ -444,11 +446,12 @@ public class MainApp extends PApplet {
 
                 textSize((float)my_scalar);
                 fill(channel_colors[j]);
-                if (th.dna_weights[i][j][tensor_idx] > 0) {
+                if (th.dna_weights[i][j][tensor_idx] < 0) {
                     pushMatrix();
+
                     translate(logo_x, y_neg, 0);
-                    rotateZ(PI);
-                    rotateY(-PI);
+                    rotateZ(-PI);
+                    translate(-(float)my_scalar/1.5f,0,0);
                     text(dna[j], 0, 0);
                     popMatrix();
                     y_neg += my_scalar;
