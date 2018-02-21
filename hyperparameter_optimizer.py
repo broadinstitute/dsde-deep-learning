@@ -392,18 +392,17 @@ class HyperparameterOptimizer(object):
 
 				if model.count_params() > 5000000:
 					print('Model too big')
-					return 9e8
+					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				normalized_loss = loss_and_metrics[0]
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience, 'Normalized loss:', normalized_loss)
+				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
 				limit_mem()
-				return normalized_loss
+				return loss_and_metrics[0]
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return 9e9
+				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
 
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_1d,  	# Objective function       
@@ -414,9 +413,8 @@ class HyperparameterOptimizer(object):
                                              verbosity=True							# Talk to me!
                                              )           
 
-		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-9, report_file=args.output_dir + args.id + '.bayes_report')
+		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-12, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_1d(optimizer.x_opt))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
 			f.write(self.str_from_params_1d(optimizer.x_opt))
 

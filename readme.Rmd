@@ -4,12 +4,24 @@ date: "2/20/2018"
 author: "Sam Friedman"
 email: "sam@broadinstitute.org"
 output:
- pdf_document
-# md_document:
-#  variant: markdown_github
+ #pdf_document
+ md_document:
+  variant: markdown_github
 ---
 
 # Deep Learning Recipes for DNA reads and short variants.
+
+## Setting up your environment
+We recommend using [anaconda](https://conda.io/docs/user-guide/install/index.html) to handle your python environments.
+For CPU only libraries:
+```
+conda env create -n gatk -f ./gatkcondaenv_cpu.yml
+```
+To use GPU, you will need a NVIDIA GPU, [CUDA](http://docs.nvidia.com/cuda/index.html) and [CuDNN](https://developer.nvidia.com/cudnn) installed [tensorflow has nice instructions](https://www.tensorflow.org/install/install_windows#requirements_to_run_tensorflow_with_gpu_support):
+```
+conda env create -n gatk -f ./gatkcondaenv_gpu.yml
+```
+
 
 ## Training models from example tensors
 
@@ -45,16 +57,6 @@ python recipes.py train_reference_annotation \
   --id ref_model
 ```
 
-## Setting up your environment
-We recommend using [anaconda](https://conda.io/docs/user-guide/install/index.html) to handle your python environments.
-For CPU only libraries:
-```
-conda env create -n gatk -f ./gatkcondaenv_cpu.yml
-```
-To use GPU:
-```
-conda env create -n gatk -f ./gatkcondaenv_gpu.yml
-```
 
 
 

@@ -1,6 +1,17 @@
 Deep Learning Recipes for DNA reads and short variants.
 =======================================================
 
+Setting up your environment
+---------------------------
+
+We recommend using [anaconda](https://conda.io/docs/user-guide/install/index.html) to handle your python environments. For CPU only libraries:
+
+    conda env create -n gatk -f ./gatkcondaenv_cpu.yml
+
+To use GPU, you will need a NVIDIA GPU, [CUDA](http://docs.nvidia.com/cuda/index.html) and [CuDNN](https://developer.nvidia.com/cudnn) installed [tensorflow has nice instructions](https://www.tensorflow.org/install/install_windows#requirements_to_run_tensorflow_with_gpu_support):
+
+    conda env create -n gatk -f ./gatkcondaenv_gpu.yml
+
 Training models from example tensors
 ------------------------------------
 
@@ -31,14 +42,3 @@ Train a model that predicts variant quality from reference sequence only:
       --data_dir ./data/example_reference_tensors_chr1/ \
       --tensor_map reference \
       --id ref_model
-
-Setting up your environment
----------------------------
-
-We recommend using [anaconda](https://conda.io/docs/user-guide/install/index.html) to handle your python environments. For CPU only libraries:
-
-    conda env create -n gatk -f ./gatkcondaenv_cpu.yml
-
-To use GPU:
-
-    conda env create -n gatk -f ./gatkcondaenv_gpu.yml
