@@ -25,7 +25,7 @@ import h5py
 import time
 import plots
 import pysam
-#import models
+import models
 import defines
 import operator
 import arguments
@@ -66,7 +66,7 @@ def run():
 		train_calling_model_full(args)		
 	elif 'train_calling_model_1d' == args.mode:
 		train_calling_model_1d(args)		
-	elif 'ref_read_anno' == args.mode:
+	elif 'train_ref_read_anno' == args.mode:
 		train_ref_read_annotation_model(args)								
 	elif 'ref_read_anno_exome' == args.mode:
 		train_ref_read_annotation_exome_model(args)	

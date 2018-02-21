@@ -4,9 +4,9 @@ date: "2/20/2018"
 author: "Sam Friedman"
 email: "sam@broadinstitute.org"
 output:
-# pdf_document
- md_document:
-  variant: markdown_github
+ pdf_document
+# md_document:
+#  variant: markdown_github
 ---
 
 # Deep Learning Recipes and Experiments with DNA reads and variants.
@@ -20,11 +20,15 @@ python recipes.py train_ref_read_anno --data_dir ./data/example_tensors/ --epoch
 
 
 ### Setting up your environment
-
+We recommend using [anaconda](https://conda.io/docs/user-guide/install/index.html) to handle your python environments.
+On a mac:
 ```
-conda env -n gatk -f ./gatkcondaenv.yml
+conda env create -n gatk -f ./gatkcondaenv_macosx.yml
 ```
-
+On linux:
+```
+conda env create -n gatk -f ./gatkcondaenv_linux.yml
+```
 
 
 
