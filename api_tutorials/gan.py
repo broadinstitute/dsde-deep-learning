@@ -79,6 +79,8 @@ def parse_args():
 	parser.add_argument('-glr', '--generator_learning_rate', default=1e-4, type=float)	
 	parser.add_argument('-dl',  '--discriminator_loops', default=6, type=int)
 	parser.add_argument('-dlr', '--discriminator_learning_rate', default=1e-4, type=float)
+	parser.add_argument('-lrd', '--learning_rate_decay', default=0, type=int)
+
 
 	args = parser.parse_args()
 	print('Arguments are', args)	
@@ -342,11 +344,12 @@ def total_variation_norm(x):
 def build_imagenet_generative_model(args):
 	# Build Generative model ...
 	nch = 50
-	dense_channels = 24
+	dense_channels = 32
 	inner_dim = 16
 	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(dense_channels*inner_dim*inner_dim, kernel_initializer='glorot_normal')(g_input)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = Reshape( [inner_dim, inner_dim, dense_channels] )(H)
 	H = UpSampling2D(size=(2, 2))(H)
@@ -366,11 +369,9 @@ def build_imagenet_generative_model(args):
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)	
 	pre_logit = Conv2D(3, (1, 1), padding='same', kernel_initializer='glorot_uniform')(H)
-
 	generation = Activation('sigmoid')(pre_logit)
 	generator = Model(g_input, generation)
 	opt = RMSprop(lr=args.generator_learning_rate)		
-	
 
 	gloss = generator_loss(args, pre_logit)	
 	generator.compile(loss=gloss, optimizer=opt)
@@ -386,21 +387,26 @@ def batch_normalize_or_not(args, x, channel_axis):
 
 def build_imagenet_discriminative(args):
 	# Build Discriminative model ...
+	channel_axis = -1
 	d_input = Input(shape=args.in_shape)
 	H = Conv2D(216, (5, 5), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
-	H = LeakyReLU(0.2)(H)
-	H = Conv2D(256,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform', activation='relu')(d_input)
+	H = Activation('relu')(H)
+	H = Conv2D(256,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
-	H = LeakyReLU(0.2)(H)
+	H = Activation('relu')(H)
 	H = Conv2D(128,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
-	H = LeakyReLU(0.2)(H)
+	H = Activation('relu')(H)
 	H = Conv2D(64,  (3, 3), strides=(2, 2),  padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
-	H = LeakyReLU(0.2)(H)
+	H = Activation('relu')(H)
 	H = Flatten()(H)
-	H = Dense(32)(H)
+	H = Dense(44)(H)
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, probability_out)
@@ -672,7 +678,6 @@ def train_for_n(args, data, generator, discriminator, gan):
 	samples_seeds = np.random.uniform(0,1,size=[args.plot_examples, args.seeds])
 
 	for e in range(args.epochs):
-
 		make_trainable(discriminator, False)
 		make_trainable(generator, True)
 		for _ in range(args.generator_loops):	
@@ -700,6 +705,11 @@ def train_for_n(args, data, generator, discriminator, gan):
 			d_loss  = discriminator.train_on_batch(X,y)
 			losses["d"].append(d_loss)
 		
+		if args.learning_rate_decay and (e+1)%args.learning_rate_decay == 0:
+			args.discriminator_learning_rate /= 2
+			args.generator_learning_rate /= 2
+			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
+
 		# Save images during optimization 
 		if e%args.fps == args.fps-1:
 			save_path = args.save_path + '/' + args.mode + '/epoch_' + str(e) + '.jpg'

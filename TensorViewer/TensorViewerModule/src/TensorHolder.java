@@ -83,7 +83,7 @@ public class TensorHolder {
                 H5.H5Dread(dataset_id, HDF5Constants.H5T_NATIVE_FLOAT,
                         HDF5Constants.H5S_ALL, HDF5Constants.H5S_ALL,
                         HDF5Constants.H5P_DEFAULT, read_tensor);
-                System.out.println("Tensor loaded." + Arrays.toString(read_tensor[0][0]));
+                System.out.println("Tensor loaded. Shape:" + Arrays.toString(tensor_shape));
 
 
             }
@@ -252,7 +252,7 @@ public class TensorHolder {
                         }
                     }
 
-                    System.out.println("Loaded Kernel:  " + Arrays.toString(convolution_kernels[0][0][0]));
+                    System.out.println("Loaded Kernel Shape:  " + Arrays.toString(kernel_shape));
 
                     convolution_bias = new float[(int)kernel_shape[3]];
                     H5.H5Dread(aid4, HDF5Constants.H5T_IEEE_F32LE,
@@ -266,7 +266,6 @@ public class TensorHolder {
         catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
 
@@ -306,11 +305,9 @@ public class TensorHolder {
                         for (int k = 0; k < kernel_shape[2]; k++) {
                             int index = (int) (k + (j * kernel_shape[2]) + (i * kernel_shape[1] * kernel_shape[2]));
                             dna_weights[i][j][k] = dna_tensors2[index];
-
                         }
                     }
                 }
-
                 System.out.println("Loaded Kernel:  " + Arrays.toString(dna_weights[0][0]));
 
                 float[] dna_biases = new float[(int) kernel_shape[2]];
@@ -318,16 +315,10 @@ public class TensorHolder {
                         HDF5Constants.H5S_ALL, HDF5Constants.H5S_ALL,
                         HDF5Constants.H5P_DEFAULT, dna_biases);
                 System.out.println("Loaded Biases:  " + Arrays.toString(dna_biases) + "\n selected " + dna_biases[0]);
-
             }
         }
         catch (Exception e) {
             e.printStackTrace();
         }
-
-
-
     }
-
-
 }
