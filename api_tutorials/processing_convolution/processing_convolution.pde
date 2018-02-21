@@ -116,6 +116,8 @@ void draw() {
       img = loadImage("palantir.png");
     } else if (key == 'c'){
       img = loadImage("sunflowerfield.jpg");
+    }else if (key == 'h'){
+      img = loadImage("horse.png");
     }
   }
 }
