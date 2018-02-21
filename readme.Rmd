@@ -1,1 +1,30 @@
-# DSDE Deep Learning Experiments
+---
+title: "Deep Learning Recipes and Experiments"
+date: "2/20/2018"
+author: "Sam Friedman"
+email: "sam@broadinstitute.org"
+output:
+# pdf_document
+ md_document:
+  variant: markdown_github
+---
+
+# Deep Learning Recipes and Experiments with DNA reads and variants.
+
+## Quickstart
+
+
+```
+python recipes.py train_ref_read_anno --data_dir ./data/example_tensors/ --epochs 100 --patience 5
+```
+
+
+### Setting up your environment
+
+```
+conda env -n gatk -f ./gatkcondaenv.yml
+```
+
+
+
+
