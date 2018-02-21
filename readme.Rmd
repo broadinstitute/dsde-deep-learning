@@ -9,7 +9,7 @@ output:
   variant: markdown_github
 ---
 
-# Deep Learning Recipes and Experiments with DNA reads and variants.
+# Deep Learning Recipes for DNA reads and short variants.
 
 ## Quickstart
 

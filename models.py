@@ -412,7 +412,7 @@ def build_reference_annotation_skip_model(args):
 	return model
 
 
-def build_reference_annotation_1d_model_from_args(args,
+def build_reference_1d_model_from_args(args,
 											conv_width = 6, 
 											conv_layers = [128, 128, 128, 128],
 											conv_dropout = 0.1,					
