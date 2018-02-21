@@ -25,7 +25,7 @@ import h5py
 import time
 import plots
 import pysam
-import models
+#import models
 import defines
 import operator
 import arguments
@@ -38,27 +38,27 @@ def run():
 	args = arguments.parse_args()
 
 	# Model training recipes
-	if 'reference' == args.mode:
+	if 'train_reference' == args.mode:
 		make_reference_net(args)
-	elif 'reference_annotation' == args.mode:
+	elif 'train_reference_annotation' == args.mode:
 		make_reference_annotation_net(args)
-	elif 'reference_plus_skip' == args.mode:
+	elif 'train_reference_plus_skip' == args.mode:
 		train_reference_plus_skip(args)		
-	elif 'reference_1layer' == args.mode:
+	elif 'train_reference_1layer' == args.mode:
 		make_reference_annotation_net_1layer(args)		
-	elif 'annotation_mlp' == args.mode:
+	elif 'train_annotation_mlp' == args.mode:
 		make_annotation_multilayer_perceptron(args)
-	elif 'ref_read' == args.mode:
+	elif 'train_ref_read' == args.mode:
 		train_ref_read_model(args)
-	elif 'ref_read_resnet' == args.mode:
+	elif 'train_ref_read_resnet' == args.mode:
 		train_ref_read_resnet_model(args)
-	elif 'ref_read_dilated' == args.mode:
+	elif 'train_ref_read_dilated' == args.mode:
 		train_ref_read_dilated_model(args)
-	elif 'ref_read_b' == args.mode:
+	elif 'train_train_ref_read_b' == args.mode:
 		train_ref_read_model_b(args)
-	elif 'ref_read_bayes' == args.mode:
+	elif 'train_ref_read_bayes' == args.mode:
 		train_ref_read_inception_model(args)
-	elif 'pileup_filter' == args.mode:
+	elif 'train_pileup_filter' == args.mode:
 		train_pileup_filter(args)
 	elif 'train_calling_model' == args.mode:
 		train_calling_model(args)
@@ -68,15 +68,15 @@ def run():
 		train_calling_model_1d(args)		
 	elif 'train_ref_read_anno' == args.mode:
 		train_ref_read_annotation_model(args)								
-	elif 'ref_read_anno_exome' == args.mode:
+	elif 'train_ref_read_anno_exome' == args.mode:
 		train_ref_read_annotation_exome_model(args)	
-	elif 'bqsr' == args.mode:
+	elif 'train_bqsr' == args.mode:
 		bqsr_train_tensor(args)
-	elif 'bqsr_anno' == args.mode:
+	elif 'train_bqsr_anno' == args.mode:
 		bqsr_train_annotation_tensor(args)		
-	elif 'bqsr_lstm' == args.mode:
+	elif 'train_bqsr_lstm' == args.mode:
 		bqsr_lstm_train_tensor(args)								
-	elif 'depristo_inception' == args.mode:
+	elif 'train_depristo_inception' == args.mode:
 		depristo_inception(args)
 
 	# Model testing recipes

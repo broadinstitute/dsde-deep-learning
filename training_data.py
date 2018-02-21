@@ -110,7 +110,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
-			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.h5'
+			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 			stats[cur_label_key] += 1
 
 			if not os.path.exists(os.path.dirname(tensor_path)):
@@ -202,7 +202,7 @@ def paired_read_tensors_from_map(args, include_annotations=True):
 			reference_sequence_into_tensor(args, reference_seq, read_tensor)
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
-			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.h5'
+			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 			stats[cur_label_key] += 1
 
 			if not os.path.exists(os.path.dirname(tensor_path)):
@@ -348,7 +348,7 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 
 		tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 		tensor_prefix = 'calling_tensor_' + plain_name(args.bam_file) +'_'+ plain_name(args.train_vcf) 
-		tensor_path += tensor_prefix + '-' + args.chrom + '_' + str(cur_pos) + '_' +str(cur_pos+args.window_size) + '.h5'
+		tensor_path += tensor_prefix + '-' + args.chrom + '_' + str(cur_pos) + '_' +str(cur_pos+args.window_size) + '.hd5'
 
 		if not os.path.exists(os.path.dirname(tensor_path)):
 			os.makedirs(os.path.dirname(tensor_path))
@@ -508,7 +508,7 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 
 		tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 		tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
-		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.h5'
+		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 		stats[cur_label_key] += 1
 
 		if not os.path.exists(os.path.dirname(tensor_path)):
@@ -643,7 +643,7 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) +'_allele_'+ str(allele_index) + '-' + cur_label_key 
-			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.h5'
+			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 			stats[cur_label_key] += 1
 			stats['Allele index '+str(allele_index)] += 1
 
@@ -745,7 +745,7 @@ def tensors_from_tensor_map_2channel(args, include_annotations=True):
 				add_mq_to_read_tensor(args, read_tensor, tensor_channel_map, mapping_qualities)
 				tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 				tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) +'_allele_'+ str(allele_index) +'-'+ cur_label_key 
-				tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.h5'
+				tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 				stats[cur_label_key] += 1
 
 				if not os.path.exists(os.path.dirname(tensor_path)):
@@ -870,7 +870,7 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 			tensor_prefix = plain_name(args.bam_file) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
-			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + args.chrom + '_' + str(ref_pos) + '.h5'
+			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + args.chrom + '_' + str(ref_pos) + '.hd5'
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
@@ -937,7 +937,7 @@ def write_dna_and_annotations(args, include_dna=True, include_annotations=True):
 
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)
 			tensor_path += cur_label_key +'/'+ plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) 
-			tensor_path += '_allele_' + str(allele_idx) +'-'+ variant.CHROM +'_'+ str(variant.POS) + '.h5'
+			tensor_path += '_allele_' + str(allele_idx) +'-'+ variant.CHROM +'_'+ str(variant.POS) + '.hd5'
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 
@@ -1028,7 +1028,7 @@ def write_dna_multisource_annotations(args, include_dna=True, include_annotation
 
 		tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 		tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) +'_allele_'+ str(allele_idx) +'_'+ cur_label_key 
-		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.h5'
+		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 		if not os.path.exists(os.path.dirname(tensor_path)):
 			os.makedirs(os.path.dirname(tensor_path))
 
@@ -2757,7 +2757,7 @@ def position_string_from_tensor_name(tensor_name):
 
 	Includes an allele index if the filename includes _allele_
 	This is ugly, we need file names ending with genomic position 
-	(e.g. my_tensor-12_1234.h5 returns 12_1234 and a_tensor_allele_1-8_128.hd5 returns 8_128_1)
+	(e.g. my_tensor-12_1234.hd5 returns 12_1234 and a_tensor_allele_1-8_128.hd5 returns 8_128_1)
 
 	Arguments:
 		tensor_name: the filename to parse

@@ -42,8 +42,10 @@ def parse_args():
 		help='Maximum number of reads to load.')
 	parser.add_argument('--window_size', default=128, type=int,
 		help='Size of sequence window to use as input, typically centered at a variant.')
-	parser.add_argument('--channels_last', default=False, dest='channels_last', action='store_true',
+	parser.add_argument('--channels_last', default=True, dest='channels_last', action='store_true',
 		help='Store the channels in the last axis of tensors, tensorflow->true, theano->false')				
+	parser.add_argument('--channels_first', dest='channels_last', action='store_false',
+		help='Store the channels in the first axis of tensors, tensorflow->false, theano->true')	
 	parser.add_argument('--base_quality_mode', default='phot', choices=['phot', 'phred', '1hot'],
 		help='How to treat base qualities, must be in [phot, phred, 1hot]')
 
