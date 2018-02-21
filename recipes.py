@@ -25,7 +25,7 @@ import h5py
 import time
 import plots
 import pysam
-#import models
+import models
 import defines
 import operator
 import arguments
