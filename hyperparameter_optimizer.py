@@ -497,7 +497,7 @@ class HyperparameterOptimizer(object):
                                              verbosity=True							# Talk to me!
                                              )           
 
-		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-12, report_file=args.output_dir + args.id + '.bayes_report')
+		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
 		print(self.str_from_params_1d_anno(optimizer.x_opt))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
