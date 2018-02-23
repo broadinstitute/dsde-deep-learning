@@ -506,7 +506,7 @@ class HyperparameterOptimizer(object):
 	def str_from_params_1d_anno(self, x):
 		s = '\nconv_width = ' + str(int(x[0])) + '\nconv_layers = ' + str(self.conv_layers_sets[int(x[2])])
 		s += '\nconv_dropout = '+ str(x[1]) + '\nspatial_dropout = '+ str(bool(x[3])) 
-		s += '\nannotation_units = '+ str(int(x[4])) + ' annotation shortcut = ' + str(bool(x[11]))
+		s += '\nannotation_units = '+ str(int(x[4])) + ' annotation shortcut = ' + str(bool(x[10]))
 		s += '\nfc_layers = '+ str(self.fc_layer_sets[int(x[0][5])])+ '\nfc_dropout = '+ str(x[6]) + '\nbatch_normalization = '+ str(bool(x[7]))
 		s += '\nvalid padding ' if bool(x[8]) else 'same padding'
 		s += '\nmax_pool = '+str(self.max_pool_sets_1d[int(x[9])])
