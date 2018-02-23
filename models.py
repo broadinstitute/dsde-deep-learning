@@ -655,6 +655,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 											max_pools = [(3,1), (3,3)],
 											padding='valid',
 											annotation_units = 16,
+											annotation_shortcut = False,
 											fc_layers = [64],
 											fc_dropout = 0.3,
 											kernel_initializer='he_normal',
@@ -727,6 +728,9 @@ def read_tensor_2d_annotation_model_from_args(args,
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 
+	if annotation_shortcut:
+		x = layers.concatenate([x, annotations_bn], axis=concat_axis)
+		
 	# Softmax output
 	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
 	
