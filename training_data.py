@@ -484,8 +484,8 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 				elif b in defines.ambiguity_codes:
 					dna_data[i] = defines.ambiguity_codes[b]
 				else:
-					print('Error! Unknown code:', b)
-					return
+					raise ValueError('Error! Unknown code:', b)
+					
 		
 		if include_reads:
 			good_reads, insert_dict = get_good_reads(args, samfile, variant)
@@ -619,8 +619,8 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 					elif b in defines.ambiguity_codes:
 						dna_data[i] = defines.ambiguity_codes[b]
 					else:
-						print('Error! Unknown code:', b)
-						return
+						raise ValueError('Error! Unknown code:', b)
+						
 			
 			if include_reads:
 				good_reads, insert_dict = get_good_reads(args, samfile, variant)
@@ -932,8 +932,8 @@ def write_dna_and_annotations(args, include_dna=True, include_annotations=True):
 					elif b in defines.ambiguity_codes:
 						dna_data[i] = defines.ambiguity_codes[b]
 					else:
-						print('Error! Unknown code:', b)
-						return
+						raise ValueError('Error! Unknown code:', b)
+						
 
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)
 			tensor_path += cur_label_key +'/'+ plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) 
@@ -1015,8 +1015,8 @@ def write_dna_multisource_annotations(args, include_dna=True, include_annotation
 				elif b in defines.ambiguity_codes:
 					dna_data[i] = defines.ambiguity_codes[b]
 				else:
-					print('Error! Unknown code:', b)
-					return
+					raise ValueError('Error! Unknown code:', b)
+					
 
 				# Add data to remaining channels from bed files	
 				ref_i = variant.POS-idx_offset + i
@@ -1582,8 +1582,8 @@ def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_
 						tensor[:4, j, i] = defines.ambiguity_codes[b]
 				
 				else:
-					print('Error! Unknown symbol in seq block:', b)
-					return
+					raise ValueError('Error! Unknown symbol in seq block:', b)
+					
 
 			flags = flag_to_array(read.flag)
 			for i in range(defines.read_flags):
@@ -1661,8 +1661,8 @@ def good_reads_to_tensor(args, good_reads, ref_start, insert_dict):
 					tensor[:4, j, i] = defines.ambiguity_codes[b]
 			
 			else:
-				print('Error! Unknown symbol in seq block:', b)
-				return
+				raise ValueError('Error! Unknown symbol in seq block:', b)
+				
 
 		flags = flag_to_array(read.flag)
 		for i in range(defines.read_flags):
@@ -1757,8 +1757,8 @@ def seq_block_to_image(args, reference, sequences, flags, qualities, mapping_qua
 			elif b == defines.skip_char:
 				continue
 			else:
-				print('Error! Unknown symbol in seq block:', b)
-				return
+				raise ValueError('Error! Unknown symbol in seq block:', b)
+				
 
 	if debug:
 		print(reference, '\n\n\n ~~~~~~ Becomes Tensor: ~~~~~~~ \n\n')
@@ -2948,7 +2948,7 @@ def quality_from_mode(args, base_quality, base, base_dict):
 		one_hot[base_dict[base]] = 1.0
 		return one_hot
 	else:
-		print('Error! Unknown base quality mode:', args.base_quality_mode)
+		raise ValueError('Error! Unknown base quality mode:', args.base_quality_mode)
 
 
 def quality_from_mode_2bit(args, base_quality, base, base_dict):
@@ -2960,7 +2960,7 @@ def quality_from_mode_2bit(args, base_quality, base, base_dict):
 		one_hot = np.array(base_dict[base])
 		return one_hot
 	else:
-		print('Error! Unknown base quality mode:', args.base_quality_mode)
+		raise ValueError('Error! Unknown base quality mode:', args.base_quality_mode)
 
 
 def reads_to_tensor(args, sequences, qualities=None, reference_seq=None):
@@ -2997,8 +2997,8 @@ def reads_to_tensor(args, sequences, qualities=None, reference_seq=None):
 			elif b == defines.skip_char:
 				continue
 			else:
-				print('Error! Unknown symbol in seq block:', b)
-				return
+				raise ValueError('Error! Unknown symbol in seq block:', b)
+				
 
 	if reference_seq:
 		reference_sequence_into_tensor(args, reference_seq, tensor)
@@ -3059,8 +3059,8 @@ def reads_to_2bit_tensor(args, sequences, qualities=None, reference_seq=None):
 			elif b in defines.ambiguity_codes or b == defines.skip_char:
 				continue
 			else:
-				print('Error! Unknown symbol in seq block:', b)
-				return
+				raise ValueError('Error! Unknown symbol in seq block:', b)
+				
 
 	if reference_seq:
 		for i,b in enumerate(reference_seq):
@@ -3111,7 +3111,7 @@ def read_tensor_to_pileup(args, read_tensor):
 			elif 'reference' in key:
 				pileup_tensor[i, tensor_map[key]] = np.amax(read_tensor[tensor_map[key], :, i])
 			else:
-				print('Error unexpected key:'+key)
+				raise ValueError('Error unexpected key:'+key)
 
 			
 	return pileup_tensor
@@ -3137,8 +3137,8 @@ def seq_block_to_tensor(args, seq_block, qualities=None):
 			elif b == defines.skip_char:
 				continue
 			else:
-				print('Error! Unknown symbol in seq block:', b)
-				return
+				raise ValueError('Error! Unknown symbol in seq block:', b)
+				
 
 	if debug:
 		print(seq_block, '\n\n\n ~~~~~~ Becomes Tensor: ~~~~~~~ \n\n')
@@ -3162,7 +3162,7 @@ def base_string_to_tensor(args, bases, qualities=None):
 		elif b == defines.skip_char:
 			continue
 		else:
-			print('Error! Unknown symbol in seq block:', b)
+			raise ValueError('Error! Unknown symbol in seq block:', b)
 	
 	return tensor
 
