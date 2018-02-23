@@ -492,8 +492,8 @@ class HyperparameterOptimizer(object):
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_1d,  	# Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
                                              initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-                                             model_type='GP_MCMC',
-                                             acquisition_type='LCB',        			# Expected Improvement
+                                             model_type='GP',
+                                             acquisition_type='EI',        			# Expected Improvement
                                              acquisition_optimizer='DIRECT',
                                              exact_feval=True,						# Is loss exact or noisy? Noisy!
                                              verbosity=True,							# Talk to me!
