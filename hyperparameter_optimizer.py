@@ -508,7 +508,7 @@ class HyperparameterOptimizer(object):
 		s += '\nconv_dropout = '+ str(x[1]) + '\nspatial_dropout = '+ str(bool(x[3])) 
 		s += '\nannotation_units = '+ str(int(x[4])) + ' annotation shortcut = ' + str(bool(x[10]))
 		s += '\nfc_layers = '+ str(self.fc_layer_sets[int(x[5])])+ '\nfc_dropout = '+ str(x[6]) + '\nbatch_normalization = '+ str(bool(x[7]))
-		s += '\nvalid padding ' if bool(x[8]) else 'same padding'
+		s += '\nvalid padding ' if bool(x[8]) else '\nsame padding'
 		s += '\nmax_pool = '+str(self.max_pool_sets_1d[int(x[9])])
 		return s
 
