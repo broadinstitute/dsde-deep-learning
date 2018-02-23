@@ -15,7 +15,7 @@ To use GPU, you will need a NVIDIA GPU, [CUDA](http://docs.nvidia.com/cuda/index
 Training models from example tensors
 ------------------------------------
 
-In the data directory we provide a small dataset of reference and read tensors from the NA12878 sample. The reference tensors are to be used with a 1D CNN. They are a 1-hot encoding of 128 base pairs of reference sequence centered at a variant. The read tensors are for a 2D CNN. They encode reference and read sequence as well as read meta data. They use the tensorflow default channel ordering: reads x sequence x channels. You can toggle between tensorflow and theano channel ordering with the `--channels_last` and `--channels_first` arguments. Uncompress them with tar:
+In the data directory we provide a small dataset of reference and read tensors from the NA12878 sample. The reference tensors are input for a 1D CNN. They are a 1-hot encoding of 128 base pairs of reference sequence centered at a variant. The [read tensors](https://gatkforums.broadinstitute.org/gatk/discussion/10996/deep-learning-in-gatk4) are input for a 2D CNN. They encode reference and read sequence as well as read meta data. They use the tensorflow default channel ordering: reads x sequence x channels. You can toggle between tensorflow and theano channel ordering with the `--channels_last` and `--channels_first` arguments. Uncompress them with tar:
 
     cd data
     tar -zcvf example_reference_tensors_chr1.tar.gz 
@@ -63,6 +63,7 @@ Create read tensors with a truth vcf, confident region, unfiltered variant calls
       --data_dir ./data/my_read_tensors/ \ 
       --bam_file my_aligned_reads.bam \
       --tensor_map read_tensor \
+      --channels_last \
       --read_limit 128 \
       --window_size 128
 
@@ -76,3 +77,7 @@ Create reference tensors with a truth vcf, confident region, and unfiltered vari
       --data_dir ./data/my_reference_tensors/ \ 
       --tensor_map reference \
       --window_size 128
+
+You can downsample specific classes with the `--downsample_class_label` arguments. For example, to only write 10% of the positive SNPs add `--downsample_snps 0.1` to your command line or to keep half of the negative indel examples use: `--downsample_not_indels 0.5`
+
+You can also parallelize over the genome via the `--chrom`, `--start_pos`, and `--end_pos` arguments.
