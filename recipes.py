@@ -177,7 +177,7 @@ def run():
 
 	# Ooops
 	else:
-		print('\n\n ERROR! Unknown recipe mode:', args.mode, '\n\n\n')
+		raise ValueError('Unknown recipe mode:', args.mode)
 
 
 def inspect_architectures(args):
@@ -279,10 +279,10 @@ def inspect_architectures(args):
 			plots.print_auc_per_class(model, test[0], test[1], args.labels)
 		
 		elif '2d_2bit' == a:
-			print('Error 2d_2bit not implemented yet.')
+			raise ValueError('Error 2d_2bit not implemented yet.')
 		
 		else:
-			print('Error Unknown architecture:', a)			
+			raise ValueError('Error Unknown architecture:', a)			
 
 		models.train_model_from_generators(args, model, generate_train, generate_valid, args.weights_hd5)
 		models.inspect_model(args, model, generate_train, generate_valid)
