@@ -22,7 +22,7 @@ Train a model that predicts variant quality from read tensors and variant annota
       --tensor_map read_tensor \
       --id ref_read_anno_model
 
-Train a model that predicts variant quality from read tensors and variant annotations:
+Train a model that predicts variant quality from read tensors:
 
     python recipes.py train_ref_read \
       --data_dir ./data/g94982_tensors_chr1_channels_last/ \
