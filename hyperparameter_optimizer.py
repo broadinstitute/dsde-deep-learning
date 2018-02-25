@@ -182,10 +182,7 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))}
@@ -193,21 +190,18 @@ class HyperparameterOptimizer(object):
 
 		def loss_from_params_2d(x):
 			my_params = x[0]
-			max_pools = self.max_pool_sets_2d[int(my_params[9])]
+			max_pools = self.max_pool_sets_2d[int(my_params[6])]
 			conv_layers = self.conv_layers_sets[int(my_params[2])]
-			fc_layers = self.fc_layer_sets[int(my_params[5])]
+			fc_layers = self.fc_layer_sets[int(my_params[3])]
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
 										conv_width = int(my_params[0]),
 										conv_height = int(my_params[1]),
 										conv_layers = conv_layers,
-										conv_dropout = float(my_params[3]),
-										spatial_dropout = bool(my_params[4]),
 										max_pools = max_pools,
-										padding = 'valid' if bool(my_params[8]) else 'same',
+										padding = 'valid' if bool(my_params[5]) else 'same',
 										fc_layers = fc_layers,
-										fc_dropout = float(my_params[6]),
-										batch_normalization = bool(my_params[7])
+										batch_normalization = bool(my_params[4])
 										)
 
 				if model.count_params() > 5000000:
@@ -247,11 +241,11 @@ class HyperparameterOptimizer(object):
 
 	def str_from_params_2d(self, x):
 		s = '\nConv Layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1]) + ' Conv Dropout = ' + str(x[3])
-		s += '\nSpatial dropout = ' + str(bool(x[4])) + ' Padding = ' + ('valid' if bool(x[8]) else 'same')
-		s += '\nFC layers = ' + str(self.fc_layer_sets[int(x[5])]) + ' FC Dropout = ' + str(x[6])
-		s += '\nBatch normalization = ' + str(bool(x[7]))
-		s += '\n Max Pools = ' + str(self.max_pool_sets_2d[int(x[9])])
+		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1])
+		s += '\nPadding = ' + ('valid' if bool(x[5]) else 'same')
+		s += '\nFC layers = ' + str(self.fc_layer_sets[int(x[3])])
+		s += '\nBatch normalization = ' + str(bool(x[4]))
+		s += '\n Max Pools = ' + str(self.max_pool_sets_2d[int(x[6])])
 		s += '\n'
 		return s
 
@@ -278,36 +272,30 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
+			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))},
-			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 		]
 
 		def loss_from_params_2d_anno(x):
 			my_params = x[0]
-			max_pools = self.max_pool_sets_2d[int(my_params[10])]
+			max_pools = self.max_pool_sets_2d[int(my_params[8])]
 			conv_layers = self.conv_layers_sets[int(my_params[2])]
-			fc_layers = self.fc_layer_sets[int(my_params[6])]
+			fc_layers = self.fc_layer_sets[int(my_params[5])]
 			try:
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
 										conv_width = int(my_params[0]),
 										conv_height = int(my_params[1]),
 										conv_layers = conv_layers,
-										conv_dropout = float(my_params[3]),
-										spatial_dropout = bool(my_params[4]),
 										max_pools = max_pools,
-										padding = 'valid' if bool(my_params[9]) else 'same',
-										annotation_units = int(my_params[5]),
-										annotation_shortcut = bool(my_params[11]),
-										fc_layers = [int(my_params[6])],
-										fc_dropout = float(my_params[7]),
-										batch_normalization = bool(my_params[8])
+										padding = 'valid' if bool(my_params[7]) else 'same',
+										annotation_units = int(my_params[3]),
+										annotation_shortcut = bool(my_params[4]),
+										fc_layers = fc_layers,
+										batch_normalization = bool(my_params[6])
 										)
 
 				if model.count_params() > 5000000:
@@ -347,12 +335,12 @@ class HyperparameterOptimizer(object):
 
 	def str_from_params_2d_anno(self, x):
 		s = '\nConv Layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1]) + ' Conv Dropout = ' + str(x[3])
-		s += '\nSpatial dropout = ' + str(bool(x[4])) + ' Padding = ' + ('valid' if bool(x[9]) else 'same')
-		s += '\nAnno units = ' + str(int(x[5])) + ' Annotation shortcut = ' + str(bool(x[11]))
-		s += '\nFC layers = ' + str(self.fc_layer_sets[int(x[6])]) + ' FC Dropout = ' + str(x[7])
-		s += '\nBatch normalization = ' + str(bool(x[8]))
-		s += '\nMax Pools = ' + str(self.max_pool_sets_2d[int(x[10])])
+		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1])
+		s += '\nPadding = ' + ('valid' if bool(x[7]) else 'same')
+		s += '\nAnno units = ' + str(int(x[3])) + ' Annotation shortcut = ' + str(bool(x[4]))
+		s += '\nFC layers = ' + str(self.fc_layer_sets[int(x[5])])
+		s += '\nBatch normalization = ' + str(bool(x[6]))
+		s += '\nMax Pools = ' + str(self.max_pool_sets_2d[int(x[8])])
 		s += '\n'
 		return s
 
