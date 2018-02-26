@@ -717,8 +717,8 @@ def read_tensor_2d_annotation_model_from_args(args,
 	x = Flatten()(x)
 
 	# Mix the variant annotations in
-	annotations_in = Input(shape=(len(args.annotations),), name="annotations")
-	annotations_bn = BatchNormalization(axis=-1)(annotations_in)
+	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations_bn = BatchNormalization(axis=-1)(annotations)
 	alt_input_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_bn)
 	x = layers.concatenate([x, alt_input_mlp], axis=concat_axis)
 
@@ -735,7 +735,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
 	
 	# Map inputs to outputs
-	model = Model(inputs=[read_tensor_in, annotations_in], outputs=[prob_output])
+	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
 	
 	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))

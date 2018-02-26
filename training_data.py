@@ -2452,7 +2452,8 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
-
+			print('batch keys:', batch.keys())
+			print(batch['annotations'])
 		if with_positions:
 			yield (batch, label_matrix, positions)
 			positions = []
@@ -4334,7 +4335,8 @@ def inspect_dataset(args):
 			print('%s has: %d tensors %2.0f percent' % (k, stats[k], (100*stats[k] / (float(stats['total']) + 1e-7))))
 		else:
 			print('%s has: %.2f' % (k, stats[k]))
-
+	
+	dataset_summary_latex_table_line(stats)
 	if args.normalize_annotations:
 		means_and_stds = np.zeros((len(args.annotations), 2))
 		for i,a in enumerate(args.annotations):
@@ -4345,6 +4347,17 @@ def inspect_dataset(args):
 
 		with h5py.File(os.path.join(args.data_dir, 'means_and_stds.hd5'), 'w') as hf:
 			hf.create_dataset('means_and_stds', data=means_and_stds)
+
+
+def dataset_summary_latex_table_line(stats):
+	print('\n\n')
+	lkeys = ['SNP', 'INDEL', 'NOT_SNP', 'NOT_INDEL']
+	for k in lkeys:
+		print(" & %d (%2.0f\\%%)" % (stats[k]//1000, (100*stats[k] / (stats['total'] + 1e-7))), end='')
+	skeys = ['SNP Ti/Tv', 'NOT_SNP Ti/Tv', 'INDEL Insertion/Deletion', 'NOT_INDEL Insertion/Deletion']
+	for k in skeys:
+		print(' & %.2f ' % stats[k], end='')
+	print('\n\n')
 
 
 def write_tranches(args):
