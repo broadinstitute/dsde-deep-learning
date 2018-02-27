@@ -2106,7 +2106,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 		args.tensor_map = semantics['input_tensor_map_name']
 		args.window_size = semantics['window_size']
 		args.read_limit = semantics['read_limit']
-		tm = get_tensor_channel_map_from_args(args)
+		tm = defines.get_tensor_channel_map_from_args(args)
 		assert(len(tm) == len(semantics['input_tensor_map']))
 		for key in tm:
 			assert(tm[key] == semantics['input_tensor_map'][key])

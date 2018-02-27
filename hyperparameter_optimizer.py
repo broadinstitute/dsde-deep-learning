@@ -214,7 +214,7 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print('best_architecture:', self.str_from_params_2d(my_params))
 				limit_mem()
 				return loss_and_metrics[0]
@@ -280,25 +280,27 @@ class HyperparameterOptimizer(object):
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))},
+			{'name':'max_pools_2d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))},
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_2d_anno(x):
-			my_params = x[0]
-			max_pools = self.max_pool_sets_2d[int(my_params[8])]
-			conv_layers = self.conv_layers_sets[int(my_params[2])]
-			fc_layers = self.fc_layer_sets[int(my_params[5])]
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_2d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
-										conv_width = int(my_params[0]),
-										conv_height = int(my_params[1]),
+										conv_width = int(p[param_keys['conv_width']]),
+										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
-										max_pools = max_pools,
-										padding = 'valid' if bool(my_params[7]) else 'same',
-										annotation_units = int(my_params[3]),
-										annotation_shortcut = bool(my_params[4]),
+										max_pools = max_pool_set,
+										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+										annotation_units = int(p[param_keys['annotation_units']]),
+										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 										fc_layers = fc_layers,
-										batch_normalization = bool(my_params[6])
+										batch_normalization = bool(p[param_keys['batch_normalization']])
 										)
 
 				if model.count_params() > 5000000:
@@ -309,8 +311,8 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
-				print(self.str_from_params_2d_anno(my_params))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
 				return loss_and_metrics[0]
 			
@@ -331,21 +333,9 @@ class HyperparameterOptimizer(object):
 
 		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_2d_anno(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_2d_anno(optimizer.x_opt))
-
-
-	def str_from_params_2d_anno(self, x):
-		s = '\nConv Layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1])
-		s += '\nPadding = ' + ('valid' if bool(x[7]) else 'same')
-		s += '\nAnno units = ' + str(int(x[3])) + ' Annotation shortcut = ' + str(bool(x[4]))
-		s += '\nFC layers = ' + str(self.fc_layer_sets[int(x[5])])
-		s += '\nBatch normalization = ' + str(bool(x[6]))
-		s += '\nMax Pools = ' + str(self.max_pool_sets_2d[int(x[8])])
-		s += '\n'
-		return s
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
 	def bayesian_search_1d(self, args, iterations):
@@ -369,27 +359,31 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'fc', 'type':'discrete', 'domain':(32,64,96,128,160)},
+			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))}
+			{'name':'max_pools_1d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))}
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_1d(x):
-			conv_layers = self.conv_layers_sets[int(x[0][2])]
-			max_pool_set = self.max_pool_sets_1d[int(x[0][8])]
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_1d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.build_reference_1d_model_from_args(args, 
-											conv_width = int(x[0][0]), 
+											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
-											conv_dropout = float(x[0][1]),
-											spatial_dropout = bool(x[0][3]),
+											conv_dropout = float(p[param_keys['conv_dropout']]),
+											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
-											padding = 'valid' if bool(x[0][7]) else 'same',
-											fc_layers = [int(x[0][4])],
-											fc_dropout = float(x[0][5]),
-											batch_normalization = bool(x[0][6]))
+											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+											fc_layers = fc_layers,
+											fc_dropout = float(p[param_keys['fc_dropout']]),
+											batch_normalization = bool(p[param_keys['batch_normalization']]))
 
 				if model.count_params() > 5000000:
 					print('Model too big')
@@ -398,8 +392,8 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
-				print(self.str_from_params_1d(x[0]))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:
@@ -419,16 +413,11 @@ class HyperparameterOptimizer(object):
                                              )           
 
 		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
+		print('Best parameter set:', optimizer.x_opt)
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_1d(optimizer.x_opt))
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
-	def str_from_params_1d(self, x):
-		s = '\nconv_width = ' + str(int(x[0])) + '\nconv_layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nconv_dropout = '+ str(x[1]) + '\nspatial_dropout = '+ str(bool(x[3])) 
-		s += '\nfc_layers = '+ str(int(x[4]))+ '\nfc_dropout = '+ str(x[5]) + '\nbatch_normalization = '+ str(bool(x[6]))
-		s += '\nvalid padding ' if bool(x[7]) else 'same padding'
-		s += '\nmax_pool = '+str(self.max_pool_sets_1d[int(x[8])])
-		return s
 
 	def bayesian_search_1d_anno(self, args, iterations):
 		'''Random search in hyperparameter space for good architectures.
@@ -456,27 +445,30 @@ class HyperparameterOptimizer(object):
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))},
+			{'name':'max_pools_1d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_1d(x):
-			conv_layers = self.conv_layers_sets[int(x[0][2])]
-			max_pool_set = self.max_pool_sets_1d[int(x[0][9])]
-			fc_layers = self.fc_layer_sets[int(x[0][5])]
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_1d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = int(x[0][0]), 
+											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
-											conv_dropout = float(x[0][1]),
-											spatial_dropout = bool(x[0][3]),
+											conv_dropout = float(p[param_keys['conv_dropout']]),
+											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
-											padding = 'valid' if bool(x[0][8]) else 'same',
-											annotation_units = int(x[0][4]),
-											annotation_shortcut = bool(x[0][10]),
+											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+											annotation_units = int(p[param_keys['annotation_units']]),
+											annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 											fc_layers = fc_layers,
-											fc_dropout = float(x[0][6]),
-											batch_normalization = bool(x[0][7]))
+											fc_dropout = float(p[param_keys['fc_dropout']]),
+											batch_normalization = bool(p[param_keys['batch_normalization']]))
 
 				if model.count_params() > 5000000:
 					print('Model too big')
@@ -485,8 +477,8 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
-				print(self.str_from_params_1d_anno(x[0]))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(x[0], param_keys))
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:
@@ -507,17 +499,29 @@ class HyperparameterOptimizer(object):
 
 		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_1d_anno(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_1d_anno(optimizer.x_opt))
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
-	def str_from_params_1d_anno(self, x):
-		s = '\nconv_width = ' + str(int(x[0])) + '\nconv_layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nconv_dropout = '+ str(x[1]) + '\nspatial_dropout = '+ str(bool(x[3])) 
-		s += '\nannotation_units = '+ str(int(x[4])) + ' annotation shortcut = ' + str(bool(x[10]))
-		s += '\nfc_layers = '+ str(self.fc_layer_sets[int(x[5])])+ '\nfc_dropout = '+ str(x[6]) + '\nbatch_normalization = '+ str(bool(x[7]))
-		s += '\nvalid padding ' if bool(x[8]) else '\nsame padding'
-		s += '\nmax_pool = '+str(self.max_pool_sets_1d[int(x[9])])
+
+	def str_from_params_and_keys(self, x, param_keys):
+		bools = ['spatial_dropout', 'batch_normalization', 'valid_padding', 'annotation_shortcut']
+		s = ''
+		for k in param_keys:
+			s += '\n' + k + ' = '
+			if k == 'fc':
+				s += str(self.fc_layer_sets[int(x[param_keys[k]])])
+			elif k == 'conv_layers':
+				s += str(self.conv_layers_sets[int(x[param_keys[k]])])
+			elif k == 'max_pools_1d':
+				s += str(self.max_pool_sets_1d[int(x[param_keys[k]])])
+			elif k == 'max_pools_2d':
+				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])	
+			elif k in bools:
+				s += str(bool(x[param_keys[k]]))
+			else:
+				s += str(x[param_keys[k]])
+
 		return s
 
 	def bayesian_search_mlp(self, args, iterations):
@@ -537,22 +541,24 @@ class HyperparameterOptimizer(object):
 
 		stats = Counter()
 		bounds = [
-			{'name':'layers', 'type':'categorical', 'domain':range(len(self.fc_layer_sets))},
+			{'name':'fc', 'type':'categorical', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
-			{'name':'skip_connection', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)}
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_mlp(x):
-			my_params = x[0]
-			layer_set = self.fc_layer_sets[int(my_params[0])]
+			p = x[0]
+			layer_set = self.fc_layer_sets[int(p[param_keys['fc']])]
 			print('Got some X:\n', my_params, '\n got layers:', layer_set)
 			try:
 				model = models.annotation_multilayer_perceptron_from_args(args,
 											fc_layers = layer_set,
-											dropout = float(my_params[1]),
-											skip_connection = bool(my_params[2]),
-											batch_normalization = bool(my_params[3]))
+											dropout = float(p[param_keys['dropout']]),
+											skip_connection = bool(p[param_keys['annotation_shortcut']]),
+											batch_normalization = bool(p[param_keys['batch_normalization']]))
 											
 				if model.count_params() > 1000000:
 					print('Model too big')
@@ -561,10 +567,10 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				normalized_loss = loss_and_metrics[0]
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience, 'Normalized loss:', normalized_loss)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
-				return normalized_loss
+				return loss_and_metrics[0]
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
 				return 9e9
@@ -581,18 +587,11 @@ class HyperparameterOptimizer(object):
 		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-9, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
 		loss_from_params_mlp([optimizer.x_opt])
-		print(self.str_from_params_mlp(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_mlp(optimizer.x_opt))
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
-
-	def str_from_params_mlp(self, my_params):
-		s = 'layers = ' + str(self.fc_layer_sets[int(my_params[0])])
-		s += '\ndropout = ' + str(my_params[1])
-		s += '\nskip_connection = ' + str(bool(my_params[2]))
-		s += '\nbatch_normalization = ' + str(bool(my_params[3]))
-		return s
 
 
 	def ab_test_2d(self, args, params_a, params_b):

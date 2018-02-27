@@ -898,23 +898,23 @@ def train_ref_read_anno_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 15, 
-									conv_height = 7,
-									conv_layers = [256, 216, 168, 32],
+									conv_width = 5, 
+									conv_height = 5,
+									conv_layers = [256, 216, 128, 96, 64, 48, 32, 16],
 									conv_dropout = 0.0,
 									spatial_dropout = False,
-									max_pools = [(3,1), (3,1)],
+									max_pools = [(4,1)],
 									padding='same',
 									annotation_units = 16,
-									fc_layers = [64],
+									annotation_shortcut = True,
+									fc_layers = [32, 32],
 									fc_dropout = 0.0,
-									batch_normalization = False)
+									batch_normalization = True)
 	
-	#models.serialize_model_semantics(args, weight_path)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	plots.plot_roc_per_class(model, [test[0]], test[1], args.labels, args.id)
+	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id)
 
 
 
