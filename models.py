@@ -2117,8 +2117,8 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	args.input_symbols = semantics['input_symbols']
 	args.labels = semantics['output_labels']
 
-	if 'data_dir' in semantics:
-		args.data_dir = semantics['data_dir']
+	#if 'data_dir' in semantics:
+	#	args.data_dir = semantics['data_dir']
 
 	weight_path_hd5 = os.path.join(os.path.dirname(semantics_json),semantics['architecture'])
 	model = load_model(weight_path_hd5, custom_objects=get_metric_dict(args.labels))

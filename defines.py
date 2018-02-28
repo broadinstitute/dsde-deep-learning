@@ -272,7 +272,9 @@ def bqsr_tensor_channel_map():
 
 def tensor_shape_from_args(args):
 	in_channels = total_input_channels_from_args(args)
-	if args.channels_last:
+	if args.tensor_map == 'reference':
+		tensor_shape = (args.window_size, in_channels)
+	elif args.channels_last:
 		tensor_shape = (args.read_limit, args.window_size, in_channels)
 	else:
 		tensor_shape = (in_channels, args.read_limit, args.window_size) 

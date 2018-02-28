@@ -42,8 +42,8 @@ def run():
 		make_reference_net(args)
 	elif 'train_reference_annotation' == args.mode:
 		make_reference_annotation_net(args)
-	elif 'train_reference_plus_skip' == args.mode:
-		train_reference_plus_skip(args)		
+	elif 'train_reference_annotation_b' == args.mode:
+		train_reference_annotation_b(args)		
 	elif 'train_reference_1layer' == args.mode:
 		make_reference_annotation_net_1layer(args)		
 	elif 'train_annotation_mlp' == args.mode:
@@ -898,15 +898,15 @@ def train_ref_read_anno_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 5, 
-									conv_height = 5,
-									conv_layers = [256, 216, 128, 96, 64, 48, 32, 16],
+									conv_width = 11, 
+									conv_height = 19,
+									conv_layers = [128, 128, 96, 96, 32, 32, 16, 16],
 									conv_dropout = 0.0,
 									spatial_dropout = False,
-									max_pools = [(4,1)],
+									max_pools = [(2,1),(2,1)],
 									padding='same',
-									annotation_units = 16,
-									annotation_shortcut = True,
+									annotation_units = 32,
+									annotation_shortcut = False,
 									fc_layers = [32, 32],
 									fc_dropout = 0.0,
 									batch_normalization = True)
@@ -1634,7 +1634,7 @@ def make_reference_annotation_net(args):
 	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id)
 
 
-def train_reference_plus_skip(args):
+def train_reference_annotation_b(args):
 	'''Train a 1D Convolution plus MLP Annotation with skip connection architecture.
 
 	Arguments:
@@ -1652,7 +1652,18 @@ def train_reference_plus_skip(args):
 	generate_valid = td.dna_annotation_generator(args, valid_paths)
 
 	weight_path = arguments.weight_path_from_args(args)
-	model = models.build_reference_annotation_skip_model(args)
+	model = models.build_reference_annotation_1d_model_from_args(args, 
+											conv_width = 5, 
+											conv_layers = [256, 216, 168, 32],
+											conv_dropout = 0.0,
+											spatial_dropout = True,
+											max_pools = [4, 4],
+											padding = 'valid',
+											annotation_units = 64,
+											annotation_shortcut = True,
+											fc_layers = [128, 16],
+											fc_dropout = 0.0,
+											batch_normalization = True)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
@@ -1835,11 +1846,15 @@ def test_architectures(args):
 			args.architectures: list of architecture semantics config files
 	'''
 	for a in args.architectures:
+		print('Processing architecture:', a)
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
 		test = td.big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
 		model = models.set_args_and_get_model_from_semantics(args, a)
 		positions = test[-1]
-		test_data = [test[0][args.tensor_map], test[0]['annotations']]
+
+		test_data = [test[0][args.tensor_map]]
+		if defines.annotations_from_args(args):
+			test_data.append(test[0]["annotations"])
 
 		cnn_predictions = model.predict(test_data, batch_size=args.batch_size)
 		cnn_snp_dict, cnn_indel_dict = models.predictions_to_snp_indel_scores(args, cnn_predictions, positions)
@@ -1863,8 +1878,8 @@ def test_architectures(args):
 		shared_snp_keys = set.intersection(*snp_key_sets)
 		shared_indel_keys = set.intersection(*indel_key_sets)
 
-		snp_truth = [snp_deep_variant[p][1] for p in shared_snp_keys]
-		indel_truth = [indel_deep_variant[p][1] for p in shared_indel_keys]
+		snp_truth = [snp_vqsr[p][1] for p in shared_snp_keys]
+		indel_truth = [indel_vqsr[p][1] for p in shared_indel_keys]
 		
 		if 'SNP' in args.labels:
 			snp_scores = {}
