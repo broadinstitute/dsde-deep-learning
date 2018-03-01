@@ -133,7 +133,7 @@ def run():
 	elif 'write_tensors_2bit' == args.mode:
 		td.tensors_from_tensor_map_2channel(args, include_annotations=True)
 	elif 'write_tensors_no_annotations' == args.mode:
-		td.tensors_from_tensor_map(args, include_annotations=False)		
+		td.tensors_from_tensor_map(args, include_annotations=False)
 	elif 'write_tensors_gnomad_annotations' == args.mode:
 		td.tensors_from_tensor_map_gnomad_annos(args)
 	elif 'write_tensors_gnomad_annotations_per_allele_1d' == args.mode:
@@ -943,11 +943,11 @@ def train_ref_read_anno_model_tiny(args):
 									conv_layers = [64, 64],
 									conv_dropout = 0.0,
 									spatial_dropout = False,
-									max_pools = [(8,1)],
+									max_pools = [(2,1),(8,1)],
 									padding='valid',
 									annotation_units = 12,
 									annotation_shortcut = False,
-									fc_layers = [24],
+									fc_layers = [18],
 									fc_dropout = 0.0,
 									batch_normalization = False)
 	

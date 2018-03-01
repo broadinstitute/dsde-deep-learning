@@ -2431,7 +2431,6 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 
 				with h5py.File(tensor_path, 'r') as hf:
 					for key in batch.keys():
-						#batch[key][cur_example] = np.array(hf.get(key))
 						if key == 'annotations':
 							batch[key][cur_example] = np.array(hf.get(args.annotation_set))
 						else:
