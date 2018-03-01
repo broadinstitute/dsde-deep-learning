@@ -76,6 +76,7 @@ class HyperparameterOptimizer(object):
 								  [(3,3), (3,3)], [(2,2),(2,2)],  [] ]
 		self.max_pool_sets_1d = [ [3], [2], [2,2], [3,3,3], [3,2,1], [1,2,3], [6], [4,4], [10], [8,8], [2,6], [] ]
 		self.fc_layer_sets = [[32], [64], [32, 16], [16, 32], [32, 32], [64, 64], [64,32,16]]
+		self.mlp_layer_sets = [[32], [64], [256], [32, 16], [16, 32], [32, 32], [64, 64], [64,32,16], [128,64,32], [256,128,64,32], [64, 128, 256, 128, 64]]
 		self.paddings = ['valid']
 		self.annotation_units = [12, 16, 20]
 		self.conv_dropouts = [0.0, 0.2, 0.4]
@@ -505,7 +506,7 @@ class HyperparameterOptimizer(object):
 
 
 	def str_from_params_and_keys(self, x, param_keys):
-		bools = ['spatial_dropout', 'batch_normalization', 'valid_padding', 'annotation_shortcut']
+		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut']
 		s = ''
 		for k in param_keys:
 			s += '\n' + k + ' = '
@@ -532,7 +533,8 @@ class HyperparameterOptimizer(object):
 
 		Arguments:
 			iterations: how many architectures to try
-		'''		
+		'''
+		args.window_size = 0	
 		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 
 		generate_train = td.dna_annotation_generator(args, train_paths)
@@ -544,21 +546,23 @@ class HyperparameterOptimizer(object):
 			{'name':'fc', 'type':'categorical', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)}
+			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'batch_normalize_input', 'type':'categorical', 'domain':(0, 1)}
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
 
 		def loss_from_params_mlp(x):
 			p = x[0]
-			layer_set = self.fc_layer_sets[int(p[param_keys['fc']])]
-			print('Got some X:\n', my_params, '\n got layers:', layer_set)
+			layer_set = self.mlp_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.annotation_multilayer_perceptron_from_args(args,
 											fc_layers = layer_set,
 											dropout = float(p[param_keys['dropout']]),
 											skip_connection = bool(p[param_keys['annotation_shortcut']]),
-											batch_normalization = bool(p[param_keys['batch_normalization']]))
+											batch_normalization = bool(p[param_keys['batch_normalization']]),
+											batch_normalize_input = bool(p[param_keys['batch_normalize_input']])
+											)
 											
 				if model.count_params() > 1000000:
 					print('Model too big')
@@ -586,7 +590,6 @@ class HyperparameterOptimizer(object):
 
 		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-9, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		loss_from_params_mlp([optimizer.x_opt])
 		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
 			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))

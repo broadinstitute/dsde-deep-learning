@@ -34,6 +34,7 @@ import keras.backend as K
 from keras.preprocessing import image
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import plot_model, to_categorical
+from keras.utils.vis_utils import model_to_dot
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
@@ -180,6 +181,7 @@ def annotation_multilayer_perceptron_from_args(args,
 											fc_layers = [128, 128, 128, 128],
 											dropout = 0.3,
 											initializer='glorot_normal',
+											batch_normalize_input = False,
 											batch_normalization = False,
 											skip_connection = False):
 	'''Build Multilayer perceptron for classifying variants.
@@ -196,13 +198,20 @@ def annotation_multilayer_perceptron_from_args(args,
 	'''
 	annotations_in = Input(shape=(len(args.annotations),), name='annotations')
 	
-	if batch_normalization:
+	if batch_normalize_input:
 		x = annotations = BatchNormalization(axis=1)(annotations_in)
 	else:
 		x = annotations = annotations_in
 
-	for l in fc_layers:	
-		x = Dense(units=l, kernel_initializer=initializer, activation='relu')(x)
+	for l in fc_layers:
+		
+		if batch_normalization:
+			x = Dense(units=l, activation='relu', kernel_initializer=initializer)(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)
+		else:
+			x = Dense(units=l, activation='relu', kernel_initializer=initializer)(x)
+	
 		if dropout > 0:
 			x = Dropout(dropout)(x)
 		if skip_connection:
@@ -2144,6 +2153,8 @@ def inspect_model(args, model, generate_train, generate_valid):
 	Returns
 		The slightly optimized keras model
 	'''
+	plot_dot_model_in_color(model_to_dot(model, show_shapes=False,), './figures/architecture_'+args.tensor_map+'.png')
+
 	t0 = time.time()
 	history = model.fit_generator(generate_train, steps_per_epoch=args.samples, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
 	t1 = time.time()
@@ -2156,9 +2167,34 @@ def inspect_model(args, model, generate_train, generate_valid):
 	inference_speed = (t1-t0)/(args.batch_size*args.samples)
 	print('Spent: ', t1-t0, ' seconds predicting. Per tensor inference speed:', inference_speed)
 	
-	plot_model(model, './figures/architecture_'+args.tensor_map+'.jpg')
 	
 	return model
+
+
+def plot_dot_model_in_color(dot, label):
+	for n in dot.get_nodes():
+		if n.get_label():
+			if 'Conv' in n.get_label():
+				n.set_fillcolor("cyan")
+			elif 'BatchNormalization' in n.get_label():
+				n.set_fillcolor("goldenrod1")		
+			elif 'Activation' in n.get_label():
+				n.set_fillcolor("yellow")	
+			elif 'MaxPooling' in n.get_label():
+				n.set_fillcolor("aquamarine")
+			elif 'Dense' in n.get_label():
+				n.set_fillcolor("gold")
+			elif 'Flatten' in n.get_label():
+				n.set_fillcolor("coral3")
+			elif 'Input' in n.get_label():
+				n.set_fillcolor("darkolivegreen1")
+			elif 'Concatenate' in n.get_label():
+				n.set_fillcolor("darkorange")
+			elif 'Dropout' in n.get_label():
+				n.set_fillcolor("tomato")										
+		n.set_style("filled")
+		print(n.get_label(), ' atrribzz:', n.obj_dict['attributes'])
+	dot.write_png(label)
 
 
 def iterate_neuron(model, layer_dict, neuron, layer_name='conv2d_2'):
@@ -2482,7 +2518,6 @@ def get_metric_dict(labels):
 	for i,label_key in enumerate(labels.keys()):
 		metrics[label_key+'_precision'] = precision_fxns[i]
 		metrics[label_key+'_recall'] = recall_fxns[i]
-
 	return metrics
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

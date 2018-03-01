@@ -127,7 +127,7 @@ def get_tensor_channel_map_from_args(args):
 		return get_tensor_channel_map_1d_dna()
 	elif 'bqsr' == args.tensor_map:
 		return bqsr_tensor_channel_map()
-	elif 'mlp' == args.tensor_map:
+	elif 'annotations' == args.tensor_map:
 		return annotations
 	elif 'deep_variant' == args.tensor_map:
 		return deep_variant_channel_map()
