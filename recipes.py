@@ -938,16 +938,16 @@ def train_ref_read_anno_model_tiny(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 5, 
+									conv_width = 9, 
 									conv_height = 5,
 									conv_layers = [64, 64],
 									conv_dropout = 0.0,
 									spatial_dropout = False,
-									max_pools = [(2,1),(4,1)],
+									max_pools = [(4,1),(8,1)],
 									padding='same',
-									annotation_units = 32,
+									annotation_units = 16,
 									annotation_shortcut = False,
-									fc_layers = [32],
+									fc_layers = [18],
 									fc_dropout = 0.0,
 									batch_normalization = False)
 	
@@ -1998,3 +1998,4 @@ def test_architectures(args):
 # Back to the top!
 if "__main__" == __name__:
 	run()
+ 

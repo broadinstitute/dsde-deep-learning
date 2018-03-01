@@ -2153,7 +2153,7 @@ def inspect_model(args, model, generate_train, generate_valid):
 	Returns
 		The slightly optimized keras model
 	'''
-	plot_dot_model_in_color(model_to_dot(model, show_shapes=False,), './figures/architecture_'+args.tensor_map+'.png')
+	plot_dot_model_in_color(model_to_dot(model, show_shapes=True), './figures/architecture_'+args.tensor_map+'.png')
 
 	t0 = time.time()
 	history = model.fit_generator(generate_train, steps_per_epoch=args.samples, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
@@ -2193,7 +2193,6 @@ def plot_dot_model_in_color(dot, label):
 			elif 'Dropout' in n.get_label():
 				n.set_fillcolor("tomato")										
 		n.set_style("filled")
-		print(n.get_label(), ' atrribzz:', n.obj_dict['attributes'])
 	dot.write_png(label)
 
 
