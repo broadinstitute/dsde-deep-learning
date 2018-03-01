@@ -943,11 +943,11 @@ def train_ref_read_anno_model_tiny(args):
 									conv_layers = [64, 64],
 									conv_dropout = 0.0,
 									spatial_dropout = False,
-									max_pools = [(4,1),(8,1)],
-									padding='same',
-									annotation_units = 16,
+									max_pools = [(8,1)],
+									padding='valid',
+									annotation_units = 12,
 									annotation_shortcut = False,
-									fc_layers = [18],
+									fc_layers = [24],
 									fc_dropout = 0.0,
 									batch_normalization = False)
 	
@@ -1998,4 +1998,4 @@ def test_architectures(args):
 # Back to the top!
 if "__main__" == __name__:
 	run()
- 
+        
