@@ -514,6 +514,8 @@ class HyperparameterOptimizer(object):
 			s += '\n' + k + ' = '
 			if k == 'fc':
 				s += str(self.fc_layer_sets[int(x[param_keys[k]])])
+			elif k == 'mlp_fc':
+				s += str(self.mlp_layer_sets[int(x[param_keys[k]])])	
 			elif k == 'conv_layers':
 				s += str(self.conv_layers_sets[int(x[param_keys[k]])])
 			elif k == 'max_pools_1d':
@@ -545,7 +547,7 @@ class HyperparameterOptimizer(object):
 
 		stats = Counter()
 		bounds = [
-			{'name':'fc', 'type':'categorical', 'domain':range(len(self.mlp_layer_sets))},
+			{'name':'mlp_fc', 'type':'categorical', 'domain':range(len(self.mlp_layer_sets))},
 			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
@@ -556,7 +558,7 @@ class HyperparameterOptimizer(object):
 
 		def loss_from_params_mlp(x):
 			p = x[0]
-			layer_set = self.mlp_layer_sets[int(p[param_keys['fc']])]
+			layer_set = self.mlp_layer_sets[int(p[param_keys['mlp_fc']])]
 			try:
 				model = models.annotation_multilayer_perceptron_from_args(args,
 											fc_layers = layer_set,
