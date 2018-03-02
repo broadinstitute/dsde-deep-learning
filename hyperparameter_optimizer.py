@@ -545,7 +545,7 @@ class HyperparameterOptimizer(object):
 
 		stats = Counter()
 		bounds = [
-			{'name':'fc', 'type':'categorical', 'domain':range(len(self.fc_layer_sets))},
+			{'name':'fc', 'type':'categorical', 'domain':range(len(self.mlp_layer_sets))},
 			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},

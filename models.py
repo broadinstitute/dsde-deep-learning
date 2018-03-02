@@ -2085,6 +2085,8 @@ def serialize_model_semantics(args, architecture_hd5):
 	if args.data_dir:
 		semantics['data_dir'] = args.data_dir
 
+	semantics['channels_last'] = args.channels_last
+
 	json_file_name = args.output_dir + args.id + '.json'
 	with open(json_file_name, 'w') as outfile:
 		json.dump(semantics, outfile)
@@ -2123,11 +2125,11 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	if 'input_annotations' in semantics:
 		args.annotations = semantics['input_annotations']
 
+	if 'channels_last' in semantics:
+		args.channels_last = semantics['channels_last']
+	
 	args.input_symbols = semantics['input_symbols']
 	args.labels = semantics['output_labels']
-
-	#if 'data_dir' in semantics:
-	#	args.data_dir = semantics['data_dir']
 
 	weight_path_hd5 = os.path.join(os.path.dirname(semantics_json),semantics['architecture'])
 	model = load_model(weight_path_hd5, custom_objects=get_metric_dict(args.labels))
