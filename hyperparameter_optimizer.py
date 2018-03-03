@@ -188,26 +188,30 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))}
+			{'name':'max_pools_2d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))}
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_2d(x):
-			my_params = x[0]
-			max_pools = self.max_pool_sets_2d[int(my_params[6])]
-			conv_layers = self.conv_layers_sets[int(my_params[2])]
-			fc_layers = self.fc_layer_sets[int(my_params[3])]
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pools = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
-										conv_width = int(my_params[0]),
-										conv_height = int(my_params[1]),
+										conv_width = int(p[param_keys['conv_width']]),
+										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
+										conv_batch_normalize = p[param_keys['conv_batch_normalize']],
 										max_pools = max_pools,
-										padding = 'valid' if bool(my_params[5]) else 'same',
+										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 										fc_layers = fc_layers,
-										batch_normalization = bool(my_params[4])
+										fc_batch_normalize = p[param_keys['fc_batch_normalize']]
 										)
 
 				if model.count_params() > 5000000:
@@ -218,7 +222,7 @@ class HyperparameterOptimizer(object):
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
-				print('best_architecture:', self.str_from_params_2d(my_params))
+				print('best_architecture:', self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
 				return loss_and_metrics[0]
 			
@@ -239,23 +243,9 @@ class HyperparameterOptimizer(object):
 
 		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		loss_from_params_2d([optimizer.x_opt])
-		print('best_architecture:', self.str_from_params_2d(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_2d(optimizer.x_opt))
-
-
-	def str_from_params_2d(self, x):
-		s = '\nConv Layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1])
-		s += '\nPadding = ' + ('valid' if bool(x[5]) else 'same')
-		s += '\nFC layers = ' + str(self.fc_layer_sets[int(x[3])])
-		s += '\nBatch normalization = ' + str(bool(x[4]))
-		s += '\n Max Pools = ' + str(self.max_pool_sets_2d[int(x[6])])
-		s += '\n'
-		return s
-
-
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
@@ -278,10 +268,12 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_2d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))},
 		]
@@ -291,19 +283,21 @@ class HyperparameterOptimizer(object):
 		def loss_from_params_2d_anno(x):
 			p = x[0]
 			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
-			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_2d']])]
+			max_pool_set = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
 			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
 										conv_width = int(p[param_keys['conv_width']]),
 										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
+										conv_batch_normalize =  bool(p[param_keys['conv_batch_normalize']]),
 										max_pools = max_pool_set,
 										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 										annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
+										annotation_batch_normalize = bool(p[param_keys['annotation_batch_normalize']]),
 										fc_layers = fc_layers,
-										batch_normalization = bool(p[param_keys['batch_normalization']])
+										fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']])
 										)
 
 				if model.count_params() > 5000000:
@@ -352,19 +346,20 @@ class HyperparameterOptimizer(object):
 		'''		
 		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 
-		generate_train = td.dna_annotation_generator(args, train_paths)
-		generate_valid = td.dna_annotation_generator(args, valid_paths)
-		generate_test = td.dna_annotation_generator(args, test_paths)
+		generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+		generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		stats = Counter()
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_1d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))}
 		]
@@ -381,12 +376,13 @@ class HyperparameterOptimizer(object):
 											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
 											conv_dropout = float(p[param_keys['conv_dropout']]),
+											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
 											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 											fc_layers = fc_layers,
 											fc_dropout = float(p[param_keys['fc_dropout']]),
-											batch_normalization = bool(p[param_keys['batch_normalization']]))
+											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
 
 				if model.count_params() > 5000000:
 					print('Model too big')
@@ -433,23 +429,25 @@ class HyperparameterOptimizer(object):
 		'''		
 		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 
-		generate_train = td.dna_annotation_generator(args, train_paths)
-		generate_valid = td.dna_annotation_generator(args, valid_paths)
-		generate_test = td.dna_annotation_generator(args, test_paths)
+		generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+		generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		stats = Counter()
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(8,16,32,64)},
+			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_1d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))},
-			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
@@ -464,14 +462,16 @@ class HyperparameterOptimizer(object):
 											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
 											conv_dropout = float(p[param_keys['conv_dropout']]),
+											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
 											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 											annotation_units = int(p[param_keys['annotation_units']]),
 											annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
+											annotation_batch_normalize = bool(p[param_keys['annotation_batch_normalize']]),								
 											fc_layers = fc_layers,
 											fc_dropout = float(p[param_keys['fc_dropout']]),
-											batch_normalization = bool(p[param_keys['batch_normalization']]))
+											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
 
 				if model.count_params() > 5000000:
 					print('Model too big')
@@ -506,28 +506,6 @@ class HyperparameterOptimizer(object):
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
 			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
-
-	def str_from_params_and_keys(self, x, param_keys):
-		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut']
-		s = ''
-		for k in param_keys:
-			s += '\n' + k + ' = '
-			if k == 'fc':
-				s += str(self.fc_layer_sets[int(x[param_keys[k]])])
-			elif k == 'mlp_fc':
-				s += str(self.mlp_layer_sets[int(x[param_keys[k]])])	
-			elif k == 'conv_layers':
-				s += str(self.conv_layers_sets[int(x[param_keys[k]])])
-			elif k == 'max_pools_1d':
-				s += str(self.max_pool_sets_1d[int(x[param_keys[k]])])
-			elif k == 'max_pools_2d':
-				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])	
-			elif k in bools:
-				s += str(bool(x[param_keys[k]]))
-			else:
-				s += str(x[param_keys[k]])
-
-		return s
 
 	def bayesian_search_mlp(self, args, iterations):
 		'''Random search in hyperparameter space for good architectures.
@@ -570,7 +548,8 @@ class HyperparameterOptimizer(object):
 											
 				if model.count_params() > 1000000:
 					print('Model too big')
-					return 9e8
+					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
@@ -581,8 +560,7 @@ class HyperparameterOptimizer(object):
 				return loss_and_metrics[0]
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return 9e9
-
+				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_mlp,  	# Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
@@ -607,6 +585,28 @@ class HyperparameterOptimizer(object):
 			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
+	def str_from_params_and_keys(self, x, param_keys):
+		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
+				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize']
+		s = ''
+		for k in param_keys:
+			s += '\n' + k + ' = '
+			if k == 'fc':
+				s += str(self.fc_layer_sets[int(x[param_keys[k]])])
+			elif k == 'mlp_fc':
+				s += str(self.mlp_layer_sets[int(x[param_keys[k]])])	
+			elif k == 'conv_layers':
+				s += str(self.conv_layers_sets[int(x[param_keys[k]])])
+			elif k == 'max_pools_1d':
+				s += str(self.max_pool_sets_1d[int(x[param_keys[k]])])
+			elif k == 'max_pools_2d':
+				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])	
+			elif k in bools:
+				s += str(bool(x[param_keys[k]]))
+			else:
+				s += str(x[param_keys[k]])
+
+		return s
 
 
 	def ab_test_2d(self, args, params_a, params_b):

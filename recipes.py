@@ -25,7 +25,7 @@ import h5py
 import time
 import plots
 import pysam
-import models
+#import models
 import defines
 import operator
 import arguments
@@ -1693,17 +1693,17 @@ def train_reference_annotation_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = 5, 
-											conv_layers = [256, 216, 168, 32],
+											conv_width = 19, 
+											conv_layers = [128, 128, 96, 96, 32, 32],
 											conv_dropout = 0.0,
-											spatial_dropout = True,
-											max_pools = [4, 4],
-											padding = 'valid',
+											spatial_dropout = False,
+											max_pools = [2],
+											padding = 'same',
 											annotation_units = 64,
 											annotation_shortcut = True,
-											fc_layers = [128, 16],
+											fc_layers = [32],
 											fc_dropout = 0.0,
-											batch_normalization = True)
+											batch_normalization = False)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
@@ -1890,7 +1890,7 @@ def test_architectures(args):
 		
 		generate_train, generate_valid, _  = td.train_valid_test_generators_from_args(args, with_positions=False)
 		model = models.set_args_and_get_model_from_semantics(args, a)
-		models.inspect_model(args, model, generate_train, generate_valid)
+		#models.inspect_model(args, model, generate_train, generate_valid)
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
 		test = td.big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
 		
@@ -1930,6 +1930,7 @@ def test_architectures(args):
 			snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
 			snp_scores['Neural Net'] = [cnn_snp_dict[p] for p in shared_snp_keys]
 			snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
+
 			if args.single_sample_vqsr:
 				snp_scores['VQSR Single Sample'] = [snp_single_sample[p][0] for p in shared_snp_keys]
 			if args.deep_variant_vcf:
