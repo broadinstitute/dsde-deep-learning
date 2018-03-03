@@ -25,7 +25,7 @@ import h5py
 import time
 import plots
 import pysam
-#import models
+import models
 import defines
 import operator
 import arguments
@@ -1885,118 +1885,132 @@ def test_architectures(args):
 	Arguments:
 			args.architectures: list of architecture semantics config files
 	'''
+	cnn_snp_dicts = {}
+	cnn_indel_dicts = {}
 	for a in args.architectures:
 		print('Processing architecture:', a)
 		
-		generate_train, generate_valid, _  = td.train_valid_test_generators_from_args(args, with_positions=False)
 		model = models.set_args_and_get_model_from_semantics(args, a)
-		#models.inspect_model(args, model, generate_train, generate_valid)
+		if args.inspect_model:
+			generate_train, generate_valid, _  = td.train_valid_test_generators_from_args(args, with_positions=False)
+			models.inspect_model(args, model, generate_train, generate_valid, args.output_dir+td.plain_name(a)+'.png')
+		
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
 		test = td.big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
-		
 
 		positions = test[-1]
 		test_data = [test[0][args.tensor_map]]
 		if defines.annotations_from_args(args):
-			test_data.append(test[0]["annotations"])
+			test_data.append(test[0][args.annotation_set])
 
 		cnn_predictions = model.predict(test_data, batch_size=args.batch_size)
-		cnn_snp_dict, cnn_indel_dict = models.predictions_to_snp_indel_scores(args, cnn_predictions, positions)
+		snp_dict, indel_dict = models.predictions_to_snp_indel_scores(args, cnn_predictions, positions)
+		cnn_indel_dicts[a] = indel_dict
+		cnn_snp_dicts[a] = snp_dict
 
-		snp_vqsr, indel_vqsr = td.gnomad_scores_from_positions(args, positions)
-		snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
+	snp_vqsr, indel_vqsr = td.gnomad_scores_from_positions(args, positions)
+	snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
 
-		snp_key_sets = [ set(snp_vqsr.keys()), set(snp_rf.keys()) ]
-		indel_key_sets = [ set(indel_vqsr.keys()), set(indel_rf.keys()) ]
+	snp_key_sets = [ set(snp_vqsr.keys()), set(snp_rf.keys()) ]
+	indel_key_sets = [ set(indel_vqsr.keys()), set(indel_rf.keys()) ]
+
+	if args.single_sample_vqsr:
+		snp_single_sample, indel_single_sample = td.scores_from_positions(args, positions)
+		snp_key_sets.append(set(snp_single_sample.keys()))
+		indel_key_sets.append(set(indel_single_sample.keys()))
+
+	if args.deep_variant_vcf:
+		snp_deep_variant, indel_deep_variant = td.scores_from_positions(args, positions, 'QUAL', args.deep_variant_vcf)
+		snp_key_sets.append(set(snp_deep_variant.keys()))
+		indel_key_sets.append(set(indel_deep_variant.keys()))		
+
+	shared_snp_keys = set.intersection(*snp_key_sets)
+	shared_indel_keys = set.intersection(*indel_key_sets)
+
+	snp_truth = [snp_vqsr[p][1] for p in shared_snp_keys]
+	indel_truth = [indel_vqsr[p][1] for p in shared_indel_keys]
+	
+	if 'SNP' in args.labels:
+		snp_scores = {}
+		snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
+		snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
+
+		for a in args.architectures:
+			snp_scores['GATK4:'+td.plain_name(a)] = [cnn_snp_dicts[a][p] for p in shared_snp_keys]
 
 		if args.single_sample_vqsr:
-			snp_single_sample, indel_single_sample = td.scores_from_positions(args, positions)
-			snp_key_sets.append(set(snp_single_sample.keys()))
-			indel_key_sets.append(set(indel_single_sample.keys()))
-
+			snp_scores['VQSR Single Sample'] = [snp_single_sample[p][0] for p in shared_snp_keys]
 		if args.deep_variant_vcf:
-			snp_deep_variant, indel_deep_variant = td.scores_from_positions(args, positions, 'QUAL', args.deep_variant_vcf)
-			snp_key_sets.append(set(snp_deep_variant.keys()))
-			indel_key_sets.append(set(indel_deep_variant.keys()))		
+			snp_scores['Deep Variant'] = [snp_deep_variant[p][0] for p in shared_snp_keys]
 
-		shared_snp_keys = set.intersection(*snp_key_sets)
-		shared_indel_keys = set.intersection(*indel_key_sets)
+		if args.emit_interesting_sites:
+			# Find CNN wrong RF and VQSR correct sites
+			vqsr_thresh = (np.max(snp_scores['VQSR gnomAD']) + np.min(snp_scores['VQSR gnomAD']))/2
 
-		snp_truth = [snp_vqsr[p][1] for p in shared_snp_keys]
-		indel_truth = [indel_vqsr[p][1] for p in shared_indel_keys]
-		
-		if 'SNP' in args.labels:
-			snp_scores = {}
-			snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
-			snp_scores['Neural Net'] = [cnn_snp_dict[p] for p in shared_snp_keys]
-			snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
+			#NEED to fix this
 
-			if args.single_sample_vqsr:
-				snp_scores['VQSR Single Sample'] = [snp_single_sample[p][0] for p in shared_snp_keys]
-			if args.deep_variant_vcf:
-				snp_scores['Deep Variant'] = [snp_deep_variant[p][0] for p in shared_snp_keys]
-
-			if args.emit_interesting_sites:
-				# Find CNN wrong RF and VQSR correct sites
-				vqsr_thresh = (np.max(snp_scores['VQSR gnomAD']) + np.min(snp_scores['VQSR gnomAD']))/2
-				cnn_thresh = (np.max(snp_scores['Neural Net']) + np.min(snp_scores['Neural Net']))/2
-				rf_thresh = (np.max(snp_scores['Random Forest']) + np.min(snp_scores['Random Forest']))/2
-				
-				for p in shared_snp_keys:
-					truth = snp_vqsr[p][1]
-					vqsr_label = int(vqsr_thresh < snp_vqsr[p][0])
-					cnn_label = int(cnn_thresh < cnn_snp_dict[p])
-					rf_label = int(rf_thresh < snp_rf[p][0])
-					if truth == rf_label and truth == vqsr_label and truth != cnn_label:
-						print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at SNP:', p, 'CNN Score:', cnn_snp_dict[p])
-
-				sorted_snps = sorted(cnn_snp_dict.items(), key=operator.itemgetter(1))
-				for i in range(5):	
-					print('Got Bad SNP score:', sorted_snps[i])
-				for i in range(len(sorted_snps)-1, len(sorted_snps)-5, -1):	
-					print('Got Good SNP score:', sorted_snps[i])
-				print('Total true SNPs:', np.sum(snp_truth), ' Total false SNPs:', (len(snp_truth)-np.sum(snp_truth)))
-
-			title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
-			plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
-			plots.plot_precision_recall_from_scores(snp_truth, snp_scores, 'SNP_Precision_Recall_'+title_suffix)		
-		
-		if 'INDEL' in args.labels:
-			indel_scores = {}
-			indel_scores['VQSR gnomAD'] = [indel_vqsr[p][0] for p in shared_indel_keys]
-			indel_scores['Neural Net'] = [cnn_indel_dict[p] for p in shared_indel_keys]
-			indel_scores['Random Forest'] = [indel_rf[p][0] for p in shared_indel_keys]
-			if args.single_sample_vqsr:
-				indel_scores['VQSR Single Sample'] = [indel_single_sample[p][0] for p in shared_indel_keys]
-			if args.deep_variant_vcf:
-				indel_scores['Deep Variant'] = [indel_deep_variant[p][0] for p in shared_indel_keys]
-
-			if args.emit_interesting_sites:
-				# Find CNN wrong RF and VQSR correct sites
-				vqsr_thresh = (np.max(indel_scores['VQSR gnomAD']) + np.min(indel_scores['VQSR gnomAD']))/2
-				cnn_thresh = (np.max(indel_scores['Neural Net']) + np.min(indel_scores['Neural Net']))/2
-				rf_thresh = (np.max(indel_scores['Random Forest']) + np.min(indel_scores['Random Forest']))/2
-				for p in shared_indel_keys:
-					truth = int(indel_vqsr[p][1])
-					vqsr_label = int(vqsr_thresh < indel_vqsr[p][0])
-					cnn_label = int(cnn_thresh < cnn_indel_dict[p])
-					rf_label = int(rf_thresh < indel_rf[p][0])
-					if truth == rf_label and truth == vqsr_label and truth != cnn_label:
-						print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at INDEL:', p, 'CNN Score:', cnn_indel_dict[p])	
-
-				sorted_indels = sorted(cnn_indel_dict.items(), key=operator.itemgetter(1))
-				for i in range(5):	
-					print('Got Bad INDEL score:', sorted_indels[i])
-				for i in range(len(sorted_indels)-1, len(sorted_indels)-5, -1):	
-					print('Got Good INDEL score:', sorted_indels[i])
-				print('Total true INDELs:', np.sum(indel_truth), ' Total false INDELs:', (len(indel_truth)-np.sum(indel_truth)))
+			cnn_thresh = (np.max(snp_scores['Neural Net']) + np.min(snp_scores['Neural Net']))/2
+			rf_thresh = (np.max(snp_scores['Random Forest']) + np.min(snp_scores['Random Forest']))/2
 			
-			title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
-			plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
-			plots.plot_precision_recall_from_scores(indel_truth, indel_scores, 'INDEL_Precision_Recall_'+title_suffix)
+			for p in shared_snp_keys:
+				truth = snp_vqsr[p][1]
+				vqsr_label = int(vqsr_thresh < snp_vqsr[p][0])
+				cnn_label = int(cnn_thresh < cnn_snp_dict[p])
+				rf_label = int(rf_thresh < snp_rf[p][0])
+				if truth == rf_label and truth == vqsr_label and truth != cnn_label:
+					print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at SNP:', p, 'CNN Score:', cnn_snp_dict[p])
+
+			sorted_snps = sorted(cnn_snp_dict.items(), key=operator.itemgetter(1))
+			for i in range(5):	
+				print('Got Bad SNP score:', sorted_snps[i])
+			for i in range(len(sorted_snps)-1, len(sorted_snps)-5, -1):	
+				print('Got Good SNP score:', sorted_snps[i])
+			print('Total true SNPs:', np.sum(snp_truth), ' Total false SNPs:', (len(snp_truth)-np.sum(snp_truth)))
+
+		title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
+		plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
+		plots.plot_precision_recall_from_scores(snp_truth, snp_scores, 'SNP_Precision_Recall_'+title_suffix)		
+	
+	if 'INDEL' in args.labels:
+		indel_scores = {}
+		indel_scores['VQSR gnomAD'] = [indel_vqsr[p][0] for p in shared_indel_keys]
+		indel_scores['Random Forest'] = [indel_rf[p][0] for p in shared_indel_keys]
+
+		for a in args.architectures:
+			indel_scores['GATK4:'+td.plain_name(a)] = [cnn_indel_dicts[a][p] for p in shared_indel_keys]
+
+		if args.single_sample_vqsr:
+			indel_scores['VQSR Single Sample'] = [indel_single_sample[p][0] for p in shared_indel_keys]
+		if args.deep_variant_vcf:
+			indel_scores['Deep Variant'] = [indel_deep_variant[p][0] for p in shared_indel_keys]
+
+		if args.emit_interesting_sites:
+			# Find CNN wrong RF and VQSR correct sites
+			vqsr_thresh = (np.max(indel_scores['VQSR gnomAD']) + np.min(indel_scores['VQSR gnomAD']))/2
+
+			#NEED to fix this
+			cnn_thresh = (np.max(indel_scores['Neural Net']) + np.min(indel_scores['Neural Net']))/2
+			rf_thresh = (np.max(indel_scores['Random Forest']) + np.min(indel_scores['Random Forest']))/2
+			for p in shared_indel_keys:
+				truth = int(indel_vqsr[p][1])
+				vqsr_label = int(vqsr_thresh < indel_vqsr[p][0])
+				cnn_label = int(cnn_thresh < cnn_indel_dict[p])
+				rf_label = int(rf_thresh < indel_rf[p][0])
+				if truth == rf_label and truth == vqsr_label and truth != cnn_label:
+					print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at INDEL:', p, 'CNN Score:', cnn_indel_dict[p])	
+
+			sorted_indels = sorted(cnn_indel_dict.items(), key=operator.itemgetter(1))
+			for i in range(5):	
+				print('Got Bad INDEL score:', sorted_indels[i])
+			for i in range(len(sorted_indels)-1, len(sorted_indels)-5, -1):	
+				print('Got Good INDEL score:', sorted_indels[i])
+			print('Total true INDELs:', np.sum(indel_truth), ' Total false INDELs:', (len(indel_truth)-np.sum(indel_truth)))
+		
+		title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
+		plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
+		plots.plot_precision_recall_from_scores(indel_truth, indel_scores, 'INDEL_Precision_Recall_'+title_suffix)
 
 
 # Back to the top!
 if "__main__" == __name__:
 	run()
-        

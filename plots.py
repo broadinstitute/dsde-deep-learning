@@ -55,7 +55,8 @@ def plot_precision_recall_from_scores(truth, scores, title):
 	lw = 4.0
 	plt.figure(figsize=(22,18))
 	matplotlib.rcParams.update({'font.size': 32})	
-	for k in scores.keys():
+
+	for k, v in sorted(scores.items()):
 		if k in key_colors:
 			c = key_colors[k]
 		else:
@@ -112,7 +113,7 @@ def plot_rocs_from_scores(truth, scores, title):
 	plt.figure(figsize=(22,18))
 	matplotlib.rcParams.update({'font.size': 32})	
 
-	for k in scores.keys():
+	for k, v in sorted(scores.items()):
 		if k in key_colors:
 			c = key_colors[k]
 		else:

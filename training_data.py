@@ -2407,7 +2407,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		batch[args.tensor_map] = np.zeros(((args.batch_size,)+tensor_shape))
 	
 	if defines.annotations_from_args(args):
-		batch['annotations'] = np.zeros((args.batch_size, len(args.annotations)))
+		batch[args.annotation_set] = np.zeros((args.batch_size, len(args.annotations)))
 	
 	if with_positions:
 		positions = []
@@ -2431,10 +2431,12 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 
 				with h5py.File(tensor_path, 'r') as hf:
 					for key in batch.keys():
-						if key == 'annotations':
-							batch[key][cur_example] = np.array(hf.get(args.annotation_set))
+						hf_tensor = hf.get(key)
+						if hf_tensor:
+							batch[key][cur_example] = np.array(hf_tensor)
 						else:
-							batch[key][cur_example] = np.array(hf.get(key))
+							raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+
 				label_matrix[cur_example, label] = 1.0
 				tensor_counts[label] += 1
 				if tensor_counts[label] == len(tensors[label]):

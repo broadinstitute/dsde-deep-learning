@@ -65,20 +65,42 @@ class HyperparameterOptimizer(object):
 		self.performances = {}
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
-		self.conv_layers_sets = [[64], [128], [64,64], [256,256],
-								[32,64,128], [128,32,12],  [128,64,32], [256, 64, 16], [256,128,64], 
-								[128, 96, 64, 32], [256,216,168,32], 
-								[128, 96, 64, 32, 16], [256,216,128,64,32],
-								[128,128,96,96,32,32], [256,216,128,96,64,32],
-								[128,128,96,96,32,32,16,16], [256,216,128,96,64,48,32,16] ]
-		self.max_pool_sets_2d = [ [(1,3)], [(3,1)], [(3,1),(3,1)], [(2,1),(2,1)], [(4,1)], [(4,1),(4,1)],
-								  [(1,2),(1,2)], [(1,3), (1,3)], 
-								  [(3,3), (3,3)], [(2,2),(2,2)],  [] ]
-		self.max_pool_sets_1d = [ [3], [2], [2,2], [3,3,3], [3,2,1], [1,2,3], [6], [4,4], [10], [8,8], [2,6], [] ]
-		self.fc_layer_sets = [[32], [64], [32, 16], [16, 32], [32, 32], [64, 64], [64,32,16]]
-		self.mlp_layer_sets = [[32], [64], [256], [32, 16], [16, 32], [32, 32], [64, 64], [128, 128], 
-								[256, 256], [256, 128, 64], [64,32,16], [128,64,32], 
-								[256,128,64,32], [64, 128, 256, 128, 64]]
+		self.conv_layers_sets = [
+									[64], [128], [32,32], [64,64], [256,256],
+									[32,64,128], [128,32,16],  [128,64,32], [256, 64, 16], [256,128,64], 
+									[128, 96, 64, 32], [256,216,168,32], 
+									[128, 96, 64, 32, 16], [256,216,128,64,32],
+									[128,128,96,96,32,32], [256,216,128,96,64,32],
+									[128,128,96,96,32,32,16,16], [256,216,128,96,64,48,32,16],
+									[32,16,32,16,32,16,32,16,32,16], 
+									[16,32,16,32,16,32,16,32,16,32], 
+									[32,32,32,32,32,32,32,32,32,32]
+								]
+
+		self.max_pool_sets_2d = [ 
+									[], [(1,2)], [(1,3)], [(3,1)], [(4,1)], 
+									[(1,2),(1,2)], [(2,1),(2,1)], 
+								  	[(3,1),(3,1)], [(1,3), (1,3)], [(4,1),(4,1)], 
+								  	[(2,2),(2,2)], [(3,3), (3,3)], [(4,4), (4,4)],
+								  	[(1,2),(1,2),(1,2)], [(2,1),(2,1),(2,1)], [(2,2),(2,2),(2,2)]
+								]
+
+		self.max_pool_sets_1d = [ 
+									[], [2], [3], [6], [8], [2,2], 
+									[3,3], [4,4], [8,8], [2,6], [] 
+								]
+
+		self.fc_layer_sets = [
+									[32], [64], [32, 16], [16, 32], 
+									[32, 32], [64, 64], [64,32,16]
+							 ]
+
+		self.mlp_layer_sets = [
+									[32], [64], [256], [32, 16], [16, 32], [32, 32], [64, 64], [128, 128], 
+									[256, 256], [512,512], [256, 128, 64], [64,32,16], [128,64,32], [512,512,512],
+									[256,128,64,32], [64, 128, 256, 128, 64]
+								]
+
 		self.paddings = ['valid']
 		self.annotation_units = [12, 16, 20]
 		self.conv_dropouts = [0.0, 0.2, 0.4]
@@ -187,12 +209,12 @@ class HyperparameterOptimizer(object):
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_2d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))}
+			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))}
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
@@ -267,7 +289,7 @@ class HyperparameterOptimizer(object):
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
@@ -275,7 +297,7 @@ class HyperparameterOptimizer(object):
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_2d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))},
+			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
@@ -314,19 +336,19 @@ class HyperparameterOptimizer(object):
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
-				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
+				print(str(e) + '\n Impossible architecture perhaps?')
 				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d_anno, # Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
                                              initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-                                             model_type='GP',
+											model_type='GP',
                                              acquisition_type='EI',        			# Expected Improvement
                                              acquisition_optimizer='DIRECT',
                                              exact_feval=True,						# Is loss exact or noisy? Noisy!
                                              verbosity=True,							# Talk to me!
                                              normalize_Y = False
-                                             )         
+                                             )           
 
 		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
@@ -354,14 +376,14 @@ class HyperparameterOptimizer(object):
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_1d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))}
+			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))}
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
@@ -437,7 +459,7 @@ class HyperparameterOptimizer(object):
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(8,16,32,64)},
@@ -447,7 +469,7 @@ class HyperparameterOptimizer(object):
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_1d', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))},
+			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))},
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
@@ -525,7 +547,7 @@ class HyperparameterOptimizer(object):
 
 		stats = Counter()
 		bounds = [
-			{'name':'mlp_fc', 'type':'categorical', 'domain':range(len(self.mlp_layer_sets))},
+			{'name':'mlp_fc', 'type':'discrete', 'domain':range(len(self.mlp_layer_sets))},
 			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},

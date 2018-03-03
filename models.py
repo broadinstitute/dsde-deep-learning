@@ -2176,7 +2176,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 # ~~~~~~~ Inspections ~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def inspect_model(args, model, generate_train, generate_valid):
+def inspect_model(args, model, generate_train, generate_valid, image_path=None):
 	'''Collect statistics on model inference and training times.
 
 	Arguments
@@ -2189,35 +2189,39 @@ def inspect_model(args, model, generate_train, generate_valid):
 	Returns
 		The slightly optimized keras model
 	'''
-	plot_dot_model_in_color(model_to_dot(model, show_shapes=True), './figures/architecture_'+args.tensor_map+'.png')
+	if image_path:
+		plot_dot_model_in_color(model_to_dot(model, show_shapes=True), image_path)
 
 	t0 = time.time()
-	history = model.fit_generator(generate_train, steps_per_epoch=args.samples, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
+	history = model.fit_generator(generate_train, steps_per_epoch=args.training_steps, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
 	t1 = time.time()
-	train_speed = (t1-t0)/(args.batch_size*args.samples)
-	print('Spent: ', t1-t0, ' seconds training, batch_size:', args.batch_size, 'steps:', args.samples, ' Per example training speed:', train_speed)
+	train_speed = (t1-t0)/(args.batch_size*args.training_steps)
+	print('Spent: ', t1-t0, ' seconds training, batch_size:', args.batch_size, 'steps:', args.training_steps, ' Per example training speed:', train_speed)
 
 	t0 = time.time()
-	predictions = model.predict_generator(generate_valid, steps=args.samples, verbose=1)
+	predictions = model.predict_generator(generate_valid, steps=args.training_steps, verbose=1)
 	t1 = time.time()
-	inference_speed = (t1-t0)/(args.batch_size*args.samples)
+	inference_speed = (t1-t0)/(args.batch_size*args.training_steps)
 	print('Spent: ', t1-t0, ' seconds predicting. Per tensor inference speed:', inference_speed)
-	
 	
 	return model
 
 
-def plot_dot_model_in_color(dot, label):
+def plot_dot_model_in_color(dot, image_path):
 	for n in dot.get_nodes():
 		if n.get_label():
-			if 'Conv' in n.get_label():
+			if 'Conv1' in n.get_label():
 				n.set_fillcolor("cyan")
+			elif 'Conv2' in n.get_label():
+				n.set_fillcolor("deepskyblue1")				
 			elif 'BatchNormalization' in n.get_label():
 				n.set_fillcolor("goldenrod1")		
 			elif 'Activation' in n.get_label():
 				n.set_fillcolor("yellow")	
 			elif 'MaxPooling' in n.get_label():
 				n.set_fillcolor("aquamarine")
+			elif 'softmax' in n.get_label():
+				n.set_fillcolor("darkolivegreen4")										
 			elif 'Dense' in n.get_label():
 				n.set_fillcolor("gold")
 			elif 'Flatten' in n.get_label():
@@ -2227,9 +2231,10 @@ def plot_dot_model_in_color(dot, label):
 			elif 'Concatenate' in n.get_label():
 				n.set_fillcolor("darkorange")
 			elif 'Dropout' in n.get_label():
-				n.set_fillcolor("tomato")										
+				n.set_fillcolor("tomato")
 		n.set_style("filled")
-	dot.write_png(label)
+	print('Saving architecture diagram to:',image_path)
+	dot.write_png(image_path)
 
 
 def iterate_neuron(model, layer_dict, neuron, layer_name='conv2d_2'):
