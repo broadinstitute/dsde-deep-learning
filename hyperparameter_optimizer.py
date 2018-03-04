@@ -293,7 +293,6 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
@@ -317,7 +316,6 @@ class HyperparameterOptimizer(object):
 										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 										annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
-										annotation_batch_normalize = bool(p[param_keys['annotation_batch_normalize']]),
 										fc_layers = fc_layers,
 										fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']])
 										)
