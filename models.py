@@ -34,6 +34,7 @@ import keras.backend as K
 from keras.preprocessing import image
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import plot_model, to_categorical
+from keras.utils.vis_utils import model_to_dot
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
@@ -180,6 +181,7 @@ def annotation_multilayer_perceptron_from_args(args,
 											fc_layers = [128, 128, 128, 128],
 											dropout = 0.3,
 											initializer='glorot_normal',
+											batch_normalize_input = False,
 											batch_normalization = False,
 											skip_connection = False):
 	'''Build Multilayer perceptron for classifying variants.
@@ -194,15 +196,22 @@ def annotation_multilayer_perceptron_from_args(args,
 	Returns
 		The keras model
 	'''
-	annotations_in = Input(shape=(len(args.annotations),), name='annotations')
+	annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	
-	if batch_normalization:
+	if batch_normalize_input:
 		x = annotations = BatchNormalization(axis=1)(annotations_in)
 	else:
 		x = annotations = annotations_in
 
-	for l in fc_layers:	
-		x = Dense(units=l, kernel_initializer=initializer, activation='relu')(x)
+	for l in fc_layers:
+		
+		if batch_normalization:
+			x = Dense(units=l, activation='linear', kernel_initializer=initializer)(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)
+		else:
+			x = Dense(units=l, activation='relu', kernel_initializer=initializer)(x)
+	
 		if dropout > 0:
 			x = Dropout(dropout)(x)
 		if skip_connection:
@@ -413,18 +422,18 @@ def build_reference_annotation_skip_model(args):
 
 
 def build_reference_1d_model_from_args(args,
-											conv_width = 6, 
-											conv_layers = [128, 128, 128, 128],
-											conv_dropout = 0.1,					
-											spatial_dropout = True,
-											max_pools = [3, 1],
-											padding='valid',
-											annotation_units = 16,
-											fc_layers = [64],
-											fc_dropout = 0.3,
-											kernel_initializer='he_normal',
-											fc_initializer='glorot_normal',
-											batch_normalization = False):
+										conv_width = 6, 
+										conv_layers = [128, 128, 128, 128],
+										conv_dropout = 0.1,
+										conv_batch_normalize = False,			
+										spatial_dropout = True,
+										max_pools = [3, 1],
+										padding='valid',
+										fc_layers = [64],
+										fc_dropout = 0.3,
+										fc_batch_normalize = False,
+										fc_initializer='glorot_normal',
+										kernel_initializer='glorot_normal'):
 	'''Build Reference 1d CNN model for classifying variants.
 
 	Architecture specified by parameters.
@@ -441,12 +450,12 @@ def build_reference_1d_model_from_args(args,
 	'''	
 	channel_map = defines.get_tensor_channel_map_1d()
 	concat_axis = -1	
-	x = reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	x = reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 
 	max_pool_diff = len(conv_layers)-len(max_pools)	
 	for  i,c in enumerate(conv_layers):
 
-		if batch_normalization:
+		if conv_batch_normalize:
 			x = Conv1D(filters=c, kernel_size=conv_width, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation('relu')(x)
@@ -464,16 +473,21 @@ def build_reference_1d_model_from_args(args,
 	x = Flatten()(x)
 
 	for fc in fc_layers:
-		if fc:
+		if fc_batch_normalize:
+			x = Dense(units=fc, activation='linear', kernel_initializer=fc_initializer)(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)			
+		else:
 			x = Dense(units=fc, activation='relu')(x)
-			if fc_dropout > 0:
-				x = Dropout(fc_dropout)(x)
+		
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
 
 	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
-	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=get_metrics(args.labels))
 	model.summary()
 	
@@ -483,17 +497,20 @@ def build_reference_1d_model_from_args(args,
 def build_reference_annotation_1d_model_from_args(args,
 											conv_width = 6, 
 											conv_layers = [128, 128, 128, 128],
-											conv_dropout = 0.1,					
+											conv_dropout = 0.1,
+											conv_batch_normalize = False,		
 											spatial_dropout = True,
 											max_pools = [3, 1],
 											padding='valid',
 											annotation_units = 16,
 											annotation_shortcut = False,
+											annotation_batch_normalize = True,	
 											fc_layers = [64],
 											fc_dropout = 0.3,
-											kernel_initializer='he_normal',
+											fc_batch_normalize = False,
 											fc_initializer='glorot_normal',
-											batch_normalization = False):
+											kernel_initializer='glorot_normal'
+											):
 	'''Build Reference 1d CNN model for classifying variants.
 
 	Architecture specified by parameters.
@@ -510,12 +527,12 @@ def build_reference_annotation_1d_model_from_args(args,
 	'''	
 	channel_map = defines.get_tensor_channel_map_1d()
 	concat_axis = -1	
-	x = reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	x = reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 
 	max_pool_diff = len(conv_layers)-len(max_pools)	
 	for  i,c in enumerate(conv_layers):
 
-		if batch_normalization:
+		if conv_batch_normalize:
 			x = Conv1D(filters=c, kernel_size=conv_width, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation('relu')(x)
@@ -532,18 +549,25 @@ def build_reference_annotation_1d_model_from_args(args,
 
 	f = Flatten()(x)
 
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
-	annotations_bn = BatchNormalization(axis=concat_axis)(annotations)
-	alt_input_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_bn)
+	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	if annotation_batch_normalize:
+		annotations_in = BatchNormalization(axis=concat_axis)(annotations_in)
+	annotation_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_in)
 	
-	x = layers.concatenate([f, alt_input_mlp], axis=1)
+	x = layers.concatenate([f, annotation_mlp], axis=1)
 	for fc in fc_layers:
-		if fc:
-			x = Dense(units=fc, activation='relu')(x)
+		if fc_batch_normalize:
+			x = Dense(units=fc, activation='linear', kernel_initializer=fc_initializer)(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)		
+		else:
+			x = Dense(units=fc, activation='relu', kernel_initializer=fc_initializer)(x)
+		
+		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 	
 	if annotation_shortcut:
-		x = layers.concatenate([x, annotations_bn], axis=1)
+		x = layers.concatenate([x, annotations_in], axis=1)
 
 	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
 	
@@ -561,14 +585,16 @@ def read_tensor_2d_model_from_args(args,
 									conv_height = 6,
 									conv_layers = [128, 128, 128, 128],
 									conv_dropout = 0.1,
+									conv_batch_normalize = False,
 									spatial_dropout = True,
-									max_pools = [(3,1), (3,3)],
+									max_pools = [(3,1), (3,1)],
 									padding='valid',
 									fc_layers = [64],
 									fc_dropout = 0.3,
-									kernel_initializer='he_normal',
+									fc_batch_normalize = False,
 									fc_initializer='glorot_normal',
-									batch_normalization = False):
+									kernel_initializer='glorot_normal'
+									):
 	'''Builds Read Tensor 2d CNN model for classifying variants.
 
 	Arguments specify widths and depths of each layer.
@@ -596,7 +622,7 @@ def read_tensor_2d_model_from_args(args,
 		in_shape = (in_channels, args.read_limit, args.window_size)
 		concat_axis = 1
 
-	x = read_tensor_in = Input(shape=in_shape, name="read_tensor")
+	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
 	# Add convolutional layers
 	max_pool_diff = len(conv_layers)-len(max_pools)
@@ -606,7 +632,7 @@ def read_tensor_2d_model_from_args(args,
 		else:
 			cur_kernel = (1, conv_height)
 
-		if batch_normalization:
+		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation('relu')(x)
@@ -625,7 +651,12 @@ def read_tensor_2d_model_from_args(args,
 
 	# Fully connected layers
 	for fc_units in fc_layers:
-		x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 
@@ -650,16 +681,19 @@ def read_tensor_2d_annotation_model_from_args(args,
 											conv_width = 6, 
 											conv_height = 6,
 											conv_layers = [128, 128, 128, 128],
-											conv_dropout = 0.1,
+											conv_dropout = 0.0,
+											conv_batch_normalize = False,
 											spatial_dropout = True,
 											max_pools = [(3,1), (3,3)],
 											padding='valid',
 											annotation_units = 16,
+											annotation_shortcut = False,
+											annotation_batch_normalize = True,
 											fc_layers = [64],
-											fc_dropout = 0.3,
-											kernel_initializer='he_normal',
-											fc_initializer='glorot_normal',
-											batch_normalization = False):
+											fc_dropout = 0.0,
+											fc_batch_normalize = False,
+											kernel_initializer='glorot_normal',
+											fc_initializer='glorot_normal'):
 	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
 
 	Arguments specify widths and depths of each layer.
@@ -688,7 +722,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 		in_shape = (in_channels, args.read_limit, args.window_size)
 		concat_axis = 1
 
-	x = read_tensor_in = Input(shape=in_shape, name="read_tensor")
+	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
 	# Add convolutional layers
 	max_pool_diff = len(conv_layers)-len(max_pools)
@@ -698,7 +732,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 		else:
 			cur_kernel = (1, conv_height)
 
-		if batch_normalization:
+		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation('relu')(x)
@@ -716,22 +750,34 @@ def read_tensor_2d_annotation_model_from_args(args,
 	x = Flatten()(x)
 
 	# Mix the variant annotations in
-	annotations_in = Input(shape=(len(args.annotations),), name="annotations")
-	annotations_bn = BatchNormalization(axis=-1)(annotations_in)
-	alt_input_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_bn)
-	x = layers.concatenate([x, alt_input_mlp], axis=concat_axis)
+	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	if annotation_batch_normalize:
+		annotations_in = BatchNormalization(axis=-1)(annotations)
+
+	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_in)
+	x = layers.concatenate([x, annotations_mlp], axis=concat_axis)
 
 	# Fully connected layers
 	for fc_units in fc_layers:
-		x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)
+		
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)		
+
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
+
+	if annotation_shortcut:
+		x = layers.concatenate([x, annotations_in], axis=concat_axis)
 
 	# Softmax output
 	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
 	
 	# Map inputs to outputs
-	model = Model(inputs=[read_tensor_in, annotations_in], outputs=[prob_output])
+	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
 	
 	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
@@ -2072,6 +2118,8 @@ def serialize_model_semantics(args, architecture_hd5):
 	if args.data_dir:
 		semantics['data_dir'] = args.data_dir
 
+	semantics['channels_last'] = args.channels_last
+
 	json_file_name = args.output_dir + args.id + '.json'
 	with open(json_file_name, 'w') as outfile:
 		json.dump(semantics, outfile)
@@ -2102,7 +2150,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 		args.tensor_map = semantics['input_tensor_map_name']
 		args.window_size = semantics['window_size']
 		args.read_limit = semantics['read_limit']
-		tm = get_tensor_channel_map_from_args(args)
+		tm = defines.get_tensor_channel_map_from_args(args)
 		assert(len(tm) == len(semantics['input_tensor_map']))
 		for key in tm:
 			assert(tm[key] == semantics['input_tensor_map'][key])
@@ -2110,11 +2158,15 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	if 'input_annotations' in semantics:
 		args.annotations = semantics['input_annotations']
 
+	if 'channels_last' in semantics:
+		args.channels_last = semantics['channels_last']
+		if args.channels_last:
+			K.set_image_data_format('channels_last')
+		else:
+			K.set_image_data_format('channels_first')
+				
 	args.input_symbols = semantics['input_symbols']
 	args.labels = semantics['output_labels']
-
-	if 'data_dir' in semantics:
-		args.data_dir = semantics['data_dir']
 
 	weight_path_hd5 = os.path.join(os.path.dirname(semantics_json),semantics['architecture'])
 	model = load_model(weight_path_hd5, custom_objects=get_metric_dict(args.labels))
@@ -2127,7 +2179,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 # ~~~~~~~ Inspections ~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-def inspect_model(args, model, generate_train, generate_valid):
+def inspect_model(args, model, generate_train, generate_valid, image_path=None):
 	'''Collect statistics on model inference and training times.
 
 	Arguments
@@ -2140,21 +2192,52 @@ def inspect_model(args, model, generate_train, generate_valid):
 	Returns
 		The slightly optimized keras model
 	'''
-	t0 = time.time()
-	history = model.fit_generator(generate_train, steps_per_epoch=args.samples, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
-	t1 = time.time()
-	train_speed = (t1-t0)/(args.batch_size*args.samples)
-	print('Spent: ', t1-t0, ' seconds training, batch_size:', args.batch_size, 'steps:', args.samples, ' Per example training speed:', train_speed)
+	if image_path:
+		plot_dot_model_in_color(model_to_dot(model, show_shapes=True), image_path)
 
 	t0 = time.time()
-	predictions = model.predict_generator(generate_valid, steps=args.samples, verbose=1)
+	history = model.fit_generator(generate_train, steps_per_epoch=args.training_steps, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
 	t1 = time.time()
-	inference_speed = (t1-t0)/(args.batch_size*args.samples)
+	train_speed = (t1-t0)/(args.batch_size*args.training_steps)
+	print('Spent: ', t1-t0, ' seconds training, batch_size:', args.batch_size, 'steps:', args.training_steps, ' Per example training speed:', train_speed)
+
+	t0 = time.time()
+	predictions = model.predict_generator(generate_valid, steps=args.training_steps, verbose=1)
+	t1 = time.time()
+	inference_speed = (t1-t0)/(args.batch_size*args.training_steps)
 	print('Spent: ', t1-t0, ' seconds predicting. Per tensor inference speed:', inference_speed)
 	
-	plot_model(model, './figures/architecture_'+args.tensor_map+'.jpg')
-	
 	return model
+
+
+def plot_dot_model_in_color(dot, image_path):
+	for n in dot.get_nodes():
+		if n.get_label():
+			if 'Conv1' in n.get_label():
+				n.set_fillcolor("cyan")
+			elif 'Conv2' in n.get_label():
+				n.set_fillcolor("deepskyblue1")				
+			elif 'BatchNormalization' in n.get_label():
+				n.set_fillcolor("goldenrod1")		
+			elif 'Activation' in n.get_label():
+				n.set_fillcolor("yellow")	
+			elif 'MaxPooling' in n.get_label():
+				n.set_fillcolor("aquamarine")
+			elif 'softmax' in n.get_label():
+				n.set_fillcolor("darkolivegreen4")										
+			elif 'Dense' in n.get_label():
+				n.set_fillcolor("gold")
+			elif 'Flatten' in n.get_label():
+				n.set_fillcolor("coral3")
+			elif 'Input' in n.get_label():
+				n.set_fillcolor("darkolivegreen1")
+			elif 'Concatenate' in n.get_label():
+				n.set_fillcolor("darkorange")
+			elif 'Dropout' in n.get_label():
+				n.set_fillcolor("tomato")
+		n.set_style("filled")
+	print('Saving architecture diagram to:',image_path)
+	dot.write_png(image_path)
 
 
 def iterate_neuron(model, layer_dict, neuron, layer_name='conv2d_2'):
@@ -2478,7 +2561,6 @@ def get_metric_dict(labels):
 	for i,label_key in enumerate(labels.keys()):
 		metrics[label_key+'_precision'] = precision_fxns[i]
 		metrics[label_key+'_recall'] = recall_fxns[i]
-
 	return metrics
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

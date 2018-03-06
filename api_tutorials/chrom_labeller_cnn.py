@@ -24,25 +24,39 @@ from random import shuffle
 from Bio import Seq, SeqIO
 from itertools import cycle
 import matplotlib.pyplot as plt
-from keras.models import Sequential
+from collections import Counter
+
 from keras.optimizers import SGD, Adam
+from keras.models import Sequential, Model
 from sklearn.metrics import roc_curve, auc, roc_auc_score
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from keras.layers.convolutional import Convolution1D, MaxPooling1D
-from keras.layers.core import Dense, Dropout, Flatten, Reshape, Activation
+from keras.layers.convolutional import Convolution1D, MaxPooling1D, Conv1D
+from keras.layers import Input, Dense, Dropout, BatchNormalization, SpatialDropout1D, Activation, Flatten
 
 data_path = '/dsde/data/deep/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
 chrom_hmm_bed_file = data_path + 'wgEncodeAwgSegmentationCombinedGm12878.bed'
+breakpoint_bed_file =  '/dsde/data/deep/vqsr/beds/icgc_bkp_sorted.bed'
+
+amiguity_codes = {'K':[0,0,0.5,0.5], 'M':[0.5,0.5,0,0], 'R':[0.5,0,0,0.5], 'Y':[0,0.5,0.5,0], 'S':[0,0.5,0,0.5], 
+				  'W':[0.5,0,0.5,0], 'B':[0,0.333,0.333,0.334], 'V':[0.333,0.333,0,0.334],'H':[0.333,0.333,0.334,0],
+				  'D':[0.333,0,0.333,0.334], 'X':[0.25,0.25,0.25,0.25], 'N':[0.25,0.25,0.25,0.25]}
+
+label_sets = {
+	'chrom_hmm'  : {'TSS':0, 'PF':1, 'E':2, 'WE':3, 'CTCF':4, 'T':5, 'R':6 },
+	'breakpoint' : {'WT':0, 'BREAKPOINT':1}
+}
 
 
 def run():
 	args = parse_args()
 
-	if 'small' == args.model:
+	if 'small' == args.mode:
 		make_small_model(args)
-	elif 'big' == args.model:
+	elif 'big' == args.mode:
 		make_big_model(args)
+	elif 'bp' == args.mode:
+		make_breakpoint_model(args)
 	else:
 		print('Unknown model argument')
 
@@ -50,15 +64,36 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--model',	            default='small')
-	parser.add_argument('--window_size', 		default=128, type=int)
-	parser.add_argument('--samples',			default=1000, type=int)
-	parser.add_argument('--reference_fasta',	default=reference_fasta)
-	parser.add_argument('--bed_file', 			default=chrom_hmm_bed_file)	
-	parser.add_argument('--inputs', 			default={'A':0, 'C':1, 'T':2, 'G':3})
-	parser.add_argument('--labels', 			default={'TSS':0, 'PF':1, 'E':2, 'WE':3, 'CTCF':4, 'T':5, 'R':6 })
+	parser.add_argument('--mode', default='bp')
+	parser.add_argument('--window_size', default=128, type=int)
+	parser.add_argument('--samples', default=1000, type=int)
+	parser.add_argument('--reference_fasta', default=reference_fasta)
+	parser.add_argument('--bed_file',default=breakpoint_bed_file)	
+	parser.add_argument('--inputs', default={'A':0, 'C':1, 'T':2, 'G':3})
+	parser.add_argument('--label_set', default='breakpoint', choices=label_sets.keys())
+	parser.add_argument('--labels', default={})
+	parser.add_argument('--conv_width', default=15, type=int, help='Width of 1D convolutional kernels.')
+	parser.add_argument('--conv_dropout', default=0.0, type=float, 
+		help='Dropout rate in convolutional layers.')
+	parser.add_argument('--conv_batch_normalize', default=False, action='store_true',
+		help='Batch normalize convolutional layers.')
+	parser.add_argument('--conv_layers', nargs='+', default=[128, 64, 32], type=int,
+		help='List of sizes for each convolutional filter layer')
+	parser.add_argument('--same_padding', default=False, action='store_true',
+		help='Valid or same border padding on the convolutional layers.')	
+	parser.add_argument('--spatial_dropout', default=False, action='store_true',
+		help='Spatial dropout on the convolutional layers.')	
+	parser.add_argument('--max_pools', nargs='+', default=[], type=int,
+		help='List of maxpooling layers.')	
+	parser.add_argument('--fc_layers', nargs='+', default=[32], type=int,
+		help='List of sizes for each fully connected layer')
+	parser.add_argument('--fc_dropout', default=0.0, type=float, 
+		help='Dropout rate in fully connected  layers.')
+	parser.add_argument('--fc_batch_normalize', default=False, action='store_true',
+		help='Batch normalize fully connected layers.')
 
 	args = parser.parse_args()
+	args.labels = label_sets[args.label_set]
 	print('Arguments are', args)
 	return args
 
@@ -97,10 +132,35 @@ def make_big_model(args):
 	plot_roc_per_class(model, test[0], test[1], args.labels, title)	
 
 
+def make_breakpoint_model(args):
+	model = build_breakpoint_classifier(args)
+	training_data = load_dna_and_breakpoint_labels(args)
+	train, valid, test = split_data(training_data)
+	
+	weight_path = weight_path_from_args(args)
+	model = train_chrom_labeller(model, train, valid, weight_path)
+
+	title = weight_path_to_title(weight_path)
+	plot_roc_per_class(model, test[0], test[1], args.labels, title)	
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Models ~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+def build_breakpoint_classifier(args):
+	return build_reference_1d_model_from_args(args,
+				conv_width = args.conv_width,
+				conv_layers = args.conv_layers,
+				conv_dropout = args.conv_dropout,
+				conv_batch_normalize = args.conv_batch_normalize,
+				spatial_dropout = args.spatial_dropout,
+				max_pools = args.max_pools,
+				padding='same' if args.same_padding else 'valid',
+				fc_layers = args.fc_layers,
+				fc_dropout = args.fc_dropout,
+				fc_batch_normalize = args.fc_batch_normalize)
+
 
 def build_small_chrom_label(args):
 	model = Sequential()
@@ -130,7 +190,7 @@ def build_small_chrom_label(args):
 	my_metrics = [metrics.categorical_accuracy, precision, recall ]
 
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
-	print('model summary:\n', model.summary())
+	model.summary()
 
 	return model
 
@@ -167,17 +227,90 @@ def build_sequential_chrom_label(args):
 	my_metrics = [metrics.categorical_accuracy, precision, recall]
 
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
-	print('model summary:\n', model.summary())
+	model.summary()
 
+	return model
+
+
+def build_reference_1d_model_from_args(args,
+									conv_width = 6, 
+									conv_layers = [128, 128, 128, 128],
+									conv_dropout = 0.0,
+									conv_batch_normalize = False,			
+									spatial_dropout = False,
+									max_pools = [],
+									padding='valid',
+									fc_layers = [64],
+									fc_dropout = 0.0,
+									fc_batch_normalize = False,
+									fc_initializer='glorot_normal',
+									kernel_initializer='glorot_normal'):
+	'''Build Reference 1d CNN model for classification.
+
+	Architecture specified by parameters.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API.
+	Prints out model summary.
+
+	Arguments
+		args.labels: The output labels (e.g. BREAKPOINT, WT)
+
+	Returns
+		The keras model
+	'''	
+	concat_axis = -1	
+	x = reference = Input(shape=(args.window_size, len(args.inputs)), name='reference')
+
+	max_pool_diff = len(conv_layers)-len(max_pools)	
+	for  i,c in enumerate(conv_layers):
+
+		if conv_batch_normalize:
+			x = Conv1D(filters=c, kernel_size=conv_width, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = BatchNormalization(axis=concat_axis)(x)
+			x = Activation('relu')(x)
+		else:
+			x = Conv1D(filters=c, kernel_size=conv_width, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+
+		if conv_dropout > 0 and spatial_dropout:
+			x = SpatialDropout1D(conv_dropout)(x)
+		elif conv_dropout > 0:
+			x = Dropout(conv_dropout)(x)
+
+		if i >= max_pool_diff:
+			x = MaxPooling1D(max_pools[i-max_pool_diff])(x)
+
+	x = Flatten()(x)
+
+	for fc in fc_layers:
+		if fc_batch_normalize:
+			x = Dense(units=fc, activation='linear', kernel_initializer=fc_initializer)(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)			
+		else:
+			x = Dense(units=fc, activation='relu')(x)
+		
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	
+	model = Model(inputs=[reference], outputs=[prob_output])
+	
+	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+	my_metrics = [metrics.binary_accuracy]
+
+	model.compile(optimizer=adam, loss='binary_crossentropy', metrics=my_metrics)
+	model.summary()
+	
 	return model
 
 
 def train_chrom_labeller(model, train_tuple, valid_tuple, save_weight_hd5):
 	checkpointer = ModelCheckpoint(filepath=save_weight_hd5, verbose=1, save_best_only=True)
-	earlystopper = EarlyStopping(monitor='val_loss', patience=3, verbose=1)	
+	earlystopper = EarlyStopping(monitor='val_loss', patience=5, verbose=1)	
 
 	history = model.fit(train_tuple[0], train_tuple[1], 
-		batch_size=32, nb_epoch=150, shuffle=False, 
+		batch_size=32, epochs=150, shuffle=True, 
 		validation_data=(valid_tuple[0], valid_tuple[1]), 
 		callbacks=[checkpointer,earlystopper])
 
@@ -189,6 +322,39 @@ def train_chrom_labeller(model, train_tuple, valid_tuple, save_weight_hd5):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Training Data ~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def load_dna_and_breakpoint_labels(args):
+	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
+	bed_dict, bed_labels = bed_file_labels_to_dict(args.bed_file)
+
+	train_data = np.zeros(( args.samples, args.window_size, len(args.inputs) ))
+	train_labels = np.zeros(( args.samples, 2 ))
+
+	idx_offset = (args.window_size/2)
+	stats = Counter()
+	while stats['count'] < args.samples:
+		contig_key, pos = sample_from_bed(bed_dict, contig_key_prefix='')
+		contig = record_dict[contig_key]
+		record = contig[pos-idx_offset: pos+idx_offset]
+
+		cur_label_key = bed_file_label(bed_dict, contig_key, pos)
+		train_labels[stats['count'], args.labels[cur_label_key]] = 1
+
+		for i,b in enumerate(record.seq):
+			B=b.upper()
+			if B in args.inputs.keys():
+				train_data[stats['count'], i, args.inputs[B]] = 1.0
+			elif B in amiguity_codes.keys():
+				train_data[stats['count'], i, :4] = amiguity_codes[B]
+			else:
+				raise ValueError('Error! Unknown code:', b)
+		
+		stats['count'] += 1
+
+	print('Labels:', args.labels, 'counts:', np.sum(train_labels, axis=0))
+	print('Train data shape:', train_data.shape, ' Training labels shape:', train_labels.shape)
+
+	return (train_data, train_labels)
+
 
 def load_dna_and_chrom_label(args, only_labels=None):
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
@@ -198,10 +364,6 @@ def load_dna_and_chrom_label(args, only_labels=None):
 	train_labels = np.zeros(( args.samples, len(bed_labels) ))
 
 	idx_offset = (args.window_size/2)
-
-	amiguity_codes = {'K':[0,0,0.5,0.5], 'M':[0.5,0.5,0,0], 'R':[0.5,0,0,0.5], 'Y':[0,0.5,0.5,0], 'S':[0,0.5,0,0.5], 
-					  'W':[0.5,0,0.5,0], 'B':[0,0.333,0.333,0.334], 'V':[0.333,0.333,0,0.334],'H':[0.333,0.333,0.334,0],
-					  'D':[0.333,0,0.333,0.334], 'X':[0.25,0.25,0.25,0.25], 'N':[0.25,0.25,0.25,0.25]}
 
 	count = 0
 	while count < args.samples:
@@ -223,8 +385,7 @@ def load_dna_and_chrom_label(args, only_labels=None):
 			elif B in amiguity_codes.keys():
 				train_data[count, i, :4] = amiguity_codes[B]
 			else:
-				print('Error! Unknown code:', b)
-				return
+				raise ValueError('Error! Unknown code:', b)
 
 		count += 1
 
@@ -242,6 +403,9 @@ def bed_file_labels_to_dict(bed_file):
 		for line in f:
 			parts = line.split()
 			contig = parts[0]
+			if contig == 'chrom' or contig[0] == '#':
+				continue
+
 			lower = int(parts[1])
 			upper = int(parts[2])
 			label = parts[3]
@@ -287,7 +451,7 @@ def bed_file_label(bed_dict, contig, pos):
 		return label
 
 
-def split_data(datasets, valid_ratio=0.1, test_ratio=0.4):
+def split_data(datasets, valid_ratio=0.2, test_ratio=0.2):
 	assert(valid_ratio + test_ratio < 1.0 and valid_ratio >= 0.0 and test_ratio >= 0.0)
 
 	samples = datasets[0].shape[0]
@@ -302,9 +466,9 @@ def split_data(datasets, valid_ratio=0.1, test_ratio=0.4):
 	test_idx = int(test_ratio * float(samples))
 
 	for d in datasets:
-		valid.append( d[ :valid_idx] )
-		test.append(  d[valid_idx : valid_idx + test_idx] )
-		train.append( d[valid_idx + test_idx: ] )
+		valid.append(d[ :valid_idx])
+		test.append(d[valid_idx : valid_idx+test_idx])
+		train.append(d[valid_idx+test_idx: ])
 
 	return train, valid, test
 
@@ -332,7 +496,7 @@ def sample_from_fasta(record_dict):
 
 
 def sample_from_bed(bed_dict, contig_key_prefix=''):
-	contig_key = contig_key_prefix + str(np.random.randint(1,20))
+	contig_key = contig_key_prefix + str(np.random.randint(1,22))
 	lowers = bed_dict[contig_key][0]
 	uppers = bed_dict[contig_key][1]
 
@@ -426,7 +590,7 @@ def plot_roc(model, test_data, test_truth, labels, title):
 	plt.ylabel('True Positive Rate')
 	plt.title('ROC:' + str(labels) + '\n' + title)
 	plt.legend(loc="lower right")
-	plt.savefig("./roc_"+title+".jpg")	
+	plt.savefig("./roc_"+title+".png")	
 
 
 def get_fpr_tpr_roc(model, test_data, test_truth, labels):
@@ -483,7 +647,7 @@ def plot_roc_per_class(model, test_data, test_truth, labels, title):
 	plt.ylabel('True Positive Rate')
 	plt.title('ROC:'+ str(labels) + '\n' + title)
 	plt.legend(loc="lower right")
-	plt.savefig("./per_class_roc_"+title+".jpg")	
+	plt.savefig("./per_class_roc_"+title+".png")	
 
 
 def plot_history(history, title):
@@ -504,7 +668,7 @@ def plot_history(history, title):
 	plt.ylabel('loss')
 	plt.xlabel('epoch')
 	plt.legend(['train', 'test'], loc='upper left')
-	plt.savefig("./plot_history_"+title+".jpg")	
+	plt.savefig("./plot_history_"+title+".png")	
 
 
 def plot_metric_history(history, title):
@@ -553,22 +717,21 @@ def plot_metric_history(history, title):
 		axes[0].set_title(title)
 
 
-	plt.savefig("./metric_history_"+title+".jpg")	
+	plt.savefig("./metric_history_"+title+".png")	
 
 	
 def weight_path_from_args(args):
-	save_weight_hd5 =  './chrom_hmm_cnn_model' 
+	save_weight_hd5 =  './chrom_labeller' 
 
-	ignore = ['inputs', 'labels', 'bed_file', 'reference_fasta'] 
+	include = ['window_size', 'samples', 'conv_width', 'mode'] 
 	for arg in vars(args):
-		if arg in ignore:
+		if not arg in include:
 			continue
 
 		attr = getattr(args, arg)
 
 		if os.path.isdir(str(attr)) or os.path.isfile(str(attr)):
 			continue
-
 
 		if os.path.isabs(str(attr)):
 			attr = os.path.splitext(os.path.basename(attr))[0]

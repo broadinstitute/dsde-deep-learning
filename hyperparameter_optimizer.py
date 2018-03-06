@@ -65,14 +65,37 @@ class HyperparameterOptimizer(object):
 		self.performances = {}
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
-		self.conv_layers_sets = [[256, 64, 16], [128,32,12], [256,256], [64,64], [64], 
-									[128,64,32], [256,128,64], [256,216,168,32], [32,64,128], 
-									[128, 96, 64, 32], [128], [256, 64, 16]]
-		self.max_pool_sets_2d = [ [(1,3)], [(3,1)], [(3,1),(3,1)], [(2,1),(2,1),(2,1)], 
-								  [(2,1),(2,1),(2,1),(2,1)], [(1,3), (3,1)], 
-								  [(1,3), (1,3)], [(4,1),(4,1)], [] ]
-		self.max_pool_sets_1d = [ [3], [2], [2,2], [3,3,3], [3,2,1], [1,2,3], [6], [4,4], [10], [8,8], [2,6], [] ]
-		self.fc_layer_sets = [[8], [16], [32], [64], [32, 32], [256, 64], [64, 64], [64,32,16], [128, 16]]
+		self.conv_layers_sets = [
+									[16], [32], [64], [128], 
+									[16,32], [32,16], [32,32], [64,32], [64,64], [128,64],
+									[32,32,32], [64,64,64], [64,32,16], [64,48,32], [32,48,64],
+									[48,64,128], [128,32,16], [128,64,32]
+								]
+
+		self.max_pool_sets_2d = [ 
+									[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
+									[(1,2),(1,2)], [(2,1),(2,1)], [(2,1),(6,1)],
+								  	[(3,1),(3,1)], [(1,3), (1,3)], [(4,1),(4,1)], [(4,1),(8,1)], 
+								  	[(2,2),(2,2)], [(3,3), (3,3)], [(4,4), (4,4)],
+								  	[(1,2),(1,2),(1,2)], [(2,1),(2,1),(2,1)], [(3,1),(3,1),(3,1)]
+								]
+
+		self.max_pool_sets_1d = [ 
+									[], [2], [3], [6], [8], [2,2], 
+									[3,3], [4,4], [8,8], [2,6], [] 
+								]
+
+		self.fc_layer_sets = [
+									[24], [32], [48], [64], [32, 16], [16, 32], 
+									[48,16], [32, 32], [48, 32]
+							 ]
+
+		self.mlp_layer_sets = [
+									[32], [64], [256], [32, 16], [16, 32], [32, 32], [64, 64], [128, 128], 
+									[256, 256], [512,512], [256, 128, 64], [64,32,16], [128,64,32], [512,512,512],
+									[256,128,64,32], [64, 128, 256, 128, 64]
+								]
+
 		self.paddings = ['valid']
 		self.annotation_units = [12, 16, 20]
 		self.conv_dropouts = [0.0, 0.2, 0.4]
@@ -181,77 +204,65 @@ class HyperparameterOptimizer(object):
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'fc', 'type':'discrete', 'domain':(6,8,12,16,20,32)},
-			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))}
+			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))}
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_2d(x):
-			my_params = x[0]
-			max_pools = self.max_pool_sets_2d[int(my_params[9])]
-			conv_layers = self.conv_layers_sets[int(my_params[2])]
-			print('Got some X:\n', self.str_from_params_2d(my_params), '\n got conv layers:', conv_layers, 'max pools:', max_pools)
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pools = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
-										conv_width = int(my_params[0]),
-										conv_height = int(my_params[1]),
+										conv_width = int(p[param_keys['conv_width']]),
+										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
-										conv_dropout = float(my_params[3]),
-										spatial_dropout = bool(my_params[4]),
+										conv_batch_normalize = p[param_keys['conv_batch_normalize']],
 										max_pools = max_pools,
-										padding = 'valid' if bool(my_params[8]) else 'same',
-										fc_layers = [int(my_params[5])],
-										fc_dropout = float(my_params[6]),
-										batch_normalization = bool(my_params[7])
+										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+										fc_layers = fc_layers,
+										fc_batch_normalize = p[param_keys['fc_batch_normalize']]
 										)
 
 				if model.count_params() > 5000000:
 					print('Model too big')
-					return 9e9
+					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				normalized_loss = loss_and_metrics[0]
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience, 'Normalized loss:', normalized_loss)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print('best_architecture:', self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
-				return normalized_loss
+				return loss_and_metrics[0]
 			
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return 9e9
+				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d, # Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience,  # Random models built before Bayesian optimization
-                                             acquisition_type='EI',        		# Expected Improvement
-                                             exact_feval=False,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True							# Talk to me!
-                                             )           
+                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
+                                             model_type='GP',
+                                             acquisition_type='EI',        			# Expected Improvement
+                                             acquisition_optimizer='DIRECT',
+                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
+                                             verbosity=True,							# Talk to me!
+                                             normalize_Y = False
+                                             )         
 
-		optimizer.run_optimization(args.iterations, max_time=6e10, eps=1e-9, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
+		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		loss_from_params_2d([optimizer.x_opt])
-		print('best_architecture:', self.str_from_params_2d(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_2d(optimizer.x_opt))
-
-
-	def str_from_params_2d(self, x):
-		s = '\nConv Layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1]) + ' Conv Dropout = ' + str(x[3])
-		s += '\nSpatial dropout = ' + str(bool(x[4])) + ' Padding = ' + ('valid' if bool(x[8]) else 'same')
-		s += '\nFC layers = ' + str(int(x[5])) + ' FC Dropout = ' + str(x[6])
-		s += '\nBatch normalization = ' + str(bool(x[7]))
-		s += '\n Max Pools = ' + str(self.max_pool_sets_2d[int(x[9])])
-		s += '\n'
-		return s
-
-
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
@@ -271,78 +282,72 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15)},
+			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15)},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
-			{'name':'fc', 'type':'discrete', 'domain':(32,64,96)},
-			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_2d))}
+			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_2d_anno(x):
-			my_params = x[0]
-			max_pools = self.max_pool_sets_2d[int(my_params[10])]
-			conv_layers = self.conv_layers_sets[int(my_params[2])]
-			print('Got some X:\n', self.str_from_params_2d(my_params), '\n got conv layers:', conv_layers, 'max pools:', max_pools)
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pool_set = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
-										conv_width = int(my_params[0]),
-										conv_height = int(my_params[1]),
+										conv_width = int(p[param_keys['conv_width']]),
+										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
-										conv_dropout = float(my_params[3]),
-										spatial_dropout = bool(my_params[4]),
-										max_pools = max_pools,
-										padding = 'valid' if bool(my_params[9]) else 'same',
-										annotation_units = int(my_params[5]),
-										fc_layers = [int(my_params[6])],
-										fc_dropout = float(my_params[7]),
-										batch_normalization = bool(my_params[8])
+										conv_batch_normalize =  bool(p[param_keys['conv_batch_normalize']]),
+										max_pools = max_pool_set,
+										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+										annotation_units = int(p[param_keys['annotation_units']]),
+										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
+										fc_layers = fc_layers,
+										fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']])
 										)
 
 				if model.count_params() > 5000000:
 					print('Model too big')
-					return 9e8
+					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				normalized_loss = loss_and_metrics[0]
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience, 'Normalized loss:', normalized_loss)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
-				return normalized_loss
+				return loss_and_metrics[0]
 			
 			except ValueError as e:
-				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return 9e9
+				print(str(e) + '\n Impossible architecture perhaps?')
+				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d_anno, # Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience,  # Random models built before Bayesian optimization
+                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
+											model_type='GP',
                                              acquisition_type='EI',        			# Expected Improvement
-                                             exact_feval=False,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True							# Talk to me!
+                                             acquisition_optimizer='DIRECT',
+                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
+                                             verbosity=True,							# Talk to me!
+                                             normalize_Y = False
                                              )           
 
-		optimizer.run_optimization(args.iterations, max_time=6e10, eps=1e-9, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
+		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_2d_anno(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_2d_anno(optimizer.x_opt))
-
-
-	def str_from_params_2d_anno(self, x):
-		s = '\nConv Layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nConv Width = ' + str(x[0]) + ' Conv Height = ' + str(x[1]) + ' Conv Dropout = ' + str(x[3])
-		s += '\nSpatial dropout = ' + str(bool(x[4])) + ' Padding = ' + ('valid' if bool(x[9]) else 'same')
-		s += '\nAnno units = ' + str(int(x[5])) + ' FC layers = ' + str(int(x[6])) + ' FC Dropout = ' + str(x[7])
-		s += '\nBatch normalization = ' + str(bool(x[8]))
-		s += '\n Max Pools = ' + str(self.max_pool_sets_2d[int(x[10])])
-		s += '\n'
-		return s
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
 	def bayesian_search_1d(self, args, iterations):
@@ -356,38 +361,43 @@ class HyperparameterOptimizer(object):
 		'''		
 		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 
-		generate_train = td.dna_annotation_generator(args, train_paths)
-		generate_valid = td.dna_annotation_generator(args, valid_paths)
-		generate_test = td.dna_annotation_generator(args, test_paths)
+		generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+		generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		stats = Counter()
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'fc', 'type':'discrete', 'domain':(32,64,96,128,160)},
+			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))}
+			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))}
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_1d(x):
-			conv_layers = self.conv_layers_sets[int(x[0][2])]
-			max_pool_set = self.max_pool_sets_1d[int(x[0][8])]
-			print('Got some X:\n', x, '\n got conv layers:', conv_layers, 'max pool set is:', max_pool_set)
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_1d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.build_reference_1d_model_from_args(args, 
-											conv_width = int(x[0][0]), 
+											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
-											conv_dropout = float(x[0][1]),
-											spatial_dropout = bool(x[0][3]),
+											conv_dropout = float(p[param_keys['conv_dropout']]),
+											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
+											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
-											padding = 'valid' if bool(x[0][7]) else 'same',
-											fc_layers = [int(x[0][4])],
-											fc_dropout = float(x[0][5]),
-											batch_normalization = bool(x[0][6]))
+											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+											fc_layers = fc_layers,
+											fc_dropout = float(p[param_keys['fc_dropout']]),
+											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
 
 				if model.count_params() > 5000000:
 					print('Model too big')
@@ -396,7 +406,8 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:
@@ -407,23 +418,20 @@ class HyperparameterOptimizer(object):
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_1d,  	# Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
                                              initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
+                                             model_type='GP',
                                              acquisition_type='EI',        			# Expected Improvement
-                                             exact_feval=False,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True							# Talk to me!
+                                             acquisition_optimizer='DIRECT',
+                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
+                                             verbosity=True,							# Talk to me!
+                                             normalize_Y = False
                                              )           
 
-		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-12, report_file=args.output_dir + args.id + '.bayes_report')
+		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_1d(optimizer.x_opt))
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
-	def str_from_params_1d(self, x):
-		s = '\nconv_width = ' + str(int(x[0])) + '\nconv_layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nconv_dropout = '+ str(x[1]) + '\nspatial_dropout = '+ str(bool(x[3])) 
-		s += '\nfc_layers = '+ str(int(x[4]))+ '\nfc_dropout = '+ str(x[5]) + '\nbatch_normalization = '+ str(bool(x[6]))
-		s += '\nvalid padding ' if bool(x[7]) else 'same padding'
-		s += '\nmax_pool = '+str(self.max_pool_sets_1d[int(x[8])])
-		return s
 
 	def bayesian_search_1d_anno(self, args, iterations):
 		'''Random search in hyperparameter space for good architectures.
@@ -436,43 +444,49 @@ class HyperparameterOptimizer(object):
 		'''		
 		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 
-		generate_train = td.dna_annotation_generator(args, train_paths)
-		generate_valid = td.dna_annotation_generator(args, valid_paths)
-		generate_test = td.dna_annotation_generator(args, test_paths)
+		generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+		generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		stats = Counter()
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'conv_layers', 'type':'categorical', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
+			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(8,16,32,64)},
+			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools', 'type':'categorical', 'domain':range(len(self.max_pool_sets_1d))},
-			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))},
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_1d(x):
-			conv_layers = self.conv_layers_sets[int(x[0][2])]
-			max_pool_set = self.max_pool_sets_1d[int(x[0][9])]
-			fc_layers = self.fc_layer_sets[int(x[0][5])]
-			print(self.str_from_params_1d_anno(x[0]))
+			p = x[0]
+			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_1d']])]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = int(x[0][0]), 
+											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
-											conv_dropout = float(x[0][1]),
-											spatial_dropout = bool(x[0][3]),
+											conv_dropout = float(p[param_keys['conv_dropout']]),
+											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
+											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
-											padding = 'valid' if bool(x[0][8]) else 'same',
-											annotation_units = int(x[0][4]),
-											annotation_shortcut = bool(x[0][10]),
+											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+											annotation_units = int(p[param_keys['annotation_units']]),
+											annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
+											annotation_batch_normalize = bool(p[param_keys['annotation_batch_normalize']]),								
 											fc_layers = fc_layers,
-											fc_dropout = float(x[0][6]),
-											batch_normalization = bool(x[0][7]))
+											fc_dropout = float(p[param_keys['fc_dropout']]),
+											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
 
 				if model.count_params() > 5000000:
 					print('Model too big')
@@ -481,7 +495,8 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(x[0], param_keys))
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:
@@ -502,18 +517,10 @@ class HyperparameterOptimizer(object):
 
 		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
 		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_1d_anno(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_1d_anno(optimizer.x_opt))
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
-	def str_from_params_1d_anno(self, x):
-		s = '\nconv_width = ' + str(int(x[0])) + '\nconv_layers = ' + str(self.conv_layers_sets[int(x[2])])
-		s += '\nconv_dropout = '+ str(x[1]) + '\nspatial_dropout = '+ str(bool(x[3])) 
-		s += '\nannotation_units = '+ str(int(x[4])) + ' annotation shortcut = ' + str(bool(x[10]))
-		s += '\nfc_layers = '+ str(self.fc_layer_sets[int(x[5])])+ '\nfc_dropout = '+ str(x[6]) + '\nbatch_normalization = '+ str(bool(x[7]))
-		s += '\nvalid padding ' if bool(x[8]) else '\nsame padding'
-		s += '\nmax_pool = '+str(self.max_pool_sets_1d[int(x[9])])
-		return s
 
 	def bayesian_search_mlp(self, args, iterations):
 		'''Random search in hyperparameter space for good architectures.
@@ -523,7 +530,8 @@ class HyperparameterOptimizer(object):
 
 		Arguments:
 			iterations: how many architectures to try
-		'''		
+		'''
+		args.window_size = 0	
 		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 
 		generate_train = td.dna_annotation_generator(args, train_paths)
@@ -532,61 +540,87 @@ class HyperparameterOptimizer(object):
 
 		stats = Counter()
 		bounds = [
-			{'name':'layers', 'type':'categorical', 'domain':range(len(self.fc_layer_sets))},
+			{'name':'mlp_fc', 'type':'discrete', 'domain':range(len(self.mlp_layer_sets))},
 			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
-			{'name':'skip_connection', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)}
+			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'batch_normalize_input', 'type':'categorical', 'domain':(0, 1)}
 		]
 
+		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+
 		def loss_from_params_mlp(x):
-			my_params = x[0]
-			layer_set = self.fc_layer_sets[int(my_params[0])]
-			print('Got some X:\n', my_params, '\n got layers:', layer_set)
+			p = x[0]
+			layer_set = self.mlp_layer_sets[int(p[param_keys['mlp_fc']])]
 			try:
 				model = models.annotation_multilayer_perceptron_from_args(args,
 											fc_layers = layer_set,
-											dropout = float(my_params[1]),
-											skip_connection = bool(my_params[2]),
-											batch_normalization = bool(my_params[3]))
+											dropout = float(p[param_keys['dropout']]),
+											skip_connection = bool(p[param_keys['annotation_shortcut']]),
+											batch_normalization = bool(p[param_keys['batch_normalization']]),
+											batch_normalize_input = bool(p[param_keys['batch_normalize_input']])
+											)
 											
 				if model.count_params() > 1000000:
 					print('Model too big')
-					return 9e8
+					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				normalized_loss = loss_and_metrics[0]
-				print('got loss and metrics', loss_and_metrics, '\nCount is:', stats['count'], 'args.iterations', args.iterations, 'initial numdata:', args.patience, 'Normalized loss:', normalized_loss)
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print(self.str_from_params_and_keys(p, param_keys))
 				limit_mem()
-				return normalized_loss
+				return loss_and_metrics[0]
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return 9e9
-
+				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
 		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_mlp,  	# Objective function       
                                              domain=bounds,          				# Box-constraints of the problem
                                              initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
+                                             model_type='GP',
                                              acquisition_type='EI',        			# Expected Improvement
-                                             exact_feval=False,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True							# Talk to me!
-                                             )           
+                                             acquisition_optimizer='DIRECT',
+                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
+                                             verbosity=True,						# Talk to me!
+                                             normalize_Y = False
+                                             )           		           
 
-		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=1e-9, report_file=args.output_dir + args.id + '.bayes_report')
+		optimizer.run_optimization(max_iter=args.iterations,
+									max_time=6e10, 
+									verbosity=True, 
+									eps=0, 
+									report_file=args.output_dir + args.id + '.bayes_report')
+		
 		print('Best parameter set:', optimizer.x_opt)
-		loss_from_params_mlp([optimizer.x_opt])
-		print(self.str_from_params_mlp(optimizer.x_opt))
+		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_mlp(optimizer.x_opt))
+			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
+	def str_from_params_and_keys(self, x, param_keys):
+		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
+				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize']
+		s = ''
+		for k in param_keys:
+			s += '\n' + k + ' = '
+			if k == 'fc':
+				s += str(self.fc_layer_sets[int(x[param_keys[k]])])
+			elif k == 'mlp_fc':
+				s += str(self.mlp_layer_sets[int(x[param_keys[k]])])	
+			elif k == 'conv_layers':
+				s += str(self.conv_layers_sets[int(x[param_keys[k]])])
+			elif k == 'max_pools_1d':
+				s += str(self.max_pool_sets_1d[int(x[param_keys[k]])])
+			elif k == 'max_pools_2d':
+				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])	
+			elif k in bools:
+				s += str(bool(x[param_keys[k]]))
+			else:
+				s += str(x[param_keys[k]])
 
-	def str_from_params_mlp(self, my_params):
-		s = 'layers = ' + str(self.fc_layer_sets[int(my_params[0])])
-		s += '\ndropout = ' + str(my_params[1])
-		s += '\nskip_connection = ' + str(bool(my_params[2]))
-		s += '\nbatch_normalization = ' + str(bool(my_params[3]))
 		return s
 
 

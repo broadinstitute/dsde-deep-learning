@@ -153,7 +153,8 @@ def parse_args():
 		help='gnomAD allele count minimum value, set to 0 by default.')
 	parser.add_argument('--score_keys', nargs='+', default=['VQSLOD'],
 		help='List of variant score keys for performance comparisons.')
-
+	parser.add_argument('--inspect_model', default=False, action='store_true',
+		help='Plot model architecture, measure inference and training speeds.')
 
 	# Run specific arguments
 	parser.add_argument('--id', default='no_id',

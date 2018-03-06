@@ -46,6 +46,7 @@ annotations = {
 				'_' : [], # Allow command line to unset annotations
 				'gatk_w_qual' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'QUAL', 'ReadPosRankSum'],
 				'gatk' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
+				'best_practices' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
 				'annotations' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
 				'm2':['AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
 				'combine': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
@@ -127,7 +128,7 @@ def get_tensor_channel_map_from_args(args):
 		return get_tensor_channel_map_1d_dna()
 	elif 'bqsr' == args.tensor_map:
 		return bqsr_tensor_channel_map()
-	elif 'mlp' == args.tensor_map:
+	elif 'annotations' == args.tensor_map:
 		return annotations
 	elif 'deep_variant' == args.tensor_map:
 		return deep_variant_channel_map()
@@ -272,7 +273,9 @@ def bqsr_tensor_channel_map():
 
 def tensor_shape_from_args(args):
 	in_channels = total_input_channels_from_args(args)
-	if args.channels_last:
+	if args.tensor_map == 'reference':
+		tensor_shape = (args.window_size, in_channels)
+	elif args.channels_last:
 		tensor_shape = (args.read_limit, args.window_size, in_channels)
 	else:
 		tensor_shape = (in_channels, args.read_limit, args.window_size) 
