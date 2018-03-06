@@ -17,6 +17,7 @@ import argparse
 import matplotlib
 import numpy as np
 matplotlib.use('Agg')
+
 from scipy import interp
 from keras import metrics
 import keras.backend as K
@@ -24,6 +25,7 @@ from random import shuffle
 from Bio import Seq, SeqIO
 from itertools import cycle
 import matplotlib.pyplot as plt
+from collections import Counter
 from keras.models import Sequential
 from keras.optimizers import SGD, Adam
 from sklearn.metrics import roc_curve, auc, roc_auc_score
@@ -34,15 +36,27 @@ from keras.layers.core import Dense, Dropout, Flatten, Reshape, Activation
 data_path = '/dsde/data/deep/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
 chrom_hmm_bed_file = data_path + 'wgEncodeAwgSegmentationCombinedGm12878.bed'
+breakpoint_bed_file =  '/dsde/data/deep/vqsr/beds/icgc_bkp_sorted.bed'
+
+amiguity_codes = {'K':[0,0,0.5,0.5], 'M':[0.5,0.5,0,0], 'R':[0.5,0,0,0.5], 'Y':[0,0.5,0.5,0], 'S':[0,0.5,0,0.5], 
+				  'W':[0.5,0,0.5,0], 'B':[0,0.333,0.333,0.334], 'V':[0.333,0.333,0,0.334],'H':[0.333,0.333,0.334,0],
+				  'D':[0.333,0,0.333,0.334], 'X':[0.25,0.25,0.25,0.25], 'N':[0.25,0.25,0.25,0.25]}
+
+label_sets = {
+	'chrom_hmm'  : {'TSS':0, 'PF':1, 'E':2, 'WE':3, 'CTCF':4, 'T':5, 'R':6 },
+	'breakpoint' : {'WT':0, 'BREAKPOINT':1}
+}
 
 
 def run():
 	args = parse_args()
 
-	if 'small' == args.model:
+	if 'small' == args.mode:
 		make_small_model(args)
-	elif 'big' == args.model:
+	elif 'big' == args.mode:
 		make_big_model(args)
+	elif 'bp' == args.mode:
+		make_breakpoint_model(args)
 	else:
 		print('Unknown model argument')
 
@@ -50,15 +64,17 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--model',	            default='small')
+	parser.add_argument('--mode',	            default='bp')
 	parser.add_argument('--window_size', 		default=128, type=int)
 	parser.add_argument('--samples',			default=1000, type=int)
 	parser.add_argument('--reference_fasta',	default=reference_fasta)
-	parser.add_argument('--bed_file', 			default=chrom_hmm_bed_file)	
+	parser.add_argument('--bed_file', 			default=breakpoint_bed_file)	
 	parser.add_argument('--inputs', 			default={'A':0, 'C':1, 'T':2, 'G':3})
-	parser.add_argument('--labels', 			default={'TSS':0, 'PF':1, 'E':2, 'WE':3, 'CTCF':4, 'T':5, 'R':6 })
+	parser.add_argument('--label_set', 			default='breakpoint', choices=label_sets.keys())
+	parser.add_argument('--labels', 			default={})
 
 	args = parser.parse_args()
+	args.labels = label_sets[args.label_set]
 	print('Arguments are', args)
 	return args
 
@@ -97,10 +113,47 @@ def make_big_model(args):
 	plot_roc_per_class(model, test[0], test[1], args.labels, title)	
 
 
+def make_breakpoint_model(args):
+	model = build_breakpoint_classifier(args)
+	training_data = load_dna_and_breakpoint_labels(args)
+	train, valid, test = split_data(training_data)
+	
+	weight_path = weight_path_from_args(args)
+	model = build_breakpoint_classifier(args)
+	model = train_chrom_labeller(model, train, valid, weight_path)
+
+	title = weight_path_to_title(weight_path)
+	plot_roc_per_class(model, test[0], test[1], args.labels, title)	
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Models ~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def build_breakpoint_classifier(args):
+	model = Sequential()
+	model.add(Convolution1D(input_shape=(args.window_size, 4), 
+		filters=128,
+		kernel_size=16,
+		padding='valid',
+		activation='relu'))
+
+	model.add(Convolution1D(filters=64, kernel_size=16, activation='relu', padding='valid'))
+	model.add(MaxPooling1D(3))
+	model.add(Flatten())
+
+	model.add(Dense(units=32, activation='relu'))
+	model.add(Dropout(0.2))	
+
+	model.add(Dense(units=len(args.labels), activation='softmax') )
+
+	adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	my_metrics = [metrics.categorical_accuracy, precision, recall]
+
+	model.compile(loss='binary_crossentropy', optimizer=adamo, metrics=my_metrics)
+	model.summary()
+
+	return model
+
 
 def build_small_chrom_label(args):
 	model = Sequential()
@@ -130,7 +183,7 @@ def build_small_chrom_label(args):
 	my_metrics = [metrics.categorical_accuracy, precision, recall ]
 
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
-	print('model summary:\n', model.summary())
+	model.summary()
 
 	return model
 
@@ -167,17 +220,17 @@ def build_sequential_chrom_label(args):
 	my_metrics = [metrics.categorical_accuracy, precision, recall]
 
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
-	print('model summary:\n', model.summary())
+	model.summary()
 
 	return model
 
 
 def train_chrom_labeller(model, train_tuple, valid_tuple, save_weight_hd5):
 	checkpointer = ModelCheckpoint(filepath=save_weight_hd5, verbose=1, save_best_only=True)
-	earlystopper = EarlyStopping(monitor='val_loss', patience=3, verbose=1)	
+	earlystopper = EarlyStopping(monitor='val_loss', patience=5, verbose=1)	
 
 	history = model.fit(train_tuple[0], train_tuple[1], 
-		batch_size=32, nb_epoch=150, shuffle=False, 
+		batch_size=32, epochs=150, shuffle=False, 
 		validation_data=(valid_tuple[0], valid_tuple[1]), 
 		callbacks=[checkpointer,earlystopper])
 
@@ -189,6 +242,39 @@ def train_chrom_labeller(model, train_tuple, valid_tuple, save_weight_hd5):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Training Data ~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def load_dna_and_breakpoint_labels(args):
+	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
+	bed_dict, bed_labels = bed_file_labels_to_dict(args.bed_file)
+
+	train_data = np.zeros(( args.samples, args.window_size, len(args.inputs) ))
+	train_labels = np.zeros(( args.samples, 2 ))
+
+	idx_offset = (args.window_size/2)
+	stats = Counter()
+	while stats['count'] < args.samples:
+		contig_key, pos = sample_from_bed(bed_dict, contig_key_prefix='')
+		contig = record_dict[contig_key]
+		record = contig[pos-idx_offset: pos+idx_offset]
+
+		cur_label_key = bed_file_label(bed_dict, contig_key, pos)
+		train_labels[stats['count'], args.labels[cur_label_key]] = 1
+
+		for i,b in enumerate(record.seq):
+			B=b.upper()
+			if B in args.inputs.keys():
+				train_data[stats['count'], i, args.inputs[B]] = 1.0
+			elif B in amiguity_codes.keys():
+				train_data[stats['count'], i, :4] = amiguity_codes[B]
+			else:
+				raise ValueError('Error! Unknown code:', b)
+		
+		stats['count'] += 1
+
+	print('Labels:', args.labels, 'counts:', np.sum(train_labels, axis=0))
+	print('Train data shape:', train_data.shape, ' Training labels shape:', train_labels.shape)
+
+	return (train_data, train_labels)
+
 
 def load_dna_and_chrom_label(args, only_labels=None):
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
@@ -198,10 +284,6 @@ def load_dna_and_chrom_label(args, only_labels=None):
 	train_labels = np.zeros(( args.samples, len(bed_labels) ))
 
 	idx_offset = (args.window_size/2)
-
-	amiguity_codes = {'K':[0,0,0.5,0.5], 'M':[0.5,0.5,0,0], 'R':[0.5,0,0,0.5], 'Y':[0,0.5,0.5,0], 'S':[0,0.5,0,0.5], 
-					  'W':[0.5,0,0.5,0], 'B':[0,0.333,0.333,0.334], 'V':[0.333,0.333,0,0.334],'H':[0.333,0.333,0.334,0],
-					  'D':[0.333,0,0.333,0.334], 'X':[0.25,0.25,0.25,0.25], 'N':[0.25,0.25,0.25,0.25]}
 
 	count = 0
 	while count < args.samples:
@@ -242,6 +324,9 @@ def bed_file_labels_to_dict(bed_file):
 		for line in f:
 			parts = line.split()
 			contig = parts[0]
+			if contig == 'chrom' or contig[0] == '#':
+				continue
+
 			lower = int(parts[1])
 			upper = int(parts[2])
 			label = parts[3]
@@ -332,7 +417,7 @@ def sample_from_fasta(record_dict):
 
 
 def sample_from_bed(bed_dict, contig_key_prefix=''):
-	contig_key = contig_key_prefix + str(np.random.randint(1,20))
+	contig_key = contig_key_prefix + str(np.random.randint(1,22))
 	lowers = bed_dict[contig_key][0]
 	uppers = bed_dict[contig_key][1]
 
@@ -426,7 +511,7 @@ def plot_roc(model, test_data, test_truth, labels, title):
 	plt.ylabel('True Positive Rate')
 	plt.title('ROC:' + str(labels) + '\n' + title)
 	plt.legend(loc="lower right")
-	plt.savefig("./roc_"+title+".jpg")	
+	plt.savefig("./roc_"+title+".png")	
 
 
 def get_fpr_tpr_roc(model, test_data, test_truth, labels):
@@ -483,7 +568,7 @@ def plot_roc_per_class(model, test_data, test_truth, labels, title):
 	plt.ylabel('True Positive Rate')
 	plt.title('ROC:'+ str(labels) + '\n' + title)
 	plt.legend(loc="lower right")
-	plt.savefig("./per_class_roc_"+title+".jpg")	
+	plt.savefig("./per_class_roc_"+title+".png")	
 
 
 def plot_history(history, title):
@@ -504,7 +589,7 @@ def plot_history(history, title):
 	plt.ylabel('loss')
 	plt.xlabel('epoch')
 	plt.legend(['train', 'test'], loc='upper left')
-	plt.savefig("./plot_history_"+title+".jpg")	
+	plt.savefig("./plot_history_"+title+".png")	
 
 
 def plot_metric_history(history, title):
@@ -553,7 +638,7 @@ def plot_metric_history(history, title):
 		axes[0].set_title(title)
 
 
-	plt.savefig("./metric_history_"+title+".jpg")	
+	plt.savefig("./metric_history_"+title+".png")	
 
 	
 def weight_path_from_args(args):

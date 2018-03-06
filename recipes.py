@@ -710,12 +710,13 @@ def train_ref_read_model_b(args):
 									conv_height = 15,
 									conv_layers = [256, 128, 64],
 									conv_dropout = 0.15,
+									conv_batch_normalization = False,
 									spatial_dropout = True,
 									max_pools = [(1,3), (3,1)],
 									padding='same',
 									fc_layers = [12],
 									fc_dropout = 0.01,
-									batch_normalization = True)
+									fc_batch_normalization = False)
 	
 	models.serialize_model_semantics(args, weight_path)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -904,6 +905,7 @@ def train_ref_read_anno_model_b(args):
 									conv_height = 19,
 									conv_layers = [128, 128, 96, 96, 32, 32, 16, 16],
 									conv_dropout = 0.0,
+									conv_batch_normalization = False,
 									spatial_dropout = False,
 									max_pools = [(2,1),(2,1)],
 									padding='same',
@@ -911,7 +913,7 @@ def train_ref_read_anno_model_b(args):
 									annotation_shortcut = False,
 									fc_layers = [32, 32],
 									fc_dropout = 0.0,
-									batch_normalization = True)
+									fc_batch_normalization = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
@@ -942,6 +944,7 @@ def train_ref_read_anno_model_tiny(args):
 									conv_height = 5,
 									conv_layers = [32, 32],
 									conv_dropout = 0.0,
+									conv_batch_normalization = False,
 									spatial_dropout = False,
 									max_pools = [(2,1),(8,1)],
 									padding='valid',
@@ -949,7 +952,7 @@ def train_ref_read_anno_model_tiny(args):
 									annotation_shortcut = False,
 									fc_layers = [16],
 									fc_dropout = 0.0,
-									batch_normalization = False)
+									fc_batch_normalization = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
@@ -1696,6 +1699,7 @@ def train_reference_annotation_b(args):
 											conv_width = 19, 
 											conv_layers = [128, 128, 96, 96, 32, 32],
 											conv_dropout = 0.0,
+											conv_batch_normalization = False,
 											spatial_dropout = False,
 											max_pools = [2],
 											padding = 'same',
@@ -1703,7 +1707,7 @@ def train_reference_annotation_b(args):
 											annotation_shortcut = True,
 											fc_layers = [32],
 											fc_dropout = 0.0,
-											batch_normalization = False)
+											fc_batch_normalization = False)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
