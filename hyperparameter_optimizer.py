@@ -76,8 +76,8 @@ class HyperparameterOptimizer(object):
 		self.conv_layers_sets = [
 									[16], [32], [64], [128], 
 									[16,32], [32,16], [32,32], [64,32], [64,64], [128,64],
-									[32,32,32], [64,64,64], [64,32,16], [64,48,32],
-									[32,64,128], [128,32,16], [128,64,32], [256, 64, 16], [256,128,64], 
+									[32,32,32], [64,64,64], [64,32,16], [64,48,32], [32,48,64],
+									[48,64,128], [128,32,16], [128,64,32]#, [256, 64, 16], [256,128,64], 
 								]
 
 		self.max_pool_sets_2d = [ 
@@ -94,8 +94,8 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.fc_layer_sets = [
-									[32], [64], [32, 16], [16, 32], 
-									[48,16], [32, 32], [64, 64], [64,32,16]
+									[24], [32], [48], [64], [32, 16], [16, 32], 
+									[48,16], [32, 32], [48, 32]#, [64,32,16]
 							 ]
 
 		self.mlp_layer_sets = [
@@ -290,8 +290,8 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
+			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15)},
+			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
