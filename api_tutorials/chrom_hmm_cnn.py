@@ -17,7 +17,6 @@ import argparse
 import matplotlib
 import numpy as np
 matplotlib.use('Agg')
-
 from scipy import interp
 from keras import metrics
 import keras.backend as K
@@ -26,12 +25,13 @@ from Bio import Seq, SeqIO
 from itertools import cycle
 import matplotlib.pyplot as plt
 from collections import Counter
-from keras.models import Sequential
+
 from keras.optimizers import SGD, Adam
+from keras.models import Sequential, Model
 from sklearn.metrics import roc_curve, auc, roc_auc_score
 from keras.callbacks import ModelCheckpoint, EarlyStopping
-from keras.layers.convolutional import Convolution1D, MaxPooling1D
-from keras.layers.core import Dense, Dropout, Flatten, Reshape, Activation
+from keras.layers.convolutional import Convolution1D, MaxPooling1D, Conv1D
+from keras.layers import Input, Dense, Dropout, BatchNormalization, SpatialDropout1D, Activation, Flatten
 
 data_path = '/dsde/data/deep/'
 reference_fasta = data_path + 'Homo_sapiens_assembly19.fasta'
@@ -64,14 +64,33 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--mode',	            default='bp')
-	parser.add_argument('--window_size', 		default=128, type=int)
-	parser.add_argument('--samples',			default=1000, type=int)
-	parser.add_argument('--reference_fasta',	default=reference_fasta)
-	parser.add_argument('--bed_file', 			default=breakpoint_bed_file)	
-	parser.add_argument('--inputs', 			default={'A':0, 'C':1, 'T':2, 'G':3})
-	parser.add_argument('--label_set', 			default='breakpoint', choices=label_sets.keys())
-	parser.add_argument('--labels', 			default={})
+	parser.add_argument('--mode', default='bp')
+	parser.add_argument('--window_size', default=128, type=int)
+	parser.add_argument('--samples', default=1000, type=int)
+	parser.add_argument('--reference_fasta', default=reference_fasta)
+	parser.add_argument('--bed_file',default=breakpoint_bed_file)	
+	parser.add_argument('--inputs', default={'A':0, 'C':1, 'T':2, 'G':3})
+	parser.add_argument('--label_set', default='breakpoint', choices=label_sets.keys())
+	parser.add_argument('--labels', default={})
+	parser.add_argument('--conv_width', default=15, help='Width of 1D convolutional kernels.')
+	parser.add_argument('--conv_dropout', default=0.0, type=float, 
+		help='Dropout rate in convolutional layers.')
+	parser.add_argument('--conv_batch_normalize', default=False, action='store_true',
+		help='Batch normalize convolutional layers.')
+	parser.add_argument('--conv_layers', nargs='+', default=[128, 64, 32], 
+		help='List of sizes for each convolutional filter layer')
+	parser.add_argument('--same_padding', default=False, action='store_true',
+		help='Valid or same border padding on the convolutional layers.')	
+	parser.add_argument('--spatial_dropout', default=False, action='store_true',
+		help='Spatial dropout on the convolutional layers.')	
+	parser.add_argument('--max_pools', nargs='+', default=[], 
+		help='List of maxpooling layers.')	
+	parser.add_argument('--fc_layers', nargs='+', default=[32], 
+		help='List of sizes for each fully connected layer')
+	parser.add_argument('--fc_dropout', default=0.0, type=float, 
+		help='Dropout rate in fully connected  layers.')
+	parser.add_argument('--fc_batch_normalize', default=False, action='store_true',
+		help='Batch normalize fully connected layers.')
 
 	args = parser.parse_args()
 	args.labels = label_sets[args.label_set]
@@ -129,30 +148,19 @@ def make_breakpoint_model(args):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Models ~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 def build_breakpoint_classifier(args):
-	model = Sequential()
-	model.add(Convolution1D(input_shape=(args.window_size, 4), 
-		filters=128,
-		kernel_size=16,
-		padding='valid',
-		activation='relu'))
-
-	model.add(Convolution1D(filters=64, kernel_size=16, activation='relu', padding='valid'))
-	model.add(MaxPooling1D(3))
-	model.add(Flatten())
-
-	model.add(Dense(units=32, activation='relu'))
-	model.add(Dropout(0.2))	
-
-	model.add(Dense(units=len(args.labels), activation='softmax') )
-
-	adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
-	my_metrics = [metrics.categorical_accuracy, precision, recall]
-
-	model.compile(loss='binary_crossentropy', optimizer=adamo, metrics=my_metrics)
-	model.summary()
-
-	return model
+	return build_reference_1d_model_from_args(args,
+				conv_width = args.conv_width,
+				conv_layers = args.conv_layers,
+				conv_dropout = args.conv_dropout,
+				conv_batch_normalize = args.conv_batch_normalize,
+				spatial_dropout = args.spatial_dropout,
+				max_pools = args.max_pools,
+				padding='same' if args.same_padding else 'valid',
+				fc_layers = args.fc_layers,
+				fc_dropout = args.fc_dropout,
+				fc_batch_normalize = args.fc_batch_normalize)
 
 
 def build_small_chrom_label(args):
@@ -222,6 +230,79 @@ def build_sequential_chrom_label(args):
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=my_metrics)
 	model.summary()
 
+	return model
+
+
+def build_reference_1d_model_from_args(args,
+									conv_width = 6, 
+									conv_layers = [128, 128, 128, 128],
+									conv_dropout = 0.0,
+									conv_batch_normalize = False,			
+									spatial_dropout = False,
+									max_pools = [],
+									padding='valid',
+									fc_layers = [64],
+									fc_dropout = 0.0,
+									fc_batch_normalize = False,
+									fc_initializer='glorot_normal',
+									kernel_initializer='glorot_normal'):
+	'''Build Reference 1d CNN model for classification.
+
+	Architecture specified by parameters.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API.
+	Prints out model summary.
+
+	Arguments
+		args.labels: The output labels (e.g. BREAKPOINT, WT)
+
+	Returns
+		The keras model
+	'''	
+	concat_axis = -1	
+	x = reference = Input(shape=(args.window_size, len(args.inputs)), name='reference')
+
+	max_pool_diff = len(conv_layers)-len(max_pools)	
+	for  i,c in enumerate(conv_layers):
+
+		if conv_batch_normalize:
+			x = Conv1D(filters=c, kernel_size=conv_width, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = BatchNormalization(axis=concat_axis)(x)
+			x = Activation('relu')(x)
+		else:
+			x = Conv1D(filters=c, kernel_size=conv_width, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+
+		if conv_dropout > 0 and spatial_dropout:
+			x = SpatialDropout1D(conv_dropout)(x)
+		elif conv_dropout > 0:
+			x = Dropout(conv_dropout)(x)
+
+		if i >= max_pool_diff:
+			x = MaxPooling1D(max_pools[i-max_pool_diff])(x)
+
+	x = Flatten()(x)
+
+	for fc in fc_layers:
+		if fc_batch_normalize:
+			x = Dense(units=fc, activation='linear', kernel_initializer=fc_initializer)(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation('relu')(x)			
+		else:
+			x = Dense(units=fc, activation='relu')(x)
+		
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	
+	model = Model(inputs=[reference], outputs=[prob_output])
+	
+	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+	my_metrics = [metrics.categorical_accuracy, precision, recall]
+
+	model.compile(optimizer=adam, loss='binary_crossentropy', metrics=my_metrics)
+	model.summary()
+	
 	return model
 
 
@@ -644,16 +725,15 @@ def plot_metric_history(history, title):
 def weight_path_from_args(args):
 	save_weight_hd5 =  './chrom_hmm_cnn_model' 
 
-	ignore = ['inputs', 'labels', 'bed_file', 'reference_fasta'] 
+	include = ['window_size', 'samples', 'conv_width', 'mode'] 
 	for arg in vars(args):
-		if arg in ignore:
+		if not arg in include:
 			continue
 
 		attr = getattr(args, arg)
 
 		if os.path.isdir(str(attr)) or os.path.isfile(str(attr)):
 			continue
-
 
 		if os.path.isabs(str(attr)):
 			attr = os.path.splitext(os.path.basename(attr))[0]

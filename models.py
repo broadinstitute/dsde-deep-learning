@@ -2158,9 +2158,13 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	if 'input_annotations' in semantics:
 		args.annotations = semantics['input_annotations']
 
-	if 'channels_last' in semantics:
-		args.channels_last = semantics['channels_last']
-	
+    if 'channels_last' in semantics:
+        args.channels_last = semantics['channels_last']
+        if args.channels_last:
+            K.set_image_data_format('channels_last')
+        else:
+            K.set_image_data_format('channels_first')
+            	
 	args.input_symbols = semantics['input_symbols']
 	args.labels = semantics['output_labels']
 
