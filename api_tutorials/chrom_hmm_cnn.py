@@ -77,15 +77,15 @@ def parse_args():
 		help='Dropout rate in convolutional layers.')
 	parser.add_argument('--conv_batch_normalize', default=False, action='store_true',
 		help='Batch normalize convolutional layers.')
-	parser.add_argument('--conv_layers', nargs='+', default=[128, 64, 32], 
+	parser.add_argument('--conv_layers', nargs='+', default=[128, 64, 32], type=int,
 		help='List of sizes for each convolutional filter layer')
 	parser.add_argument('--same_padding', default=False, action='store_true',
 		help='Valid or same border padding on the convolutional layers.')	
 	parser.add_argument('--spatial_dropout', default=False, action='store_true',
 		help='Spatial dropout on the convolutional layers.')	
-	parser.add_argument('--max_pools', nargs='+', default=[], 
+	parser.add_argument('--max_pools', nargs='+', default=[], type=int,
 		help='List of maxpooling layers.')	
-	parser.add_argument('--fc_layers', nargs='+', default=[32], 
+	parser.add_argument('--fc_layers', nargs='+', default=[32], type=int,
 		help='List of sizes for each fully connected layer')
 	parser.add_argument('--fc_dropout', default=0.0, type=float, 
 		help='Dropout rate in fully connected  layers.')
