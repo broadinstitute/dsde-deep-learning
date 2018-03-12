@@ -18,21 +18,22 @@ Training models from example tensors
 In the data directory we provide a small dataset of reference and read tensors from the NA12878 sample. The reference tensors are input for a 1D CNN. They are a 1-hot encoding of 128 base pairs of reference sequence centered at a variant. The [read tensors](https://gatkforums.broadinstitute.org/gatk/discussion/10996/deep-learning-in-gatk4) are input for a 2D CNN. They encode reference and read sequence as well as read meta data. They use the tensorflow default channel ordering: reads x sequence x channels. You can toggle between tensorflow and theano channel ordering with the `--channels_last` and `--channels_first` arguments. Uncompress them with tar:
 
     cd data
-    tar -zcvf example_reference_tensors_chr1.tar.gz 
-    tar -zcvf example_read_tensors_chr1_channels_last.tar.gz
+    tar -xzvf example_reference_tensors_chr1.tar.gz 
+    tar -xzvf example_read_tensors_chr1_channels_last.tar.gz
     cd ..
 
 Train a model that predicts variant quality from read tensors and variant annotations:
 
     python recipes.py train_ref_read_anno \
-      --data_dir ./data/g94982_tensors_chr1_channels_last/ \
+      --data_dir ./data/example_read_tensors_chr1_channels_last/ \
       --tensor_map read_tensor \
+      --annotation_set best_practices \
       --id ref_read_anno_model
 
 Train a model that predicts variant quality from read tensors:
 
     python recipes.py train_ref_read \
-      --data_dir ./data/g94982_tensors_chr1_channels_last/ \
+      --data_dir ./data/example_read_tensors_chr1_channels_last/ \
       --tensor_map read_tensor \
       --id ref_read_model
 
@@ -41,11 +42,12 @@ Train a model that predicts variant quality from reference sequence and annotati
     python recipes.py train_reference_annotation \
       --data_dir ./data/example_reference_tensors_chr1/ \
       --tensor_map reference \
+      --annotation_set best_practices \
       --id ref_anno_model
 
 Train a model that predicts variant quality from reference sequence only:
 
-    python recipes.py train_reference_annotation \
+    python recipes.py train_reference \
       --data_dir ./data/example_reference_tensors_chr1/ \
       --tensor_map reference \
       --id ref_model

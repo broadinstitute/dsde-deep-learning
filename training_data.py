@@ -949,9 +949,9 @@ def write_dna_and_annotations(args, include_dna=True, include_annotations=True):
 
 			with h5py.File(tensor_path, 'w') as hf:
 				if include_annotations:
-					hf.create_dataset('annotations', data=annotation_data, compression='gzip')
+					hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
 				if include_dna:
-					hf.create_dataset('reference', data=dna_data, compression='gzip')
+					hf.create_dataset(args.tensor_map, data=dna_data, compression='gzip')
 			
 			stats[cur_label_key] += 1
 			stats['count'] += 1
@@ -1043,9 +1043,9 @@ def write_dna_multisource_annotations(args, include_dna=True, include_annotation
 
 		with h5py.File(tensor_path, 'w') as hf:
 			if include_annotations:
-				hf.create_dataset('annotations', data=annotation_data)
+				hf.create_dataset(args.annotation_set, data=annotation_data)
 			if include_dna:
-				hf.create_dataset('reference', data=dna_data)
+				hf.create_dataset(args.tensor_map, data=dna_data)
 		
 		stats[cur_label_key] += 1
 		stats['count'] += 1
@@ -1905,9 +1905,9 @@ def dna_annotation_generator(args, train_paths):
 				tensor_path = tensors[label][tensor_counts[label]]
 				label_matrix[cur_example, label] = 1.0
 				with h5py.File(tensor_path,'r') as hf:
-					annotation_data[cur_example,:] = np.array(hf.get('annotations'))
+					annotation_data[cur_example,:] = np.array(hf.get(args.annotation_set))
 					if args.window_size > 0:
-						tensor[cur_example,:,:] = np.array(hf.get('reference'))
+						tensor[cur_example,:,:] = np.array(hf.get(args.tensor_map))
 				
 				tensor_counts[label] += 1
 				if tensor_counts[label] == len(tensors[label]):
@@ -1922,7 +1922,7 @@ def dna_annotation_generator(args, train_paths):
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
 		if args.window_size > 0:
-			yield ({'reference':tensor, 'annotations':annotation_data}, label_matrix)
+			yield ({args.tensor_map:tensor, args.annotation_set:annotation_data}, label_matrix)
 		else:
 			yield (annotation_data, label_matrix)
 

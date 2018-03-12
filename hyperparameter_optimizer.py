@@ -66,17 +66,18 @@ class HyperparameterOptimizer(object):
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
 		self.conv_layers_sets = [
-									[16], [32], [64], [128], 
+									#[16], [32], [64], [128], 
 									[16,32], [32,16], [32,32], [64,32], [64,64], [128,64],
 									[32,32,32], [64,64,64], [64,32,16], [64,48,32], [32,48,64],
-									[48,64,128], [128,32,16], [128,64,32]
+									[64,48,32,24], [128,64,32,16], [32,32,32,32]
+									#[48,64,96], [128,32,16], [128,64,32]
 								]
 
 		self.max_pool_sets_2d = [ 
-									[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
-									[(1,2),(1,2)], [(2,1),(2,1)], [(2,1),(6,1)],
+									#[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
+									#[(1,2),(1,2)], [(2,1),(2,1)], [(2,1),(6,1)],
 								  	[(3,1),(3,1)], [(1,3), (1,3)], [(4,1),(4,1)], [(4,1),(8,1)], 
-								  	[(2,2),(2,2)], [(3,3), (3,3)], [(4,4), (4,4)],
+								  	[(3,3), (3,3)], [(4,4), (4,4)], [(4,8), (4,8)],
 								  	[(1,2),(1,2),(1,2)], [(2,1),(2,1),(2,1)], [(3,1),(3,1),(3,1)]
 								]
 
@@ -86,7 +87,8 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.fc_layer_sets = [
-									[24], [32], [48], [64], [32, 16], [16, 32], 
+									[8], [12], [16], [24], [32], [48], [32, 16], [16, 32], 
+									[16,8], [12,16], [16,12],
 									[48,16], [32, 32], [48, 32]
 							 ]
 
@@ -240,6 +242,11 @@ class HyperparameterOptimizer(object):
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print('best_architecture:', self.str_from_params_and_keys(p, param_keys))
+				if args.inspect_model:
+					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
+					image_path = image_name if args.image_dir is None else args.image_dir + image_name
+					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+				
 				limit_mem()
 				return loss_and_metrics[0]
 			
@@ -282,15 +289,15 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15)},
+			{'name':'conv_width', 'type':'discrete', 'domain':(11,15,19,25,35,43)},
+			{'name':'conv_height', 'type':'discrete', 'domain':(11,15,19,25,35,43)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
+			#{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
 		]
 
@@ -308,7 +315,7 @@ class HyperparameterOptimizer(object):
 										conv_layers = conv_layers,
 										conv_batch_normalize =  bool(p[param_keys['conv_batch_normalize']]),
 										max_pools = max_pool_set,
-										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+										#padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 										annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 										fc_layers = fc_layers,
@@ -325,6 +332,11 @@ class HyperparameterOptimizer(object):
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print(self.str_from_params_and_keys(p, param_keys))
+				if args.inspect_model:
+					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
+					image_path = image_name if args.image_dir is None else args.image_dir + image_name
+					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 				limit_mem()
 				return loss_and_metrics[0]
 			
@@ -408,6 +420,11 @@ class HyperparameterOptimizer(object):
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print(self.str_from_params_and_keys(p, param_keys))
+				if args.inspect_model:
+					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
+					image_path = image_name if args.image_dir is None else args.image_dir + image_name
+					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:
@@ -497,6 +514,11 @@ class HyperparameterOptimizer(object):
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print(self.str_from_params_and_keys(x[0], param_keys))
+				if args.inspect_model:
+					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
+					image_path = image_name if args.image_dir is None else args.image_dir + image_name
+					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:
@@ -571,6 +593,11 @@ class HyperparameterOptimizer(object):
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print(self.str_from_params_and_keys(p, param_keys))
+				if args.inspect_model:
+					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
+					image_path = image_name if args.image_dir is None else args.image_dir + image_name
+					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 				limit_mem()
 				return loss_and_metrics[0]
 			except ValueError as e:

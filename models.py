@@ -245,7 +245,7 @@ def build_annotation_multilayer_perceptron(args):
 	Returns
 		The keras model
 	'''
-	annotations = Input(shape=(len(args.annotations),), name='annotations')
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	annotations_bn = BatchNormalization(axis=1)(annotations)
 	
 	x = Dense(units=216, kernel_initializer='glorot_normal', activation='relu')(annotations_bn)
@@ -285,7 +285,7 @@ def build_reference_1d_1layer_model(args):
 		The keras model
 	'''	
 	channel_map = defines.get_tensor_channel_map_1d()	
-	reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	
 	x = Conv1D(filters=256, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(reference)
 	x = SpatialDropout1D(0.5)(x)
@@ -329,7 +329,7 @@ def build_reference_plus_model(args):
 		The keras model
 	'''	
 	channel_map = defines.get_tensor_channel_map_from_args(args)	
-	reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	conv_width = 11
 	x = Conv1D(filters=256, kernel_size=conv_width, activation="relu", kernel_initializer='he_normal')(reference)
 	x = SpatialDropout1D(0.3)(x)
@@ -339,7 +339,7 @@ def build_reference_plus_model(args):
 	x = SpatialDropout1D(0.3)(x)
 	x = Flatten()(x)
 
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	annos_normed = BatchNormalization(axis=-1)(annotations)
 	annos_normed_x = Dense(units=20, kernel_initializer='normal', activation='relu')(annos_normed)
 	
@@ -875,7 +875,7 @@ def build_read_tensor_2d_and_annotations_model(args):
 		in_shape = (in_channels, args.read_limit, args.window_size)
 		concat_axis = 1
 
-	read_tensor = Input(shape=in_shape, name="read_tensor")
+	read_tensor = Input(shape=in_shape, name=args.tensor_map)
 
 	read_conv_width = 16
 	conv_dropout = 0.2
@@ -894,7 +894,7 @@ def build_read_tensor_2d_and_annotations_model(args):
 	x = Flatten()(x)
 
 	# Mix the variant annotations in
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	annotations_bn = BatchNormalization(axis=1)(annotations)
 	alt_input_mlp = Dense(units=16, kernel_initializer='glorot_normal', activation='relu')(annotations_bn)
 	x = layers.concatenate([x, alt_input_mlp], axis=concat_axis)

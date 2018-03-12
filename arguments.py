@@ -17,7 +17,7 @@ import os
 import defines
 import argparse
 import numpy as np
-
+import keras.backend as K
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -52,7 +52,7 @@ def parse_args():
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
-	parser.add_argument('--annotation_set', default='gatk', choices=defines.annotations.keys(),
+	parser.add_argument('--annotation_set', default='best_practices', choices=defines.annotations.keys(),
 		help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
 	parser.add_argument('--normalize_annotations', default=False, action='store_true',
 		help='If true tensor generators will look for mean and std files and normalize annotations.')
@@ -102,6 +102,7 @@ def parse_args():
 
 
 	# Input files and directories: vcfs, bams, beds, hd5, fasta
+	parser.add_argument('--image_dir', default=None, help='Directory to write images and plots to.')
 	parser.add_argument('--weights_hd5', default='',
 		help='A hd5 file of weights to initialize a model, will use all layers with names that match.')
 	parser.add_argument('--architecture', default='',
@@ -163,10 +164,16 @@ def parse_args():
 		help='Random seed to use throughout run.  Always use np.random.')
 
 
-	# Parse, print, set annotations and seed
+	# Parse, print, set annotations, image data format and seed
 	args = parser.parse_args()
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
+
+	if args.channels_last:
+		K.set_image_data_format('channels_last')
+	else:
+		K.set_image_data_format('channels_first')
+
 	print('Arguments are', args)
 	
 	return args
