@@ -17,7 +17,7 @@ import os
 import defines
 import argparse
 import numpy as np
-
+import keras.backend as K
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -164,10 +164,16 @@ def parse_args():
 		help='Random seed to use throughout run.  Always use np.random.')
 
 
-	# Parse, print, set annotations and seed
+	# Parse, print, set annotations, image data format and seed
 	args = parser.parse_args()
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
+
+	if args.channels_last:
+		K.set_image_data_format('channels_last')
+	else:
+		K.set_image_data_format('channels_first')
+
 	print('Arguments are', args)
 	
 	return args
