@@ -125,59 +125,15 @@ def run():
 	elif 'pr_segmentation_animation' == args.mode:
 		roc_curve_through_learning_segmentation(args)
 
-	# Writing tensor datasets for training
-	elif 'write_tensors' == args.mode:
-		td.tensors_from_tensor_map(args, include_annotations=True)
-	elif 'write_paired_read_tensors' == args.mode:
-		td.paired_read_tensors_from_map(args, include_annotations=True)
-	elif 'write_tensors_2bit' == args.mode:
-		td.tensors_from_tensor_map_2channel(args, include_annotations=True)
-	elif 'write_tensors_no_annotations' == args.mode:
-		td.tensors_from_tensor_map(args, include_annotations=False)
-	elif 'write_tensors_gnomad_annotations' == args.mode:
-		td.tensors_from_tensor_map_gnomad_annos(args)
-	elif 'write_tensors_gnomad_annotations_per_allele_1d' == args.mode:
-		td.tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=False, include_reference=True)
-	elif 'write_tensors_gnomad_1d' == args.mode:
-		td.tensors_from_tensor_map_gnomad_annos(args, include_reads=False, include_reference=True)		
-	elif 'write_depristo' == args.mode:
-		td.nist_samples_to_png(args)
-	elif 'write_calling_tensors' == args.mode:
-		td.calling_tensors_from_tensor_map(args)
-	elif 'write_pileup_filter_tensors' == args.mode:
-		td.tensors_from_tensor_map(args, pileup=True)		
-	elif 'write_calling_tensors_1d' == args.mode:
-		td.calling_tensors_from_tensor_map(args, pileup=True)		
-	elif 'write_dna_tensors' == args.mode:
-		td.write_dna_and_annotations(args)
-	elif 'write_bed_tensors' == args.mode:
-		td.write_dna_multisource_annotations(args)
-	elif 'write_bed_tensors_dna' == args.mode:
-		td.write_dna_multisource_annotations(args, include_annotations=False)		
-	elif 'write_bed_tensors_annotations' == args.mode:
-		td.write_dna_multisource_annotations(args, include_dna=False)	
-	elif 'write_bqsr_tensors' == args.mode:
-		td.bqsr_tensors_from_tensor_map(args, include_annotations=True)	
+	# Inspections			
+	elif 'inspect_architectures' == args.mode:
+		inspect_architectures(args)
 	elif 'write_filters_2d' == args.mode:
 		model = models.build_read_tensor_2d_and_annotations_model(args)
 		models.write_filters_2d(args, model)
 	elif 'write_filters_1d' == args.mode:
 		model = models.build_reference_model(args)
 		models.write_filters_1d(args, model)
-	elif 'write_tranches' == args.mode:
-		td.write_tranches(args)
-
-	# Inspections			
-	elif 'inspect_tensors' == args.mode:
-		td.inspect_read_tensors(args)
-	elif 'inspect_dataset' == args.mode:
-		td.inspect_dataset(args)
-	elif 'inspect_architectures' == args.mode:
-		inspect_architectures(args)
-	elif 'inspect_gnomad' == args.mode:
-		td.inspect_gnomad_low_ac(args)
-	elif 'combine_vcfs' == args.mode:
-		td.combine_vcfs(args)
 
 	# Ooops
 	else:
@@ -901,17 +857,17 @@ def train_ref_read_anno_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 11, 
-									conv_height = 19,
-									conv_layers = [128, 128, 96, 96, 32, 32, 16, 16],
+									conv_width = 25, 
+									conv_height = 25,
+									conv_layers = [64, 48, 32, 24],
 									conv_dropout = 0.0,
 									conv_batch_normalize = False,
 									spatial_dropout = False,
-									max_pools = [(2,1),(2,1)],
-									padding='same',
-									annotation_units = 32,
+									max_pools = [(3,1),(3,1)],
+									padding='valid',
+									annotation_units = 64,
 									annotation_shortcut = False,
-									fc_layers = [32, 32],
+									fc_layers = [24],
 									fc_dropout = 0.0,
 									fc_batch_normalize = False)
 	

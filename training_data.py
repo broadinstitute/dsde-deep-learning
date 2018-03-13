@@ -27,6 +27,7 @@ import pysam
 import random
 import defines
 import operator
+import arguments
 import numpy as np
 
 from random import shuffle
@@ -35,6 +36,61 @@ from scipy.stats import norm
 from collections import Counter, defaultdict
 
 tensor_exts = ['.h5', '.hd5']
+
+
+def run_training_data():
+	'''Dispatch on args.mode command-line supplied recipe'''
+	args = arguments.parse_args()
+
+	# Writing tensor datasets for training
+	if 'write_tensors' == args.mode:
+		tensors_from_tensor_map(args, include_annotations=True)
+	elif 'write_paired_read_tensors' == args.mode:
+		paired_read_tensors_from_map(args, include_annotations=True)
+	elif 'write_tensors_2bit' == args.mode:
+		tensors_from_tensor_map_2channel(args, include_annotations=True)
+	elif 'write_tensors_no_annotations' == args.mode:
+		tensors_from_tensor_map(args, include_annotations=False)
+	elif 'write_tensors_gnomad_annotations' == args.mode:
+		tensors_from_tensor_map_gnomad_annos(args)
+	elif 'write_tensors_gnomad_annotations_per_allele_1d' == args.mode:
+		tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=False, include_reference=True)
+	elif 'write_tensors_gnomad_1d' == args.mode:
+		tensors_from_tensor_map_gnomad_annos(args, include_reads=False, include_reference=True)		
+	elif 'write_depristo' == args.mode:
+		nist_samples_to_png(args)
+	elif 'write_calling_tensors' == args.mode:
+		calling_tensors_from_tensor_map(args)
+	elif 'write_pileup_filter_tensors' == args.mode:
+		tensors_from_tensor_map(args, pileup=True)		
+	elif 'write_calling_tensors_1d' == args.mode:
+		calling_tensors_from_tensor_map(args, pileup=True)		
+	elif 'write_dna_tensors' == args.mode:
+		write_dna_and_annotations(args)
+	elif 'write_bed_tensors' == args.mode:
+		write_dna_multisource_annotations(args)
+	elif 'write_bed_tensors_dna' == args.mode:
+		write_dna_multisource_annotations(args, include_annotations=False)		
+	elif 'write_bed_tensors_annotations' == args.mode:
+		write_dna_multisource_annotations(args, include_dna=False)	
+	elif 'write_bqsr_tensors' == args.mode:
+		bqsr_tensors_from_tensor_map(args, include_annotations=True)	
+	elif 'write_tranches' == args.mode:
+		write_tranches(args)
+
+	# Inspections			
+	elif 'inspect_tensors' == args.mode:
+		inspect_read_tensors(args)
+	elif 'inspect_dataset' == args.mode:
+		inspect_dataset(args)
+	elif 'inspect_gnomad' == args.mode:
+		inspect_gnomad_low_ac(args)
+	elif 'combine_vcfs' == args.mode:
+		combine_vcfs(args)	
+	
+	# Ooops
+	else:
+		raise ValueError('Unknown recipe mode:', args.mode)
 
 
 def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
@@ -4730,3 +4786,6 @@ def is_insertion(variant):
 def is_deletion(variant):
 	return any( map(lambda x: x and len(x) < len(variant.REF), variant.ALT) )
 
+# Back to the top!
+if "__main__" == __name__:
+	run_training_data()

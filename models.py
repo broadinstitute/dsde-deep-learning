@@ -39,7 +39,7 @@ from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
 from keras.layers.convolutional import Convolution1D, Convolution2D, Convolution3D, MaxPooling1D, MaxPooling2D, AveragePooling2D
-from keras.layers import Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -684,6 +684,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 											conv_dropout = 0.0,
 											conv_batch_normalize = False,
 											spatial_dropout = True,
+											residual_layers = [],
 											max_pools = [(3,1), (3,3)],
 											padding='valid',
 											annotation_units = 16,
@@ -693,6 +694,8 @@ def read_tensor_2d_annotation_model_from_args(args,
 											fc_dropout = 0.0,
 											fc_batch_normalize = False,
 											kernel_initializer='glorot_normal',
+											kernel_single_channel=True,
+											freeze_bn=False,
 											fc_initializer='glorot_normal'):
 	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
 
@@ -715,27 +718,50 @@ def read_tensor_2d_annotation_model_from_args(args,
 	in_channels = defines.total_input_channels_from_args(args)
 	if args.channels_last:
 		in_shape = (args.read_limit, args.window_size, in_channels)
-		K.set_image_data_format('channels_last')
 		concat_axis = -1
-		#print('image df:', K.image_data_format(), 'concat:', concat_axis)
 	else:
 		in_shape = (in_channels, args.read_limit, args.window_size)
 		concat_axis = 1
 
 	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
-	# Add convolutional layers
-	max_pool_diff = len(conv_layers)-len(max_pools)
-	for i,f in enumerate(conv_layers):
-		if i%2 == 0:
-			cur_kernel = (conv_width, 1)
-		else:
-			cur_kernel = (1, conv_height)
+	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
+	residual_diff = max(0, len(conv_layers)-len(residual_layers))
 
-		if conv_batch_normalize:
+	# Add convolutional layers
+	for i,f in enumerate(conv_layers):
+		
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		if i >= residual_diff:
+			#y = ZeroPadding2D(padding=1)(x)
+			y = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer, use_bias=False)(x)
+			y = BatchNormalization(axis=concat_axis)(y)
+			y = Activation("relu",)(y)
+
+			#y = ZeroPadding2D(padding=1)(y)
+			y = Conv2D(f, cur_kernel,  padding=padding, use_bias=False)(y)
+			y = BatchNormalization(axis=concat_axis)(y)
+
+			if i > 0 and f != conv_layers[i-1]:
+				shortcut = Conv2D(f, (1, 1), strides=1,  padding=padding, use_bias=False)(x)
+				shortcut = BatchNormalization(axis=concat_axis)(shortcut)
+			else:
+				shortcut = x
+
+			y = Add()([y, shortcut])
+			x = Activation("relu")(y)
+
+		elif conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation('relu')(x)
+
 		else:
 			x = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
 

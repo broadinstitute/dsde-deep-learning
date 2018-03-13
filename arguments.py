@@ -77,7 +77,8 @@ def parse_args():
 		help='Number of validation batches to examine in an epoch validation.')
 	parser.add_argument('--iterations', default=5, type=int,
 		help='Generic iteration limit for hyperparameter optimization, animation, and other counts.')
-
+	parser.add_argument('--max_parameters', default=5e6, type=int,
+		help='Maximum number of model parameters used for hyperparameter optimization, etc.')
 
 	# Dataset generation related arguments
 	parser.add_argument('--downsample_snps', default=1.0, type=float,
