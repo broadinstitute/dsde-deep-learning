@@ -1849,14 +1849,15 @@ def test_architectures(args):
 	'''
 	cnn_snp_dicts = {}
 	cnn_indel_dicts = {}
-	for a in args.architectures:
-		print('Processing architecture:', a)
-		
+	for a in args.architectures:	
+		print('Processing architecture:', a)		
 		model = models.set_args_and_get_model_from_semantics(args, a)
+		
 		if args.inspect_model:
 			generate_train, generate_valid, _  = td.train_valid_test_generators_from_args(args, with_positions=False)
-			models.inspect_model(args, model, generate_train, generate_valid, args.output_dir+td.plain_name(a)+'.png')
-		
+			image_path = a.replace('.json','.png') if args.image_dir is None else args.image_dir + a.replace('.json','.png')
+			models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
 		test = td.big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
 

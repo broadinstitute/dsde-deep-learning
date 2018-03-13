@@ -2510,7 +2510,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 			print('batch keys:', batch.keys())
-			print(batch['annotations'])
+
 		if with_positions:
 			yield (batch, label_matrix, positions)
 			positions = []
@@ -2522,7 +2522,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 			batch[args.tensor_map] = np.zeros(((args.batch_size,)+tensor_shape))
 		
 		if with_positions and defines.annotations_from_args(args):
-			batch['annotations'] = np.zeros((args.batch_size, len(args.annotations)))		
+			batch[args.annotation_set] = np.zeros((args.batch_size, len(args.annotations)))		
 
 
 def big_batch_from_minibatch_generator(args, generator, with_positions=False):
@@ -2536,7 +2536,7 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 
 	annotations = defines.annotations_from_args(args)
 	if annotations:
-		input_data['annotations'] = []	
+		input_data[args.annotation_set] = []	
 
 	if with_positions:
 		positions = []
@@ -2546,7 +2546,7 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 		if tm:
 			input_data[args.tensor_map].extend(next_batch[0][args.tensor_map])
 		if annotations:
-			input_data['annotations'].extend(next_batch[0]['annotations'])
+			input_data[args.annotation_set].extend(next_batch[0][args.annotation_set])
 		labels.extend(next_batch[1])
 		if with_positions:
 			positions.extend(next_batch[-1])
