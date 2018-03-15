@@ -67,6 +67,7 @@ def parse_args():
 	parser.add_argument('--mode', default='bp')
 	parser.add_argument('--window_size', default=128, type=int)
 	parser.add_argument('--samples', default=1000, type=int)
+	parser.add_argument('--min_consensus', default=0, type=int)
 	parser.add_argument('--reference_fasta', default=reference_fasta)
 	parser.add_argument('--bed_file',default=breakpoint_bed_file)	
 	parser.add_argument('--inputs', default={'A':0, 'C':1, 'T':2, 'G':3})
@@ -324,7 +325,7 @@ def train_chrom_labeller(model, train_tuple, valid_tuple, save_weight_hd5):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def load_dna_and_breakpoint_labels(args):
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	bed_dict, bed_labels = bed_file_labels_to_dict(args.bed_file)
+	bed_dict, bed_labels = bed_file_labels_to_dict(args.bed_file, args.min_consensus)
 
 	train_data = np.zeros(( args.samples, args.window_size, len(args.inputs) ))
 	train_labels = np.zeros(( args.samples, 2 ))
@@ -395,7 +396,7 @@ def load_dna_and_chrom_label(args, only_labels=None):
 	return (train_data, train_labels)
 
 
-def bed_file_labels_to_dict(bed_file):
+def bed_file_labels_to_dict(bed_file, min_consensus=0):
 	bed = {}
 	labels = {}
 
@@ -409,6 +410,9 @@ def bed_file_labels_to_dict(bed_file):
 			lower = int(parts[1])
 			upper = int(parts[2])
 			label = parts[3]
+
+			if min_consensus > 0 and label == 'BREAKPOINT' and int(parts[4]) < min_consensus:
+				continue
 
 			if contig not in bed.keys():
 				bed[contig] = ([], [], [])

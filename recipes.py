@@ -1654,18 +1654,19 @@ def train_reference_annotation_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = 19, 
-											conv_layers = [128, 128, 96, 96, 32, 32],
-											conv_dropout = 0.0,
-											conv_batch_normalize = False,
-											spatial_dropout = False,
-											max_pools = [2],
+											conv_width = 7, 
+											conv_layers = [256, 216, 128, 64, 32],
+											conv_dropout = 0.1, # was .3
+											conv_batch_normalize = True,
+											spatial_dropout = True,
+											max_pools = [],
 											padding = 'same',
 											annotation_units = 64,
 											annotation_shortcut = True,
-											fc_layers = [32],
-											fc_dropout = 0.0,
+											fc_layers = [64, 64],
+											fc_dropout = 0.1,
 											fc_batch_normalize = False)
+	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)

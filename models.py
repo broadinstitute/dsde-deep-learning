@@ -26,6 +26,7 @@ import json
 import plots
 import defines
 import numpy as np
+from collections import namedtuple
 
 # Keras Imports
 from keras import layers
@@ -40,6 +41,8 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceL
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
 from keras.layers.convolutional import Convolution1D, Convolution2D, Convolution3D, MaxPooling1D, MaxPooling2D, AveragePooling2D
 from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+
+ResidualLayer = namedtuple("ResidualLayer", "identity filters strides")
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -490,27 +493,31 @@ def build_reference_1d_model_from_args(args,
 	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=get_metrics(args.labels))
 	model.summary()
+
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
 	
 	return model
 
 
 def build_reference_annotation_1d_model_from_args(args,
-											conv_width = 6, 
-											conv_layers = [128, 128, 128, 128],
-											conv_dropout = 0.1,
-											conv_batch_normalize = False,		
-											spatial_dropout = True,
-											max_pools = [3, 1],
-											padding='valid',
-											annotation_units = 16,
-											annotation_shortcut = False,
-											annotation_batch_normalize = True,	
-											fc_layers = [64],
-											fc_dropout = 0.3,
-											fc_batch_normalize = False,
-											fc_initializer='glorot_normal',
-											kernel_initializer='glorot_normal'
-											):
+													conv_width = 6, 
+													conv_layers = [128, 128, 128, 128],
+													conv_dropout = 0.0,
+													conv_batch_normalize = False,		
+													spatial_dropout = True,
+													max_pools = [],
+													padding='valid',
+													annotation_units = 16,
+													annotation_shortcut = False,
+													annotation_batch_normalize = True,	
+													fc_layers = [64],
+													fc_dropout = 0.0,
+													fc_batch_normalize = False,
+													fc_initializer='glorot_normal',
+													kernel_initializer='glorot_normal'
+												):
 	'''Build Reference 1d CNN model for classifying variants.
 
 	Architecture specified by parameters.
@@ -576,6 +583,10 @@ def build_reference_annotation_1d_model_from_args(args,
 	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=get_metrics(args.labels))
 	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
 	
 	return model
 
@@ -726,11 +737,9 @@ def read_tensor_2d_annotation_model_from_args(args,
 	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
 	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
-	residual_diff = max(0, len(conv_layers)-len(residual_layers))
 
 	# Add convolutional layers
-	for i,f in enumerate(conv_layers):
-		
+	for i,f in enumerate(conv_layers):	
 		if kernel_single_channel and i%2 == 0:
 			cur_kernel = (conv_width, 1)
 		elif kernel_single_channel:
@@ -738,30 +747,10 @@ def read_tensor_2d_annotation_model_from_args(args,
 		else:
 			cur_kernel = (conv_width, conv_height)
 
-		if i >= residual_diff:
-			#y = ZeroPadding2D(padding=1)(x)
-			y = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer, use_bias=False)(x)
-			y = BatchNormalization(axis=concat_axis)(y)
-			y = Activation("relu",)(y)
-
-			#y = ZeroPadding2D(padding=1)(y)
-			y = Conv2D(f, cur_kernel,  padding=padding, use_bias=False)(y)
-			y = BatchNormalization(axis=concat_axis)(y)
-
-			if i > 0 and f != conv_layers[i-1]:
-				shortcut = Conv2D(f, (1, 1), strides=1,  padding=padding, use_bias=False)(x)
-				shortcut = BatchNormalization(axis=concat_axis)(shortcut)
-			else:
-				shortcut = x
-
-			y = Add()([y, shortcut])
-			x = Activation("relu")(y)
-
-		elif conv_batch_normalize:
+		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation('relu')(x)
-
 		else:
 			x = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
 
@@ -772,6 +761,34 @@ def read_tensor_2d_annotation_model_from_args(args,
 
 		if i >= max_pool_diff:
 			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
+
+	for i,r in enumerate(residual_layers):
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		y = Conv2D(r.filters[0], (1, 1), strides=r.strides)(x)
+		y = BatchNormalization(axis=concat_axis)(y)
+		y = Activation('relu')(y)
+
+		y = Conv2D(r.filters[1], cur_kernel, padding='same')(y)
+		y = BatchNormalization(axis=concat_axis)(y)
+		y = Activation('relu')(y)
+
+		y = Conv2D(r.filters[2], (1, 1))(y)
+		y = BatchNormalization(axis=concat_axis)(y)
+
+		if r.identity:
+			x = layers.add([y, x])
+		else:
+			shortcut = Conv2D(r.filters[2], (1, 1), strides=r.strides)(x)
+			shortcut = BatchNormalization(axis=concat_axis)(shortcut)
+			x = layers.add([y, shortcut])
+		
+		x = Activation('relu')(x)
 
 	x = Flatten()(x)
 

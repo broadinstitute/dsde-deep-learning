@@ -17,7 +17,13 @@ import os
 import defines
 import argparse
 import numpy as np
-import keras.backend as K
+
+print('uname is:', os.uname())
+# def is_broad_cluster():
+# 	return os.uname()[1].startswith('node') and os.uname()[1].endswith('broadinstitute.org')
+
+# if not is_broad_cluster():
+# 	import keras.backend as K
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -79,6 +85,7 @@ def parse_args():
 		help='Generic iteration limit for hyperparameter optimization, animation, and other counts.')
 	parser.add_argument('--max_parameters', default=5e6, type=int,
 		help='Maximum number of model parameters used for hyperparameter optimization, etc.')
+
 
 	# Dataset generation related arguments
 	parser.add_argument('--downsample_snps', default=1.0, type=float,
@@ -158,6 +165,7 @@ def parse_args():
 	parser.add_argument('--inspect_model', default=False, action='store_true',
 		help='Plot model architecture, measure inference and training speeds.')
 
+
 	# Run specific arguments
 	parser.add_argument('--id', default='no_id',
 		help='Identifier for this run, user-defined string to keep experiments organized.')	
@@ -170,10 +178,11 @@ def parse_args():
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
 
-	if args.channels_last:
-		K.set_image_data_format('channels_last')
-	else:
-		K.set_image_data_format('channels_first')
+	# if not is_broad_cluster():
+	# 	if args.channels_last:
+	# 		K.set_image_data_format('channels_last')
+	# 	else:
+	# 		K.set_image_data_format('channels_first')
 
 	print('Arguments are', args)
 	
@@ -189,4 +198,5 @@ def weight_path_from_args(args):
 	save_weight_hd5 =  args.output_dir + args.id + '.hd5'
 	print('save weight path:' , save_weight_hd5)
 	return save_weight_hd5
+
 

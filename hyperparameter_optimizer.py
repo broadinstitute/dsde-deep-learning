@@ -63,6 +63,13 @@ class HyperparameterOptimizer(object):
 
 	def __init__(self):
 		self.performances = {}
+		self.paddings = ['valid']
+		self.annotation_units = [12, 16, 20]
+		self.conv_dropouts = [0.0, 0.2, 0.4]
+		self.fc_dropouts =  [0.0, 0.2, 0.3, 0.4]
+		self.batch_normalizations =  [False]
+		self.kernel_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']
+		self.fc_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']		
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
 		self.conv_layers_sets = [
@@ -71,8 +78,8 @@ class HyperparameterOptimizer(object):
 									[32,32,32], [64,64,64], [64,32,16], [64,48,32], [32,48,64],
 									[48,64,96], [128,32,16], [128,64,32],
 									[64,48,32,24], [128,64,32,16], [32,32,32,32], [256, 128, 64, 32],
-									[96, 96, 64, 64, 48, 32], [96, 96, 64, 64, 48, 48, 32, 32],
-									[96, 96, 64, 64, 48, 48, 32, 32, 24, 24]
+									#[96, 96, 64, 64, 48, 32], [96, 96, 64, 64, 48, 48, 32, 32],
+									#[96, 96, 64, 64, 48, 48, 32, 32, 24, 24]
 								]
 
 		self.max_pool_sets_2d = [ 
@@ -101,18 +108,37 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.residual_layers_sets = [
-										[], [2], [2,2], [2,2,2],
-										[2,2,2,2], [3, 4, 6, 3]
+										[],
+										[ 	
+											models.ResidualLayer(False, [64, 64, 256], [1,1]), 
+											models.ResidualLayer(True, [64, 64, 256], [1,1]), 
+											models.ResidualLayer(True, [64, 64, 256], [1,1])
+										],										
+										[ 	
+											models.ResidualLayer(False, [64, 64, 256], [1,1]), 
+											models.ResidualLayer(True, [64, 64, 256], [1,1]), 
+											models.ResidualLayer(True, [64, 64, 256], [1,1]),
+											models.ResidualLayer(False, [128, 128, 512], [2,2]),
+											models.ResidualLayer(True, [128, 128, 512], [1,1]),
+											models.ResidualLayer(True, [128, 128, 512], [1,1]),
+											models.ResidualLayer(True, [128, 128, 512], [1,1])
+										],
+										[ 	
+											models.ResidualLayer(False, [64, 64, 256], [1,1]), 
+											models.ResidualLayer(True, [64, 64, 256], [1,1]), 
+											models.ResidualLayer(True, [64, 64, 256], [1,1]),
+											models.ResidualLayer(False, [128, 128, 512], [2,2]),
+											models.ResidualLayer(True, [128, 128, 512], [1,1]),
+											models.ResidualLayer(True, [128, 128, 512], [1,1]),
+											models.ResidualLayer(True, [128, 128, 512], [1,1]),
+											models.ResidualLayer(False, [256, 256, 512], [2,2]),
+											models.ResidualLayer(True, [256, 256, 512], [1,1]),
+											models.ResidualLayer(True, [256, 256, 512], [1,1]),
+											models.ResidualLayer(True, [256, 256, 512], [1,1]),
+											models.ResidualLayer(True, [256, 256, 512], [1,1])
+										]
 									]
 
-
-		self.paddings = ['valid']
-		self.annotation_units = [12, 16, 20]
-		self.conv_dropouts = [0.0, 0.2, 0.4]
-		self.fc_dropouts =  [0.0, 0.2, 0.3, 0.4]
-		self.batch_normalizations =  [False]
-		self.kernel_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']
-		self.fc_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']
 
 	def grid_search_2d(self, args):
 		'''Grid search in hyperparameter space over convolution size and max pooling tuples.
@@ -297,8 +323,8 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,9,11,15,19,25,35,43)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,9,11,15,19,25,35,43)},
+			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,9)},
+			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,9)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},

@@ -93,7 +93,7 @@ def run_training_data():
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
+def tensors_from_tensor_map(args, include_annotations=True, pileup=False, reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -155,6 +155,17 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 				continue
 
 			reference_seq = record.seq
+			if reference_map is not None:
+				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
+				for i,b in enumerate(reference_seq):
+					b = b.upper()
+					if b in defines.inputs:
+						reference_tensor[i, defines.inputs[b]] = 1.0
+					elif b in defines.ambiguity_codes:
+						reference_tensor[i] = defines.ambiguity_codes[b]
+					else:
+						raise ValueError('Error! Unknown code:', b)
+
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
 				if i < 0:
 					reference_seq = defines.indel_char*insert_dict[i] + reference_seq
@@ -172,12 +183,14 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
-				if pileup:
-					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
-					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
 				if include_annotations:
 					hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
+				if reference_map is not None:
+					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
+				if pileup:
+					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
+					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
 			
 			if debug:
 				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
@@ -571,9 +584,9 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
 			if include_reads:
-				hf.create_dataset('read_tensor', data=read_tensor)
+				hf.create_dataset(args.tensor_map, data=read_tensor)
 			if include_annotations:
-				hf.create_dataset('annotations', data=annotation_data)
+				hf.create_dataset(args.annotation_set, data=annotation_data)
 			if include_reference:
 				hf.create_dataset('reference', data=dna_data)
 
@@ -707,9 +720,9 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
 				if include_reads:
-					hf.create_dataset('read_tensor', data=read_tensor)
+					hf.create_dataset(args.tensor_map, data=read_tensor)
 				if include_annotations:
-					hf.create_dataset('annotations', data=annotation_data)
+					hf.create_dataset(args.annotation_set, data=annotation_data)
 				if include_reference:
 					hf.create_dataset('reference', data=dna_data)
 
@@ -807,9 +820,9 @@ def tensors_from_tensor_map_2channel(args, include_annotations=True):
 				if not os.path.exists(os.path.dirname(tensor_path)):
 					os.makedirs(os.path.dirname(tensor_path))
 				with h5py.File(tensor_path, 'w') as hf:
-					hf.create_dataset('read_tensor', data=read_tensor)
+					hf.create_dataset(args.tensor_map, data=read_tensor)
 					if include_annotations:
-						hf.create_dataset('annotations', data=annotation_data)
+						hf.create_dataset(args.annotation_set, data=annotation_data)
 				
 				if debug:
 					print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
@@ -930,9 +943,9 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
-				hf.create_dataset('read_tensor', data=read_tensor)
+				hf.create_dataset(args.tensor_map, data=read_tensor)
 				if include_annotations:
-					hf.create_dataset('annotations', data=annotation_data)
+					hf.create_dataset(args.annotation_set, data=annotation_data)
 		
 			stats['count'] +=1
 			if stats['count']%400 == 0:
@@ -1204,8 +1217,8 @@ def nist_samples_to_png(args):
 
 def get_variant_window(args, variant):
 	index_offset = (args.window_size//2)
-	reference_start = variant.POS-(index_offset+1)
-	reference_end = variant.POS+index_offset
+	reference_start = variant.POS-index_offset
+	reference_end = variant.POS+index_offset + (args.window_size%2)
 
 	return index_offset, reference_start, reference_end
 
@@ -2029,7 +2042,7 @@ def pileup_tensor_generator(args, train_paths, include_annotations=False):
 				label_matrix[cur_example, label] = 1.0
 				with h5py.File(tensor_path,'r') as hf:
 					if include_annotations:
-						annotation_data[cur_example,:] = np.array(hf.get('annotations'))
+						annotation_data[cur_example,:] = np.array(hf.get(args.tensor_map))
 					if args.window_size > 0:
 						tensor[cur_example,:,:] = np.array(hf.get('pileup_tensor'))
 				
@@ -2046,7 +2059,7 @@ def pileup_tensor_generator(args, train_paths, include_annotations=False):
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
 		if args.window_size > 0 and include_annotations:
-			yield ({'pileup_tensor':tensor, 'annotations':annotation_data}, label_matrix)
+			yield ({'pileup_tensor':tensor, args.annotation_set:annotation_data}, label_matrix)
 		elif args.window_size > 0:
 			yield ({'pileup_tensor':tensor}, label_matrix)
 		else:
@@ -2159,8 +2172,8 @@ def bqsr_tensor_annotation_generator(args, train_paths):
 				tensor_path = tensors[label][tensor_counts[label]]
 				try:
 					with h5py.File(tensor_path,'r') as hf:
-						tensor[cur_example] = np.array(hf.get('read_tensor'))
-						annotation_data[cur_example] = np.array(hf.get('annotations'))
+						tensor[cur_example] = np.array(hf.get(args.tensor_map))
+						annotation_data[cur_example] = np.array(hf.get(args.annotation_set))
 				except:
 					e = sys.exc_info()
 					print('\nError', e, ' \n could be corrupt tensor at:', tensor_path)
@@ -2180,7 +2193,7 @@ def bqsr_tensor_annotation_generator(args, train_paths):
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
-		yield ({'read_tensor':tensor, 'annotations':annotation_data}, label_matrix)
+		yield ({args.tensor_map:tensor, args.annotation_set:annotation_data}, label_matrix)
 		label_matrix = np.zeros((args.batch_size, len(args.labels)))
 
 
@@ -2399,8 +2412,8 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 
 				try:
 					with h5py.File(tensor_path, 'r') as hf:
-						tensor[cur_example] = np.array(hf.get('read_tensor'))
-						annotations[cur_example] = np.array(hf.get('annotations'))
+						tensor[cur_example] = np.array(hf.get(args.tensor_map))
+						annotations[cur_example] = np.array(hf.get(args.annotation_set))
 					if args.normalize_annotations:
 						for i,a in enumerate(args.annotations):
 							if annotations[cur_example][i] == 0:
@@ -2428,7 +2441,7 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
-		yield ({'read_tensor':tensor, 'annotations':annotations}, label_matrix)
+		yield ({args.tensor_map:tensor, args.annotation_set:annotations}, label_matrix)
 		label_matrix = np.zeros((args.batch_size, len(args.labels)))		
 		annotations = np.zeros((args.batch_size,len(args.annotations)))
 
@@ -2675,7 +2688,7 @@ def load_tensors_and_annotations_from_class_dirs(args, train_paths, per_class_ma
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get('read_tensor')))
+				tensors.append(np.array(hf.get(args.tensor_map)))
 				annotations.append(np.array(hf.get(args.annotation_set)))
 
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
@@ -2716,7 +2729,7 @@ def load_bqsr_tensors_from_class_dirs(args, train_paths, per_class_max=4000):
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get('read_tensor')))
+				tensors.append(np.array(hf.get(args.tensor_map)))
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -2753,8 +2766,8 @@ def load_bqsr_tensors_annotations_from_class_dirs(args, train_paths, per_class_m
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get('read_tensor')))
-				annotations.append(np.array(hf.get('annotations')))
+				tensors.append(np.array(hf.get(args.tensor_map)))
+				annotations.append(np.array(hf.get(args.annotation_set)))
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -2793,9 +2806,9 @@ def load_dna_annotations_positions_from_class_dirs(args, train_paths, per_class_
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
 				if include_annotations:
-					annotation_data.append(np.array(hf.get('annotations')))
+					annotation_data.append(np.array(hf.get(args.annotation_set)))
 				if include_dna:
-					reference_data.append(np.array(hf.get('reference')))
+					reference_data.append(np.array(hf.get(args.tensor_map)))
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -4369,7 +4382,7 @@ def inspect_dataset(args):
 
 					if args.normalize_annotations and v.POS == pos and not maxed_out:
 						with h5py.File(os.path.join(tp,t),'r') as hf:
-							annotation_data = np.array(hf.get('annotations'))
+							annotation_data = np.array(hf.get(args.anotation_set))
 							for i,a in enumerate(args.annotations):
 								if annotation_data[i] == 0:
 									continue
