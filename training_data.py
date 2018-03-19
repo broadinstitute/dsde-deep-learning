@@ -4253,12 +4253,12 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 				variant = v
 				v_negative = variant_in_vcf(variant, vcf_negative)
 
-		if not v_negative:
-			stats['Not in negative VCF'] += 1
-			continue
-
 		if not variant:
 			stats['Not in gnomad'] += 1
+			continue
+			
+		if not v_negative:
+			stats['Not in negative VCF'] += 1
 			continue
 
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):

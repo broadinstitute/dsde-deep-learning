@@ -857,18 +857,18 @@ def train_ref_read_anno_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 25, 
-									conv_height = 25,
+									conv_width = 21, # 25
+									conv_height = 21, # 25
 									conv_layers = [64, 48, 32, 24],
-									conv_dropout = 0.0,
+									conv_dropout = 0.2, #0
 									conv_batch_normalize = False,
-									spatial_dropout = False,
+									spatial_dropout = True, # False,
 									max_pools = [(3,1),(3,1)],
 									padding='valid',
-									annotation_units = 64,
-									annotation_shortcut = False,
-									fc_layers = [24],
-									fc_dropout = 0.0,
+									annotation_units = 24, #64
+									annotation_shortcut = True, #False,
+									fc_layers = [32], #[24],
+									fc_dropout = 0.4, # 0
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
