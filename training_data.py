@@ -3095,7 +3095,7 @@ def reference_sequence_into_tensor(args, reference_seq, tensor):
 				tensor[ref_offset+args.input_symbols[b], :, i] = 1.0
 		elif b in defines.ambiguity_codes:
 			if args.channels_last:
-				tensor[:, i, ref_offset:ref_offset+4] = np.transpose(np.tile(defines.ambiguity_codes[b], (args.read_limit, 1)))
+				tensor[:, i, ref_offset:ref_offset+4] = np.tile(defines.ambiguity_codes[b], (args.read_limit, 1))
 			else:
 				tensor[ref_offset:ref_offset+4, :, i] = np.transpose(np.tile(defines.ambiguity_codes[b], (args.read_limit, 1)))		
 
@@ -4256,7 +4256,7 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 		if not variant:
 			stats['Not in gnomad'] += 1
 			continue
-			
+
 		if not v_negative:
 			stats['Not in negative VCF'] += 1
 			continue

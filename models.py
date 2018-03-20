@@ -287,20 +287,22 @@ def build_reference_1d_1layer_model(args):
 	Returns
 		The keras model
 	'''	
-	channel_map = defines.get_tensor_channel_map_1d()	
+	channel_map = defines.get_tensor_channel_map_from_args(args)	
 	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	
-	x = Conv1D(filters=256, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(reference)
-	x = SpatialDropout1D(0.5)(x)
+	x = Conv1D(filters=320, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(reference)
+	x = SpatialDropout1D(0.4)(x)
+	x = Conv1D(filters=128, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(x)
+	x = SpatialDropout1D(0.4)(x)	
 	#x = MaxPooling1D(3)(x)
 	x = Flatten()(x)
 
-	#x = Dense(units=64, kernel_initializer='glorot_normal', activation='relu')(x)
-	#x = Dropout(0.5)(x)
-	x = Dense(units=32, kernel_initializer='glorot_normal', activation='relu')(x)
-	#x = Dropout(0.3)(x)
+	x = Dense(units=32, activation='relu')(x)
+	x = Dropout(0.4)(x)
+	x = Dense(units=48, activation='relu')(x)
+	x = Dropout(0.3)(x)
 
-	prob_output = Dense(units=len(args.labels), kernel_initializer='glorot_normal', activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), name='softmax_predictions', activation='softmax')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
