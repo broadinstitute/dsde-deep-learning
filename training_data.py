@@ -2463,7 +2463,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		A tuple with a dict of the input tensors 
 		and a 1-Hot matrix (2D numpy array) of the labels.
 	"""	
-	debug = False
+	debug = True
 
 	batch = {}
 	tensors = {}

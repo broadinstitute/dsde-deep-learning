@@ -1885,31 +1885,38 @@ def test_architectures(args):
 		snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
 		snp_key_sets.extend([set(snp_vqsr.keys()), set(snp_rf.keys())])
 		indel_key_sets.extend([set(indel_vqsr.keys()), set(indel_rf.keys())])
+		snp_truth_dict = snp_vqsr
+		indel_truth_dict = indel_vqsr
 
 	if args.single_sample_vqsr:
 		snp_single_sample, indel_single_sample = td.scores_from_positions(args, positions)
 		snp_key_sets.append(set(snp_single_sample.keys()))
 		indel_key_sets.append(set(indel_single_sample.keys()))
+		snp_truth_dict = snp_single_sample
+		indel_truth_dict = indel_single_sample
 
 	if args.deep_variant_vcf:
 		snp_deep_variant, indel_deep_variant = td.scores_from_positions(args, positions, 'QUAL', args.deep_variant_vcf)
 		snp_key_sets.append(set(snp_deep_variant.keys()))
 		indel_key_sets.append(set(indel_deep_variant.keys()))		
+		snp_truth_dict = snp_deep_variant
+		indel_truth_dict = indel_deep_variant
 
 	shared_snp_keys = set.intersection(*snp_key_sets)
 	shared_indel_keys = set.intersection(*indel_key_sets)
 
-	snp_truth = [snp_vqsr[p][1] for p in shared_snp_keys]
-	indel_truth = [indel_vqsr[p][1] for p in shared_indel_keys]
+	snp_truth = [snp_truth_dict[p][1] for p in shared_snp_keys]
+	indel_truth = [indel_truth_dict[p][1] for p in shared_indel_keys]
 	
 	if 'SNP' in args.labels:
 		snp_scores = {}
-		snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
-		snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
 
 		for a in args.architectures:
 			snp_scores['GATK4:'+td.plain_name(a)] = [cnn_snp_dicts[a][p] for p in shared_snp_keys]
 
+		if args.gnomad_compare:
+			snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
+			snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
 		if args.single_sample_vqsr:
 			snp_scores['VQSR Single Sample'] = [snp_single_sample[p][0] for p in shared_snp_keys]
 		if args.deep_variant_vcf:
@@ -1945,12 +1952,13 @@ def test_architectures(args):
 	
 	if 'INDEL' in args.labels:
 		indel_scores = {}
-		indel_scores['VQSR gnomAD'] = [indel_vqsr[p][0] for p in shared_indel_keys]
-		indel_scores['Random Forest'] = [indel_rf[p][0] for p in shared_indel_keys]
 
 		for a in args.architectures:
 			indel_scores['GATK4:'+td.plain_name(a)] = [cnn_indel_dicts[a][p] for p in shared_indel_keys]
 
+		if args.gnomad_compare:
+			indel_scores['VQSR gnomAD'] = [indel_vqsr[p][0] for p in shared_indel_keys]
+			indel_scores['Random Forest'] = [indel_rf[p][0] for p in shared_indel_keys]
 		if args.single_sample_vqsr:
 			indel_scores['VQSR Single Sample'] = [indel_single_sample[p][0] for p in shared_indel_keys]
 		if args.deep_variant_vcf:
