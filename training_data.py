@@ -2463,7 +2463,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		A tuple with a dict of the input tensors 
 		and a 1-Hot matrix (2D numpy array) of the labels.
 	"""	
-	debug = True
+	debug = False
 
 	batch = {}
 	tensors = {}
@@ -2555,7 +2555,7 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 		positions = []
 
 	for _ in range(minibatches):
-		next_batch = generator.next()
+		next_batch = next(generator)
 		if tm:
 			input_data[args.tensor_map].extend(next_batch[0][args.tensor_map])
 		if annotations:

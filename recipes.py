@@ -176,7 +176,7 @@ def inspect_architectures(args):
 			generate_valid = td.calling_pileup_tensors_generator(args, valid_paths)
 			generate_test = td.calling_pileup_tensors_generator(args, test_paths)
 			
-			test = generate_test.next()
+			test = next(generate_test)
 
 			model = models.build_1d_cnn_calling_segmentation_1d(args)			
 		
@@ -275,7 +275,7 @@ def train_calling_model(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -317,7 +317,7 @@ def train_calling_model_full(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -355,7 +355,7 @@ def train_calling_model_1d(args):
 
 	args.batch_size = args.samples # hack
 	generate_test = td.calling_pileup_tensors_generator(args, test_paths)
-	test_batch = generate_test.next()
+	test_batch = next(generate_test)
 	predictions = model.predict(test_batch[0])
 	for i in range(30):
 		print('\n\n\npredictions ', i,' is:\n', np.argmax(predictions[i,:,:], axis =-1), '\n for truth labels:\n', np.argmax(test_batch[1][i,:,:], axis=-1))
@@ -405,7 +405,7 @@ def train_pileup_filter(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_pileups[i*args.batch_size:(i+1)*args.batch_size,:,:] = next_batch[0]['pileup_tensor']
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -440,7 +440,7 @@ def test_caller_pileup(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_pileups[i*args.batch_size:(i+1)*args.batch_size,:,:] = next_batch[0]['pileup_tensor']
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -491,7 +491,7 @@ def test_caller_2d(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -1504,7 +1504,7 @@ def roc_curve_through_learning_segmentation(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -1860,7 +1860,7 @@ def test_architectures(args):
 		model = models.set_args_and_get_model_from_semantics(args, a)
 		
 		if args.inspect_model:
-			generate_train, generate_valid, _  = td.train_valid_test_generators_from_args(args, with_positions=False)
+			generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 			image_path = a.replace('.json','.png') if args.image_dir is None else args.image_dir + a.replace('.json','.png')
 			models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
