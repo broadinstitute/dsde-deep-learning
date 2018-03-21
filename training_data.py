@@ -3544,18 +3544,18 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 	stats = Counter()
 
 	bed_dict = bed_file_to_dict(args.bed_file)
-	vcf_truth = vcf.Reader(open(args.train_vcf, 'r'))
+	vcf_truth = vcf.Reader(open(args.train_vcf, 'rb'))
 
 	if override_vcf:
-		vcf_ram = vcf.Reader(open(override_vcf, 'r'))
-		vcf_negative = vcf.Reader(open(args.negative_vcf, 'r'))
+		vcf_ram = vcf.Reader(open(override_vcf, 'rb'))
+		vcf_negative = vcf.Reader(open(args.negative_vcf, 'rb'))
 	else:
-		vcf_ram = vcf.Reader(open(args.negative_vcf, 'r'))
+		vcf_ram = vcf.Reader(open(args.negative_vcf, 'rb'))
 
 	if args.ignore_vcf:
-		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'r'))
+		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'rb'))
 	if args.include_vcf:
-		vcf_include = vcf.Reader(open(args.include_vcf, 'r'))
+		vcf_include = vcf.Reader(open(args.include_vcf, 'rb'))
 
 	snp_data = {}
 	indel_data = {}
