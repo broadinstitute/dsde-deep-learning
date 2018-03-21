@@ -1692,7 +1692,12 @@ def make_reference_annotation_net_1layer(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_reference_1d_1layer_model(args)
-	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+#	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+	for i in range(args.epochs):
+		model.save(args.output_dir + args.id + '_epoch_' + str(i) + '.hd5')
+		model.fit_generator(generate_train, 
+			steps_per_epoch=args.training_steps, epochs=1, verbose=1, 
+			validation_steps=args.validation_steps, validation_data=generate_valid)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
 	plots.plot_roc_per_class(model, test[0], test[2], args.labels, args.id)
@@ -1872,11 +1877,14 @@ def test_architectures(args):
 		cnn_indel_dicts[a] = indel_dict
 		cnn_snp_dicts[a] = snp_dict
 
-	snp_vqsr, indel_vqsr = td.gnomad_scores_from_positions(args, positions)
-	snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
+	snp_key_sets = []
+	indel_key_sets = []
 
-	snp_key_sets = [ set(snp_vqsr.keys()), set(snp_rf.keys()) ]
-	indel_key_sets = [ set(indel_vqsr.keys()), set(indel_rf.keys()) ]
+	if args.gnomad_compare:
+		snp_vqsr, indel_vqsr = td.gnomad_scores_from_positions(args, positions)
+		snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
+		snp_key_sets.extend([set(snp_vqsr.keys()), set(snp_rf.keys())])
+		indel_key_sets.extend([set(indel_vqsr.keys()), set(indel_rf.keys())])
 
 	if args.single_sample_vqsr:
 		snp_single_sample, indel_single_sample = td.scores_from_positions(args, positions)

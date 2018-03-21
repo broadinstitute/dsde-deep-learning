@@ -164,7 +164,8 @@ def parse_args():
 		help='List of variant score keys for performance comparisons.')
 	parser.add_argument('--inspect_model', default=False, action='store_true',
 		help='Plot model architecture, measure inference and training speeds.')
-
+	parser.add_argument('--gnomad_compare', default=False, action='store_true',
+		help='Compare to gnomad random forest and VQSR.')
 
 	# Run specific arguments
 	parser.add_argument('--id', default='no_id',
