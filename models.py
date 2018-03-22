@@ -2464,7 +2464,7 @@ def get_callbacks(args, save_weight_hd5):
 	
 	callbacks.append(ModelCheckpoint(filepath=save_weight_hd5, verbose=1, save_best_only=True))
 	callbacks.append(EarlyStopping(monitor='val_loss', patience=args.patience*4, verbose=1))
-	callbacks.append(ReduceLROnPlateau(monitor='val_loss', patience=args.patience, verbose=1))
+	callbacks.append(ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=args.patience, verbose=1))
 	
 	# if args.channels_last:
 	# 	callbacks.append(TensorBoard())

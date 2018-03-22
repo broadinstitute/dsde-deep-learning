@@ -1946,7 +1946,7 @@ def test_architectures(args):
 				print('Got Good SNP score:', sorted_snps[i])
 			print('Total true SNPs:', np.sum(snp_truth), ' Total false SNPs:', (len(snp_truth)-np.sum(snp_truth)))
 
-		title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
+		title_suffix = args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
 		plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
 		plots.plot_precision_recall_from_scores(snp_truth, snp_scores, 'SNP_Precision_Recall_'+title_suffix)		
 	
@@ -1986,7 +1986,7 @@ def test_architectures(args):
 				print('Got Good INDEL score:', sorted_indels[i])
 			print('Total true INDELs:', np.sum(indel_truth), ' Total false INDELs:', (len(indel_truth)-np.sum(indel_truth)))
 		
-		title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
+		title_suffix = args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
 		plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
 		plots.plot_precision_recall_from_scores(indel_truth, indel_scores, 'INDEL_Precision_Recall_'+title_suffix)
 
