@@ -125,10 +125,6 @@ def parse_args():
 		help='Path to a VCF that has annotations (typically from Haplotype Caller).')
 	parser.add_argument('--negative_vcf', default=defines.negative_vcf,
 		help='Haplotype Caller or VQSR generated VCF with raw annotation values [and quality scores].')
-	parser.add_argument('--negative_vcf_2', default=None,
-		help='Additional Haplotype Caller or VQSR generated VCF with raw annotation values [and quality scores].')
-	parser.add_argument('--negative_vcf_3', default=None,
-		help='Additional Haplotype Caller or VQSR generated VCF with raw annotation values [and quality scores].')
 	parser.add_argument('--ignore_vcf', default=None,
 		help='Optional VCF of sites to ignore when doing evaluations.')
 	parser.add_argument('--include_vcf', default=None,

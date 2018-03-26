@@ -25,7 +25,7 @@ import h5py
 import time
 import plots
 import pysam
-import models
+#import models
 import defines
 import operator
 import arguments
@@ -122,7 +122,7 @@ def run():
 		plot_multi_vcf_roc(args)	
 	elif 'roc_animation' == args.mode:
 		roc_curve_through_learning(args)
-	elif 'pr_segmentation_animation' == args.mode:
+	elif 'plot_seg_ani' == args.mode:
 		roc_curve_through_learning_segmentation(args)
 
 	# Inspections			
@@ -1514,7 +1514,11 @@ def roc_curve_through_learning_segmentation(args):
 		predictions = model.predict(test_tensors)
 		predictions = predictions.reshape(melt_shape)
 		test_truth = test_labels.reshape(melt_shape)
-		plots.plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), prefix='./figures/animations/')
+		plots.plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), 
+			prefix='./figures/animations/seg_prauc/pr_')
+		plots.plot_roc_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), 
+			prefix='./figures/animations/seg_roc/roc_')
+
 		model.fit_generator(generate_train, 
 			steps_per_epoch=args.batch_size, epochs=1, verbose=1, 
 			validation_steps=args.batch_size*8, validation_data=generate_valid)

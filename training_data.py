@@ -1352,6 +1352,25 @@ def downsample(args, cur_label_key, stats):
 	return False
 
 
+def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, reference_start, stats):
+	good_reads, insert_dict = get_good_reads(args, samfile, variant)
+	if len(good_reads) >= args.read_limit:
+		stats['More reads than read_limit'] += 1
+	if len(good_reads) == 0:
+		stats['No reads aligned'] += 1
+		return None
+
+	for i in sorted(insert_dict.keys(), key=int, reverse=True):
+		if i < 0:
+			reference_seq = defines.indel_char*insert_dict[i] + reference_seq
+		else:
+			reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
+
+	read_tensor = good_reads_to_tensor(args, good_reads, reference_start, insert_dict)
+	reference_sequence_into_tensor(args, reference_seq, read_tensor)
+	return read_tensor
+
+
 def get_good_reads(args, samfile, variant, sort_by='base'):
 	'''Return an array of usable reads centered at the variant.
 	
@@ -1423,7 +1442,8 @@ def get_base_to_sort_by(read, variant):
 
 	if variant.is_snp:
 		return read.query_alignment_sequence[clamp((variant.POS-read.reference_start)-1, 0, max_idx)]
-	elif variant.is_indel:
+	#elif variant.is_indel:
+	else:
 		var_idx = variant.POS-read.reference_start
 		cur_idx = 0
 		for cur_op, length in read.cigartuples:
