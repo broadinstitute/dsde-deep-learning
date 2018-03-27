@@ -1442,11 +1442,10 @@ def get_base_to_sort_by(read, variant):
 	if len(read.query_alignment_sequence) > 0:
 		max_idx = len(read.query_alignment_sequence)-1
 	else:
-		return -2
+		return 'Z'
 
 	if variant.is_snp:
 		return read.query_alignment_sequence[clamp((variant.POS-read.reference_start)-1, 0, max_idx)]
-	#elif variant.is_indel:
 	else:
 		var_idx = variant.POS-read.reference_start
 		cur_idx = 0
@@ -1456,8 +1455,8 @@ def get_base_to_sort_by(read, variant):
 				if cur_op == defines.cigar_code['M']:
 					return read.query_alignment_sequence[clamp(var_idx, 0, max_idx)]
 				else:
-					return cur_op
-		return -1
+					return defines.code2cigar[cur_op]
+		return 'Y'
 		
 
 def clamp(n, minn, maxn):

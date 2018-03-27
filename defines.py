@@ -89,7 +89,8 @@ bqsr_annotations = ['reverse', 'first_in_pair', 'mapping_quality', 'read_positio
 
 reference_beds = [exon_bed_file, repeat_bed_file]
 cigar_code = {'M':0, 'I':1, 'D':2, 'N':3, 'S':4}
-
+code2cigar = 'MIDNSHP=XB'
+cigar2code = dict([y, x] for x, y in enumerate(CODE2CIGAR))
 
 architectures = {
 				'2d':data_path+'tensors/g94982_allele_specific/', 
