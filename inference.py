@@ -38,14 +38,18 @@ def annotate_vcf_with_inference(args):
 	cnns = {}
 	stats = Counter()
 	vcf_reader = pysam.VariantFile(args.negative_vcf, "r")
+	input_tensors = {}
 
 	for a in args.architectures:	
 		print('Annotating with architecture:', a)		
 		cnns[a] = models.set_args_and_get_model_from_semantics(args, a)
 		vcf_reader.header.info.add(score_key_from_json(a), '1', 'Float', 'Site-level score from Convolutional Neural Net named '+a+'.')
+		if defines.annotations_from_args(args) is not None:
+			input_tensors[args.annotation_set] = (len(args.annotations),)
+		input_tensors[args.tensor_map] = defines.tensor_shape_from_args(args)
 
 	vcf_writer = pysam.VariantFile(args.output_vcf, 'w', header=vcf_reader.header)
-	print('got vcfs.')
+	print('got vcfs. input tensor shape mapping:', input_tensors)
 
 	reference = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
 	print('got ref.')
@@ -53,23 +57,22 @@ def annotate_vcf_with_inference(args):
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	print('got sam.')
 
-	tensor_channel_map = defines.get_tensor_channel_map_from_args(args)
-	if args.channels_last:
-		tensor_shape = (args.read_limit, args.window_size, len(tensor_channel_map))
-	else:
-		tensor_shape = (len(tensor_channel_map), args.read_limit, args.window_size) 
-
-	print('iterate over vcf')
-
 	positions = []
 	variant_batch = []
 	time_batch = time.time()
-	tensor_batch = np.zeros(((args.batch_size,) + tensor_shape))
-	annotation_batch = np.zeros((args.batch_size, len(args.annotations)))
-		
+	# tensor_batch = np.zeros(((args.batch_size,) + tensor_shape))
+	# reference_batch = np.zeros(((args.batch_size,) + reference_shape))
+	# annotation_batch = np.zeros((args.batch_size, len(args.annotations)))
+
+	batch = {}
+	for tm in input_tensors:
+		batch[tm] = np.zeros(((args.batch_size,) + input_tensors[tm]))
+
 	if args.chrom:
+		print('iterate over region of vcf', args.chrom, args.start_pos, args.end_pos)
 		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
 	else:
+		print('iterate over vcf')
 		variants = vcf_reader
 
 	for variant in variants:
@@ -79,30 +82,46 @@ def annotate_vcf_with_inference(args):
 		record = contig[ ref_start : ref_end ]
 		v = pysam_variant_to_pyvcf(variant)
 		
-		annotation_data = td.get_annotation_data(args, v, stats)
-		annotation_batch[stats['annotations_in_batch']] = annotation_data
-		stats['annotations_in_batch'] += 1
+		for tm in batch:
+			batch_key = tm+'_in_batch'
 
-		read_tensor = td.make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
-		if read_tensor is None:
-			continue
+			if tm in defines.annotations:
+				args.annotation_set = tm
+				annotation_data = td.get_annotation_data(args, v, stats)
+				batch[tm][stats[batch_key]] = annotation_data
+				stats[batch_key] += 1
 
-		tensor_batch[stats['read_tensors_in_batch']] = read_tensor
-		stats['read_tensors_in_batch'] += 1
+			if tm in defines.read_tensor_maps:
+				args.tensor_map = tm
+				read_tensor = td.make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
+				batch[tm][stats[batch_key]] = read_tensor
+				if read_tensor is None:
+					continue
+				stats[batch_key] += 1
+
+			if tm in defines.reference_tensor_maps:
+				args.tensor_map = tm
+				reference_tensor = td.make_reference_tensor(args, record.seq)
+				batch[tm][stats[batch_key]] = reference_tensor
+				stats[batch_key] += 1
+
 
 		positions.append(variant.contig + '_' + str(variant.pos))
 		variant_batch.append(variant)
 
-		if stats['read_tensors_in_batch'] == args.batch_size or stats['annotations_in_batch'] == args.batch_size:
-			batch = [tensor_batch, annotation_batch]
+		if stats[batch_key] == args.batch_size:
 			apply_cnns_to_batch(args, cnns, batch, positions, variant_batch, vcf_writer, stats)
 			
 			# Reset the batch
 			positions = []		
 			variant_batch = []
-			tensor_batch = np.zeros(((args.batch_size,)+tensor_shape))
-			annotation_batch = np.zeros((args.batch_size, len(args.annotations)))		
-			stats['read_tensors_in_batch'] = stats['annotations_in_batch'] = 0
+			#tensor_batch = np.zeros(((args.batch_size,)+tensor_shape))
+			#annotation_batch = np.zeros((args.batch_size, len(args.annotations)))		
+			for tm in batch:
+				batch_key = tm+'_in_batch'
+				batch[tm] = np.zeros(((args.batch_size,) + input_tensors[tm]))
+				stats[batch_key] = 0
+
 			stats['batches processed'] += 1
 			if stats['batches processed'] % 10 == 0:
 				print('Processed:', stats['batches processed'], 'batches.  Last variant:', variant)
@@ -110,8 +129,7 @@ def annotate_vcf_with_inference(args):
 		if stats['batches processed']*args.batch_size > args.samples:
 			break
 
-	if stats['read_tensors_in_batch'] > 0 or stats['annotations_in_batch'] > 0:
-		batch = [tensor_batch, annotation_batch]
+	if stats[batch_key] > 0:
 		apply_cnns_to_batch(args, cnns, batch, positions, variant_batch, vcf_writer, stats)
 
 	for s in stats.keys():
@@ -136,12 +154,12 @@ def get_variant_window(args, variant):
 	return index_offset, reference_start, reference_end
 
 
-def apply_cnns_to_batch(args, cnns, input_data, positions, variant_batch, vcf_writer, stats):
+def apply_cnns_to_batch(args, cnns, batch, positions, variant_batch, vcf_writer, stats):
 	snp_dicts = {}
 	indel_dicts = {}
 	predictions = {}
 	for a in cnns:
-		predictions[a] = cnns[a].predict(input_data, batch_size=args.batch_size)
+		predictions[a] = cnns[a].predict(batch, batch_size=args.batch_size)
 		snp_dicts[a] = models.predictions_to_snp_scores(args, predictions[a], positions)
 		indel_dicts[a] = models.predictions_to_indel_scores(args, predictions[a], positions)
 

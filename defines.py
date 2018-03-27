@@ -104,12 +104,13 @@ architectures = {
 				'deep_variant':data_path+'tensors/g94982_deep_variant_ref_sort/',
 				}
 
+reference_tensor_maps = ['reference']
+read_tensor_maps = ['read_tensor', '2d_mapping_quality']
 
 def annotations_from_args(args):
-	if args.annotation_set and args.annotation_set in annotations:
+	if args.annotation_set and args.annotation_set in annotations and args.annotation_set != '_':
 		return annotations[args.annotation_set]
 	return None
-
 
 
 def get_tensor_channel_map_from_args(args):

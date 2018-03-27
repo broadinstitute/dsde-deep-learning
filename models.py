@@ -2203,6 +2203,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 
 	if 'input_annotations' in semantics:
 		args.annotations = semantics['input_annotations']
+		args.annotation_set = semantics['input_annotation_set']
 
 	if 'channels_last' in semantics:
 		args.channels_last = semantics['channels_last']

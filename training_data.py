@@ -1356,6 +1356,25 @@ def downsample(args, cur_label_key, stats):
 	return False
 
 
+def make_reference_tensor(args, reference_seq):
+	reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
+	
+	for i,b in enumerate(reference_seq):
+		if i >= args.window_size:
+			break
+			
+		b = b.upper()
+		if b in defines.inputs:
+			reference_tensor[i, defines.inputs[b]] = 1.0
+		elif b in defines.ambiguity_codes:
+			reference_tensor[i] = defines.ambiguity_codes[b]
+		else:
+			raise ValueError('Error! Unknown code:', b)
+
+	return reference_tensor
+
+
+
 def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, reference_start, stats):
 	good_reads, insert_dict = get_good_reads(args, samfile, variant)
 	if len(good_reads) >= args.read_limit:
