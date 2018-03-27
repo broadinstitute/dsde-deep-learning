@@ -71,7 +71,7 @@ def annotate_vcf_with_inference(args):
 		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
 	else:
 		variants = vcf_reader
-		
+
 	for variant in variants:
 		idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 
@@ -152,10 +152,11 @@ def apply_cnns_to_batch(args, cnns, input_data, positions, variant_batch, vcf_wr
 		for a in cnns:
 			if is_snp(v_out):
 				v_out.info[score_key_from_json(a)] = float(snp_dicts[a][position])
-			elif len(v_out.ref) > 1 or len(v_out.alleles[1][0]) > 1:
+			elif is_indel(v_out):
 				v_out.info[score_key_from_json(a)] = float(indel_dicts[a][position])
 			else:
 				stats['Not SNP or INDEL'] += 1
+				break
 
 		vcf_writer.write(v_out)
 		stats['variants_written'] += 1
