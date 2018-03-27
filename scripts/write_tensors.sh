@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=echo
+ECHO=
 
 MODE=write_tensors
 
@@ -8,7 +8,7 @@ TENSOR_MAP=read_tensor
 READ_LIMIT=128
 WINDOW_SIZE=128
 BASE_QUALITY_MODE=phot
-CHANNEL_ORDER=channels_first
+CHANNEL_ORDER=channels_last
 ANNOTATION_SET=best_practices
 
 # Downsample certain types of variant
@@ -116,11 +116,11 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # DOWNSAMPLE_INDELS=0.075
 # DOWNSAMPLE_NOT_SNPS=0.5
 # DOWNSAMPLE_NOT_INDELS=0.15
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g76270_na12878_pcrplus.vcf.gz
-# BAM_FILE=/dsde/data/deep/vqsr/bams/g76270_na12878_pcrplus_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g76270_na12878_pcrplus_channels_last/
+TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g76270_na12878_pcrplus.vcf.gz
+BAM_FILE=/dsde/data/deep/vqsr/bams/g76270_na12878_pcrplus_bamout.bam
+BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
 
 # Project G96830 snapshot NA12878 with Mapping Quality HG38 reference
@@ -173,15 +173,15 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 
 # Project G94982 calling tensors 1D
-MODE=write_calling_tensors
-DOWNSAMPLE_SNPS=0.0015
-DOWNSAMPLE_INDELS=0.1
-DOWNSAMPLE_HOMOZYGOUS=0.03
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_channels_first_calling_small/
-BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
+# MODE=write_calling_tensors
+# DOWNSAMPLE_SNPS=0.0015
+# DOWNSAMPLE_INDELS=0.1
+# DOWNSAMPLE_HOMOZYGOUS=0.03
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_channels_first_calling_small/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
 
 
 # Project G94982 pileup tensors

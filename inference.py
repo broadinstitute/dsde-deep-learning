@@ -66,8 +66,13 @@ def annotate_vcf_with_inference(args):
 	time_batch = time.time()
 	tensor_batch = np.zeros(((args.batch_size,) + tensor_shape))
 	annotation_batch = np.zeros((args.batch_size, len(args.annotations)))
-	
-	for variant in vcf_reader:
+		
+	if args.chrom:
+		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
+	else:
+		variants = vcf_reader
+		
+	for variant in variants:
 		idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 
 		contig = reference[variant.contig]	

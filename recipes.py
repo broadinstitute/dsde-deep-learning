@@ -25,117 +25,32 @@ import h5py
 import time
 import plots
 import pysam
-#import models
+import models
 import defines
+import inspect
 import operator
 import arguments
 import numpy as np
 import training_data as td
 from collections import Counter
 
-def run():
-	'''Dispatch on args.mode command-line supplied recipe'''
+
+def run(file_fxns):
+	'''Dispatch on args.mode command-line supplied recipe
+	
+	Any function defined in this file is considered a recipe.
+	They must take the args namespace as input.
+	Recipes are run via:
+
+	python recipes.py <NAME_OF_RECIPE_FUNCTION> [Additional arguments]
+
+	Arguments:
+		file_fxns: a dict mapping function names as strings to function objects
+	'''	
 	args = arguments.parse_args()
 
-	# Model training recipes
-	if 'train_reference' == args.mode:
-		make_reference_net(args)
-	elif 'train_reference_annotation' == args.mode:
-		make_reference_annotation_net(args)
-	elif 'train_reference_annotation_b' == args.mode:
-		train_reference_annotation_b(args)		
-	elif 'train_reference_1layer' == args.mode:
-		make_reference_annotation_net_1layer(args)		
-	elif 'train_annotation_mlp' == args.mode:
-		make_annotation_multilayer_perceptron(args)
-	elif 'train_ref_read' == args.mode:
-		train_ref_read_model(args)
-	elif 'train_ref_read_resnet' == args.mode:
-		train_ref_read_resnet_model(args)
-	elif 'train_ref_read_dilated' == args.mode:
-		train_ref_read_dilated_model(args)
-	elif 'train_ref_read_b' == args.mode:
-		train_ref_read_model_b(args)
-	elif 'train_ref_read_bayes' == args.mode:
-		train_ref_read_inception_model(args)
-	elif 'train_pileup_filter' == args.mode:
-		train_pileup_filter(args)
-	elif 'train_calling_model' == args.mode:
-		train_calling_model(args)
-	elif 'train_calling_full2d' == args.mode:
-		train_calling_model_full(args)		
-	elif 'train_calling_model_1d' == args.mode:
-		train_calling_model_1d(args)		
-	elif 'train_ref_read_anno' == args.mode:
-		train_ref_read_annotation_model(args)								
-	elif 'train_ref_read_anno_exome' == args.mode:
-		train_ref_read_annotation_exome_model(args)
-	elif 'train_ref_read_anno_b' == args.mode:
-		train_ref_read_anno_model_b(args)
-	elif 'train_ref_read_anno_tiny' == args.mode:
-		train_ref_read_anno_model_tiny(args)			
-	elif 'train_bqsr' == args.mode:
-		bqsr_train_tensor(args)
-	elif 'train_bqsr_anno' == args.mode:
-		bqsr_train_annotation_tensor(args)		
-	elif 'train_bqsr_lstm' == args.mode:
-		bqsr_lstm_train_tensor(args)								
-	elif 'train_depristo_inception' == args.mode:
-		depristo_inception(args)
-
-	# Model testing recipes
-	elif 'test_tensor' == args.mode:
-		test_tensor_and_annotations(args)
-	elif 'test_tensor_exome' == args.mode:
-		test_ref_read_annotation_exome_model(args)		
-	elif 'test_tensor_vcf' == args.mode:
-		test_tensor_vs_vcf(args)
-	elif 'test_tensor_multi_vcf' == args.mode:
-		test_tensor_vs_multiple_vcfs(args)
-	elif 'test_tensor_filters' == args.mode:
-		test_tensor_and_annotations_vs_filters(args)		
-	elif 'test_tensor_gnomad' == args.mode:
-		test_tensor_vs_gnomad(args)
-	elif 'test_refconv_gnomad' == args.mode:
-		test_refconv_vs_gnomad(args)									
-	elif 'test_refconv' == args.mode:
-		test_reference_annotation_net(args)
-	elif 'test_ref' == args.mode:
-		test_reference_net(args)
-	elif 'test_anno_mlp' == args.mode:
-		test_annotation_multilayer_perceptron(args)
-	elif 'test_caller' == args.mode:
-		test_caller_pileup(args)
-	elif 'test_caller_2d' == args.mode:
-		test_caller_2d(args)
-	elif 'test_architectures' == args.mode:
-		test_architectures(args)
-
-	# Plotting recipes
-	elif 'plot_vcf_roc' == args.mode:
-		plot_vcf_roc(args)
-	elif 'plot_vcf_roc_gnomad' == args.mode:
-		plot_vcf_roc_gnomad_scores(args)
-	elif 'plot_vcf_roc_gnomad_like' == args.mode:
-		plot_vcf_roc_gnomad_like_scores(args)		
-	elif 'plot_multi_vcf_roc' == args.mode:
-		plot_multi_vcf_roc(args)	
-	elif 'roc_animation' == args.mode:
-		roc_curve_through_learning(args)
-	elif 'plot_seg_ani' == args.mode:
-		roc_curve_through_learning_segmentation(args)
-
-	# Inspections			
-	elif 'inspect_architectures' == args.mode:
-		inspect_architectures(args)
-	elif 'write_filters_2d' == args.mode:
-		model = models.build_read_tensor_2d_and_annotations_model(args)
-		models.write_filters_2d(args, model)
-	elif 'write_filters_1d' == args.mode:
-		model = models.build_reference_model(args)
-		models.write_filters_1d(args, model)
-
-	# Ooops
+	if args.mode in file_fxns:
+		file_fxns[args.mode](args)
 	else:
 		raise ValueError('Unknown recipe mode:', args.mode)
 
@@ -1443,39 +1358,6 @@ def roc_curve_through_learning(args):
 	model = models.build_read_tensor_2d_and_annotations_model(args)
 
 	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	for i in range(args.epochs):
-		model.fit_generator(generate_train, 
-			samples_per_epoch=args.batch_size*2, nb_epoch=1, verbose=1, 
-			nb_val_samples=args.batch_size, validation_data=generate_valid,
-			callbacks=models.get_callbacks(weight_path, patience=4))
-		plots.plot_roc_per_class(model, [test[0], test[1], test[2]], test[3], args.labels, args.id+str(i), prefix='./figures/animations/')
-
-def roc_curve_through_learning(args):
-	"""Plot ROC curves during optimization.
-
-	Arguments:
-		args.data_dir tensors to train and evaluate model
-		args.samples number of ROC curves to plot during training.
-
-	Tensors must be generated by calling 
-	td.nist_samples_to_tensors_flags_and_annotations(args) 
-	before this function is used.
-	"""		
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-
-	in_channels = defines.total_input_channels_from_args(args)
-	if args.channels_last:
-		tensor_shape = (args.read_limit, args.window_size, in_channels)
-	else:
-		tensor_shape = (in_channels, args.read_limit, args.window_size) 
-
-	generate_train = td.tensor_annotation_generator(args, train_paths, tensor_shape)
-	generate_valid = td.tensor_annotation_generator(args, valid_paths, tensor_shape)
-
-	weight_path = arguments.weight_path_from_args(args)
-	model = models.build_read_tensor_2d_and_annotations_model(args)
-
-	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
 	for i in range(args.iterations):
 		model.fit_generator(generate_train, 
 			samples_per_epoch=args.batch_size*2, nb_epoch=1, verbose=1, 
@@ -1484,7 +1366,7 @@ def roc_curve_through_learning(args):
 		plots.plot_roc_per_class(model, [test[0], test[1], test[2]], test[3], args.labels, args.id+str(i), prefix='./figures/animations/')
 
 
-def roc_curve_through_learning_segmentation(args):
+def animate_learning_segmentation(args):
 	"""Plot ROC curves during optimization of segmenting architecture.
 
 	Arguments:
@@ -1498,7 +1380,8 @@ def roc_curve_through_learning_segmentation(args):
 	generate_valid = td.calling_tensors_generator(args, valid_paths)
 	generate_test = td.calling_tensors_generator(args, test_paths)
 
-	model = models.build_2d_cnn_calling_segmentation_1d(args)
+	#model = models.build_2d_cnn_calling_segmentation_1d(args)
+	model = models.build_2d_cnn_calling_segmentation_full_2d(args)
 
 	test_tensors = np.zeros((args.iterations*args.batch_size,) + defines.tensor_shape_from_args(args))
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
@@ -1509,15 +1392,17 @@ def roc_curve_through_learning_segmentation(args):
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
 	melt_shape = (test_labels.shape[0]*test_labels.shape[1], test_labels.shape[2])
-
+	predictions = model.predict(test_tensors)
+	predictions = predictions.reshape(melt_shape)
+	print('random predictions are:\n', predictions)
 	for i in range(args.samples):
 		predictions = model.predict(test_tensors)
 		predictions = predictions.reshape(melt_shape)
 		test_truth = test_labels.reshape(melt_shape)
 		plots.plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), 
-			prefix='./figures/animations/seg_prauc/pr_')
+			prefix='./figures/animations/seg_prauc2/pr_')
 		plots.plot_roc_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), 
-			prefix='./figures/animations/seg_roc/roc_')
+			prefix='./figures/animations/seg_roc2/roc_')
 
 		model.fit_generator(generate_train, 
 			steps_per_epoch=args.batch_size, epochs=1, verbose=1, 
@@ -1997,4 +1882,6 @@ def test_architectures(args):
 
 # Back to the top!
 if "__main__" == __name__:
-	run()
+	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunction(obj) }
+	print(file_fxns)
+	run(file_fxns)

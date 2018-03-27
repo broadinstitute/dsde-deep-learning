@@ -389,18 +389,22 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 				stats['Downsampled Homozygous'] += 1
 				skip_this = True
 
-		if skip_this:
-			cur_pos += args.window_size
-			continue
-
-		for l in cur_labels:
-			stats[l] += 1	
-
 		if len(cur_labels) == 0:
-			stats['Reference only tensor written'] += 1
+			stats['Reference only tensor'] += 1
 			good_reads, insert_dict = get_good_reads_in_window(args, samfile, cur_pos, cur_pos+args.window_size)
 		else:
 			good_reads, insert_dict = get_good_reads_in_window(args, samfile, cur_pos, cur_pos+args.window_size, variant)
+
+		if len(good_reads) == 0:
+			stats['No reads aligned'] += 1
+			skip_this = True
+
+		if skip_this:
+			cur_pos += args.window_size
+			continue	
+
+		for l in cur_labels:
+			stats[l] += 1	
 
 		reference_seq = record.seq
 		for i in sorted(insert_dict.keys(), key=int, reverse=True):
