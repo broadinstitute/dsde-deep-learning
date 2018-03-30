@@ -9,8 +9,8 @@ use GridEngine8
 GATKUnstable=/humgen/gsa-hpprojects/GATK/private_unstable_builds/GenomeAnalysisTK_latest_unstable.jar
 GATK4=/dsde/working/sam/gatk/build/libs/gatk.jar
 QUEUE=/humgen/gsa-hpprojects/Queue/private_unstable_builds/Queue_latest_unstable.jar
-HAPLOTYPECALLER=./HaplotypeCallerSingleSampleScript.scala
-VQSR=./VQSRScript.scala
+HAPLOTYPECALLER=./scripts/HaplotypeCallerSingleSampleScript.scala
+VQSR=./scripts/VQSRScript.scala
 REFERENCE=/seq/references/Homo_sapiens_assembly19/v1/Homo_sapiens_assembly19.fasta
 TMPDIR=/broad/hptmp/`whoami`
 INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/wgs_calling_regions.v1.interval_list
@@ -56,6 +56,14 @@ INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_
 # VCF=/dsde/data/deep/vqsr/vcfs/g96830_na12878_hg38.vcf.gz
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+
+# Clinical project g47m NA12878 HG38
+BAM=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878.bam
+BAMOUT=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878_bamout.bam
+VCF=/dsde/data/deep/vqsr/vcfs/g947m_o1d1v1_na12878.vcf.gz
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+
 
 # NA12877 CEPH CEU Utah husband Solexa 269364
 # BAM=/seq/picard_aggregation/LCSET-6205/Solexa-269364,_PCR-Free_pool/v1/Solexa-269364,_PCR-Free_pool.bam

@@ -220,7 +220,7 @@ def annotation_multilayer_perceptron_from_args(args,
 		if skip_connection:
 			x = layers.concatenate([x, annotations], axis=1)	
 
-	prob_output = Dense(units=len(args.labels), kernel_initializer=initializer, activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), kernel_initializer=initializer, activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[annotations_in], outputs=[prob_output])
 	
@@ -489,7 +489,7 @@ def build_reference_1d_model_from_args(args,
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
@@ -579,7 +579,7 @@ def build_reference_annotation_1d_model_from_args(args,
 	if annotation_shortcut:
 		x = layers.concatenate([x, annotations_in], axis=1)
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference, annotations], outputs=[prob_output])
 	
@@ -675,7 +675,7 @@ def read_tensor_2d_model_from_args(args,
 			x = Dropout(fc_dropout)(x)
 
 	# Softmax output
-	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
 	
 	# Map inputs to outputs
 	model = Model(inputs=[read_tensor_in], outputs=[prob_output])
@@ -820,7 +820,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 		x = layers.concatenate([x, annotations_in], axis=concat_axis)
 
 	# Softmax output
-	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
 	
 	# Map inputs to outputs
 	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
@@ -1160,7 +1160,7 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	conv11 = layers.concatenate([conv10, piled_up], axis=-1)
 
 	conv_label = Conv1D(len(args.labels), 1, activation="linear", padding=padding_mode)(conv11)
-	conv_out = Activation('softmax')(conv_label)
+	conv_out = Activation('softmax', name='softmax_predictions')(conv_label)
 
 	model = Model(inputs=read_tensor, outputs=conv_out)
 	weights = np.array([0.5,3,2,1,1,1,1])
@@ -2266,16 +2266,18 @@ def plot_dot_model_in_color(dot, image_path):
 				n.set_fillcolor("deepskyblue1")				
 			elif 'BatchNormalization' in n.get_label():
 				n.set_fillcolor("goldenrod1")		
+			elif 'softmax' in n.get_label():
+				n.set_fillcolor("chartreuse")										
 			elif 'Activation' in n.get_label():
 				n.set_fillcolor("yellow")	
 			elif 'MaxPooling' in n.get_label():
 				n.set_fillcolor("aquamarine")
-			elif 'softmax' in n.get_label():
-				n.set_fillcolor("darkolivegreen4")										
 			elif 'Dense' in n.get_label():
 				n.set_fillcolor("gold")
 			elif 'Flatten' in n.get_label():
 				n.set_fillcolor("coral3")
+			elif 'Reshape' in n.get_label():
+				n.set_fillcolor("coral")			
 			elif 'Input' in n.get_label():
 				n.set_fillcolor("darkolivegreen1")
 			elif 'Concatenate' in n.get_label():
@@ -2464,7 +2466,7 @@ def get_callbacks(args, save_weight_hd5):
 	callbacks = []
 	
 	callbacks.append(ModelCheckpoint(filepath=save_weight_hd5, verbose=1, save_best_only=True))
-	callbacks.append(EarlyStopping(monitor='val_loss', patience=args.patience*4, verbose=1))
+	callbacks.append(EarlyStopping(monitor='val_loss', patience=args.patience*3, verbose=1))
 	callbacks.append(ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=args.patience, verbose=1))
 	
 	# if args.channels_last:

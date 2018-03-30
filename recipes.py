@@ -176,14 +176,15 @@ def train_calling_model(args):
 	'''
 	args.labels = defines.calling_labels
 	model = models.build_2d_cnn_calling_segmentation_1d(args)
-
+	
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths_all(args)
-
 	generate_train = td.calling_tensors_generator(args, train_paths)
 	generate_valid = td.calling_tensors_generator(args, valid_paths)
 	generate_test = td.calling_tensors_generator(args, test_paths)
 
 	weight_path = arguments.weight_path_from_args(args)
+	if args.inspect_model:
+		models.inspect_model(args, model, generate_train, generate_valid, weight_path.replace('.hd5', '.png'))
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test_tensors = np.zeros((args.iterations*args.batch_size,) + defines.tensor_shape_from_args(args))

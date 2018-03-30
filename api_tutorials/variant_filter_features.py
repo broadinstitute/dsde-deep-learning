@@ -48,6 +48,7 @@ ANNOTATIONS = {
 	'gatk_w_qual' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'QUAL', 'ReadPosRankSum'],
 	'gatk' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
 	'annotations' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
+	'best_practices' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
 	'm2':['AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
 	'combine': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
 	'gnomad': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'DP_MEDIAN', 'DREF_MEDIAN', 'GQ_MEDIAN', 'AB_MEDIAN'],
@@ -256,11 +257,11 @@ def excite_neuron(args, model):
 		if i % 4 == 0:
 			print("After iteration:", i, "of:", args.iterations, "loss is:", loss_value," layer name:", target_layer_name)
 	
-		if not os.path.exists(os.path.dirname(out_file)):
-			os.makedirs(os.path.dirname(out_file))
-		with h5py.File(out_file, 'w') as hf:
-			hf.create_dataset(args.tensor_name, data=read_tensor[0], compression='gzip')
-		print('Wrote tensor to:', out_file)
+	if not os.path.exists(os.path.dirname(out_file)):
+		os.makedirs(os.path.dirname(out_file))
+	with h5py.File(out_file, 'w') as hf:
+		hf.create_dataset(args.tensor_name, data=read_tensor[0], compression='gzip')
+	print('Wrote tensor to:', out_file)
 					
 
 ########################################
@@ -299,7 +300,7 @@ def iterate_channel(args, model, layer_dict, layer_name='conv5_1', channel=0):
 
 
 def iterate_neuron(args, model, layer_dict, neuron, layer_name='conv5_1'):
-	input_tensor = model.input
+	input_tensor = model.input[0]
 
 	# this is a placeholder tensor that will contain our generated images
 
@@ -318,9 +319,9 @@ def iterate_neuron(args, model, layer_dict, neuron, layer_name='conv5_1'):
 	objective += args.activity_weight* K.sum(K.square(x)) / np.prod(shape[1:])
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	objective -= args.total_variation * total_variation_norm(input_tensor)
+	objective += args.total_variation * total_variation_norm(input_tensor)
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	objective -= args.l2 * K.sum(K.square(input_tensor))
+	objective += args.l2 * K.sum(K.square(input_tensor))
 
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(objective, input_tensor)[0]
