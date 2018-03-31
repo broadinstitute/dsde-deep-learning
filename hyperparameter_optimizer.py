@@ -242,7 +242,6 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))}
 		]
@@ -261,8 +260,7 @@ class HyperparameterOptimizer(object):
 										conv_layers = conv_layers,
 										max_pools = max_pools,
 										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-										fc_layers = fc_layers,
-										fc_batch_normalize = p[param_keys['fc_batch_normalize']]
+										fc_layers = fc_layers
 										)
 
 				if model.count_params() > args.max_parameters:
@@ -331,7 +329,6 @@ class HyperparameterOptimizer(object):
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
@@ -356,7 +353,6 @@ class HyperparameterOptimizer(object):
 										annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 										fc_layers = fc_layers,
-										fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']])
 										)
 
 				if model.count_params() > args.max_parameters:
@@ -423,7 +419,6 @@ class HyperparameterOptimizer(object):
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))}
 		]
@@ -445,8 +440,7 @@ class HyperparameterOptimizer(object):
 											max_pools = max_pool_set,
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 											fc_layers = fc_layers,
-											fc_dropout = float(p[param_keys['fc_dropout']]),
-											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
+											fc_dropout = float(p[param_keys['fc_dropout']])
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
@@ -507,14 +501,12 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(8,16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))},
 		]
@@ -531,7 +523,6 @@ class HyperparameterOptimizer(object):
 											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
 											conv_dropout = float(p[param_keys['conv_dropout']]),
-											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
 											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
@@ -539,8 +530,8 @@ class HyperparameterOptimizer(object):
 											annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 											annotation_batch_normalize = bool(p[param_keys['annotation_batch_normalize']]),								
 											fc_layers = fc_layers,
-											fc_dropout = float(p[param_keys['fc_dropout']]),
-											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
+											fc_dropout = float(p[param_keys['fc_dropout']])
+											)
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
