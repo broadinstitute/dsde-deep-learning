@@ -441,6 +441,7 @@ class HyperparameterOptimizer(object):
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 											fc_layers = fc_layers,
 											fc_dropout = float(p[param_keys['fc_dropout']])
+											)
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
