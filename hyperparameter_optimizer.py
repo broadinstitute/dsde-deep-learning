@@ -73,12 +73,11 @@ class HyperparameterOptimizer(object):
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
 		self.conv_layers_sets = [
-									#[32,32], [64,32], [64,64], [128,64],
-									#[32,32,32], [64,64,64], [64,32,16], [64,48,32], [32,48,64],
-									[48,64,96], [128,32,16], [128,64,32],
-									[32,32,32,32], [64,48,32,24], [128,64,32,16], [256, 128, 64, 32],
-									[96, 96, 64, 64, 48, 32], [96, 96, 64, 64, 48, 48, 32, 32],
-									[96, 96, 64, 64, 48, 48, 32, 32, 24, 24]
+									[48, 64, 96], [96, 64, 48], [32, 64, 128], [128, 64, 32],
+									[64,48,32,24], [24,32,48,64], [48,64,96,128],  [128,96,64,48], 
+									[48, 48, 64, 64, 96, 96], [96, 96, 64, 64, 48, 32], 
+									[96, 96, 64, 64, 48, 48, 32, 32], [32, 32, 48, 48, 64, 64, 96, 96],
+									[96, 96, 64, 64, 48, 48, 32, 32, 24, 24], [24, 24, 32, 32, 48, 48, 64, 64, 96, 96]
 								]
 
 		self.max_pool_sets_2d = [ 
@@ -95,9 +94,9 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.fc_layer_sets = [
-									[24], [32], [48], [32, 16], [16, 32], 
-									[12,16], [16,12], [48,16], [32, 32], [48, 32],
-									[24, 24, 24], [32, 64, 32]
+									[24], [32], [48], 
+									[32, 16], [16, 32], [32, 32], [48, 32], [32, 32],
+									[24, 24, 24], [24, 32, 24]
 							 ]
 
 		self.mlp_layer_sets = [
@@ -323,7 +322,7 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,9)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
 			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
-			#{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
 			{'name':'residual_layers', 'type':'discrete', 'domain':range(len(self.residual_layers_sets))},
 			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
@@ -348,7 +347,7 @@ class HyperparameterOptimizer(object):
 										conv_layers = conv_layers,
 										max_pools = max_pool_set,
 										residual_layers = residual_layers,
-										padding = 'same',
+										padding = bool(p[param_keys['valid_padding']]),
 										kernel_single_channel = bool(p[param_keys['kernel_single_channel']]),
 										annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
