@@ -60,11 +60,18 @@ class VQSRScript extends QScript {
   val high_conf_1kg_snps = "/humgen/gsa-hpprojects/GATK/bundle/current/b37/1000G_phase1.snps.high_confidence.b37.vcf"
   val dbsnp_sites = "/humgen/gsa-hpprojects/GATK/bundle/current/b37/dbsnp_138.b37.vcf"
   val mills_sites = "/humgen/gsa-hpprojects/GATK/bundle/current/b37/Mills_and_1000G_gold_standard.indels.b37.vcf"
-  var snp_hapmap_resource = new TaggedFile(hapmap_sites, "hapmap,known=false,training=true,truth=true,prior=15.0")
-  var snp_omni_resource = new TaggedFile(omni_1kg_sites, "omni,known=false,training=true,truth=true,prior=12.0")
-  var snp_1kg_resource = new TaggedFile(high_conf_1kg_snps, "1000G,known=false,training=true,truth=false,prior=10.0")
-  var dbsnp_resource = new TaggedFile(dbsnp_sites, "dbsnp,known=true,training=false,truth=false,prior=2.0")
-  var indel_mills_resource = new TaggedFile(mills_sites, "mills,known=false,training=true,truth=true,prior=12.0")
+
+  val hapmap_sites38 = "/seq/references/Homo_sapiens_assembly38/v0/resources/hapmap_3.3.hg38.vcf.gz"
+  val omni_1kg_sites38 = "/seq/references/Homo_sapiens_assembly38/v0/resources/1000G_omni2.5.hg38.vcf.gz"
+  val high_conf_1kg_snps38 = "/seq/references/Homo_sapiens_assembly38/v0/resources/1000G_phase1.snps.high_confidence.hg38.vcf.gz"
+  val dbsnp_sites38 = "/seq/references/Homo_sapiens_assembly38/v0/resources/dbsnp_146.hg38.vcf.gz"
+  val mills_sites38 = "/seq/references/Homo_sapiens_assembly38/v0/resources/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz"
+
+  var snp_hapmap_resource = new TaggedFile(hapmap_sites38, "hapmap,known=false,training=true,truth=true,prior=15.0")
+  var snp_omni_resource = new TaggedFile(omni_1kg_sites38, "omni,known=false,training=true,truth=true,prior=12.0")
+  var snp_1kg_resource = new TaggedFile(high_conf_1kg_snps38, "1000G,known=false,training=true,truth=false,prior=10.0")
+  var dbsnp_resource = new TaggedFile(dbsnp_sites38, "dbsnp,known=true,training=false,truth=false,prior=2.0")
+  var indel_mills_resource = new TaggedFile(mills_sites38, "mills,known=false,training=true,truth=true,prior=12.0")
 
   // Required arguments
   @Argument(shortName = "input", required = true, doc = "vcf file(s)") var input_vcf: File = _

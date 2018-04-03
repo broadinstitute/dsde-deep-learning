@@ -860,7 +860,7 @@ def train_ref_read_anno_c(args):
 									conv_width = 3,
 									conv_height = 3,
 									conv_layers = [96, 96, 64, 64, 48, 48, 32, 32, 24, 24],
-									conv_dropout = 0,
+									conv_dropout = 0.2,
 									conv_batch_normalize = False,
 									kernel_single_channel = False,
 									spatial_dropout = False,
@@ -869,7 +869,7 @@ def train_ref_read_anno_c(args):
 									annotation_units = 64,
 									annotation_shortcut = False,
 									fc_layers = [24],
-									fc_dropout = 0,
+									fc_dropout = 0.3,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -1877,6 +1877,15 @@ def test_architectures(args):
 		snp_truth_dict = snp_deep_variant
 		indel_truth_dict = indel_deep_variant
 
+	if args.hard_filter_compare:
+		snp_gatk_scores, indel_gatk_scores = td.scores_from_gatk_hard_filters(args, positions, distance_score=True)
+		snp_gatk, indel_gatk = td.scores_from_gatk_hard_filters(args, positions)
+		snp_heng_li, indel_heng_li = td.scores_from_heng_li_filters(args, positions)
+		snp_key_sets.extend([set(snp_gatk_scores.keys()), set(snp_gatk.keys()), set(snp_heng_li.keys())])		
+		indel_key_sets.extend([set(indel_gatk_scores.keys()), set(indel_gatk.keys()), set(indel_heng_li.keys())])		
+		snp_truth_dict = snp_gatk
+		indel_truth_dict = indel_gatk
+
 	shared_snp_keys = set.intersection(*snp_key_sets)
 	shared_indel_keys = set.intersection(*indel_key_sets)
 
@@ -1896,6 +1905,10 @@ def test_architectures(args):
 			snp_scores['VQSR Single Sample'] = [snp_single_sample[p][0] for p in shared_snp_keys]
 		if args.deep_variant_vcf:
 			snp_scores['Deep Variant'] = [snp_deep_variant[p][0] for p in shared_snp_keys]
+		if args.hard_filter_compare:
+			snp_scores['GATK Signed Distance'] = [snp_gatk_scores[p][0] for p in shared_snp_keys]
+			snp_scores['GATK Hard Filters'] = [snp_gatk[p][0] for p in shared_snp_keys]	
+			snp_scores['Heng Li Hard Filters'] = [snp_heng_li[p][0] for p in shared_snp_keys]			
 
 		if args.emit_interesting_sites:
 			# Find CNN wrong RF and VQSR correct sites
@@ -1938,6 +1951,10 @@ def test_architectures(args):
 			indel_scores['VQSR Single Sample'] = [indel_single_sample[p][0] for p in shared_indel_keys]
 		if args.deep_variant_vcf:
 			indel_scores['Deep Variant'] = [indel_deep_variant[p][0] for p in shared_indel_keys]
+		if args.hard_filter_compare:
+			indel_scores['GATK Signed Distance'] = [indel_gatk_scores[p][0] for p in shared_indel_keys]
+			indel_scores['GATK Hard Filters'] = [indel_gatk[p][0] for p in shared_indel_keys]
+			indel_scores['Heng Li Hard Filters'] = [indel_heng_li[p][0] for p in shared_indel_keys]
 
 		if args.emit_interesting_sites:
 			# Find CNN wrong RF and VQSR correct sites
