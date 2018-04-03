@@ -347,7 +347,7 @@ class HyperparameterOptimizer(object):
 										conv_layers = conv_layers,
 										max_pools = max_pool_set,
 										residual_layers = residual_layers,
-										padding = bool(p[param_keys['valid_padding']]),
+										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 										kernel_single_channel = bool(p[param_keys['kernel_single_channel']]),
 										annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
