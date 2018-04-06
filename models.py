@@ -1492,7 +1492,7 @@ def build_read_tensor_keras_resnet(args):
 
 	x = Input(in_shape, name=args.tensor_map)
 	model = keras_resnet.models.ResNet50(x, classes=len(args.labels))
-	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
+	adamo = Adam(lr=0.000001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
 	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
 	model.summary()
 	return model
