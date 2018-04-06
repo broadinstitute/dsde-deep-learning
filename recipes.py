@@ -708,7 +708,7 @@ def train_ref_read_anno_b(args):
 									conv_width = 3,
 									conv_height = 11,
 									conv_layers = [128, 96, 64, 48],
-									conv_dropout = 0,
+									conv_dropout = 0.2,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
 									kernel_single_channel = False,
@@ -717,7 +717,7 @@ def train_ref_read_anno_b(args):
 									annotation_units = 16,
 									annotation_shortcut = True,
 									fc_layers = [24],
-									fc_dropout = 0,
+									fc_dropout = 0.3,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
