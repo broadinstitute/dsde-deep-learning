@@ -55,114 +55,6 @@ def run(file_fxns):
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-def inspect_architectures(args):
-	'''Run one batch of training and inference for each architecture in defines.architectures.
-
-	Many command line arguments are ignored to give each architecture required values.
-	Calls models.inspect_model() on each model for timing, etc
-
-	Arguments:
-		args.batch_size The size of the batch to time 
-	'''	
-	args.samples = 10
-	for a in defines.architectures.keys():
-
-		args.tensor_map = a
-		args.window_size = 128
-		args.labels = defines.snp_indel_labels
-		args.input_symbols = defines.inputs_indel
-		in_channels = defines.total_input_channels_from_args(args)
-		if args.channels_last:
-			tensor_shape = (args.read_limit, args.window_size, in_channels)
-		else:
-			tensor_shape = (in_channels, args.read_limit, args.window_size) 
-
-		per_class_max = 300
-		args.data_dir = defines.architectures[a]
-		args.weights_hd5 = args.data_dir + a +'.hd5'
-		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-		print('Inspecting architecture:', a, 'tensor shape:', tensor_shape)
-
-		if '1d_calling' == a:
-			args.labels = defines.calling_labels
-			train_paths, valid_paths, test_paths = td.get_train_valid_test_paths_all(args)
-			
-			generate_train = td.calling_pileup_tensors_generator(args, train_paths)
-			generate_valid = td.calling_pileup_tensors_generator(args, valid_paths)
-			generate_test = td.calling_pileup_tensors_generator(args, test_paths)
-			
-			test = next(generate_test)
-
-			model = models.build_1d_cnn_calling_segmentation_1d(args)			
-		
-		elif 'bqsr' == a:
-			args.window_size = 11
-			args.labels = defines.base_labels_binary
-			args.input_symbols = defines.bqsr_tensor_channel_map()
-
-			generate_train = td.bqsr_tensor_generator(args, train_paths)
-			generate_valid = td.bqsr_tensor_generator(args, valid_paths)
-			test = td.load_bqsr_tensors_from_class_dirs(args, test_paths, per_class_max)
-
-			model = models.build_bqsr_model(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)	
-		
-		elif '2d_annotations' == a:
-			generate_train = td.tensor_annotation_generator(args, train_paths, tensor_shape)
-			generate_valid = td.tensor_annotation_generator(args, valid_paths, tensor_shape)
-			test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max)
-			model = models.build_read_tensor_2d_and_annotations_model(args)
-			plots.print_auc_per_class(model, [test[0], test[1]], test[2], args.labels)		
-
-		elif '2d' == a:
-			generate_train = td.tensor_generator(args, train_paths, tensor_shape)
-			generate_valid = td.tensor_generator(args, valid_paths, tensor_shape)
-			test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max)
-			model = models.build_read_tensor_2d_model(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)			
-		
-		elif '1d_annotations' == a:
-			generate_train = td.dna_annotation_generator(args, train_paths)
-			generate_valid = td.dna_annotation_generator(args, valid_paths)
-			test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max)
-			model = models.build_reference_plus_model(args)
-			plots.print_auc_per_class(model, [test[0], test[1]], test[2], args.labels)
-		
-		elif '1d' == a:
-			generate_train = td.dna_annotation_generator(args, train_paths)
-			generate_valid = td.dna_annotation_generator(args, valid_paths)
-			test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max, dataset_id='reference')
-			model = models.build_reference_model(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)			
-		
-		elif 'mlp' == a:
-			args.window_size = 0
-			generate_train = td.dna_annotation_generator(args, train_paths)
-			generate_valid = td.dna_annotation_generator(args, valid_paths)
-			test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max, dataset_id='annotations')
-			model = models.build_annotation_multilayer_perceptron(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)			
-
-		elif 'deep_variant' == a:
-			args.read_limit = 299
-			args.window_size = 299
-			image_shape = (args.read_limit, args.window_size)
-			generate_train = td.image_generator(args, train_paths, shape=image_shape)
-			generate_valid = td.image_generator(args, valid_paths, shape=image_shape)
-			test = td.load_images_from_class_dirs(args, test_paths, shape=image_shape, per_class_max=args.samples)
-			model = models.inception_v3_max(args, architecture=args.weights_hd5)	
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)
-		
-		elif '2d_2bit' == a:
-			raise ValueError('Error 2d_2bit not implemented yet.')
-		
-		else:
-			raise ValueError('Error Unknown architecture:', a)			
-
-		models.train_model_from_generators(args, model, generate_train, generate_valid, args.weights_hd5)
-		models.inspect_model(args, model, generate_train, generate_valid)
-
-
 def train_calling_model(args):
 	'''Trains the variant calling as 1D segmentation CNN architecture on tensors at the supplied data directory.
 
@@ -1639,7 +1531,7 @@ def train_reference_annotation_b(args):
 											annotation_units = 64,
 											annotation_shortcut = True,
 											fc_layers = [64, 64],
-											fc_dropout = 0.1,
+											fc_dropout = 0.2,
 											fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -1911,22 +1803,6 @@ def test_architectures(args):
 			snp_scores['Heng Li Hard Filters'] = [snp_heng_li[p][0] for p in shared_snp_keys]			
 
 		if args.emit_interesting_sites:
-			# Find CNN wrong RF and VQSR correct sites
-			vqsr_thresh = (np.max(snp_scores['VQSR gnomAD']) + np.min(snp_scores['VQSR gnomAD']))/2
-
-			#NEED to fix this
-
-			cnn_thresh = (np.max(snp_scores['Neural Net']) + np.min(snp_scores['Neural Net']))/2
-			rf_thresh = (np.max(snp_scores['Random Forest']) + np.min(snp_scores['Random Forest']))/2
-			
-			for p in shared_snp_keys:
-				truth = snp_vqsr[p][1]
-				vqsr_label = int(vqsr_thresh < snp_vqsr[p][0])
-				cnn_label = int(cnn_thresh < cnn_snp_dict[p])
-				rf_label = int(rf_thresh < snp_rf[p][0])
-				if truth == rf_label and truth == vqsr_label and truth != cnn_label:
-					print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at SNP:', p, 'CNN Score:', cnn_snp_dict[p])
-
 			sorted_snps = sorted(cnn_snp_dict.items(), key=operator.itemgetter(1))
 			for i in range(5):	
 				print('Got Bad SNP score:', sorted_snps[i])
@@ -1957,20 +1833,6 @@ def test_architectures(args):
 			indel_scores['Heng Li Hard Filters'] = [indel_heng_li[p][0] for p in shared_indel_keys]
 
 		if args.emit_interesting_sites:
-			# Find CNN wrong RF and VQSR correct sites
-			vqsr_thresh = (np.max(indel_scores['VQSR gnomAD']) + np.min(indel_scores['VQSR gnomAD']))/2
-
-			#NEED to fix this
-			cnn_thresh = (np.max(indel_scores['Neural Net']) + np.min(indel_scores['Neural Net']))/2
-			rf_thresh = (np.max(indel_scores['Random Forest']) + np.min(indel_scores['Random Forest']))/2
-			for p in shared_indel_keys:
-				truth = int(indel_vqsr[p][1])
-				vqsr_label = int(vqsr_thresh < indel_vqsr[p][0])
-				cnn_label = int(cnn_thresh < cnn_indel_dict[p])
-				rf_label = int(rf_thresh < indel_rf[p][0])
-				if truth == rf_label and truth == vqsr_label and truth != cnn_label:
-					print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at INDEL:', p, 'CNN Score:', cnn_indel_dict[p])	
-
 			sorted_indels = sorted(cnn_indel_dict.items(), key=operator.itemgetter(1))
 			for i in range(5):	
 				print('Got Bad INDEL score:', sorted_indels[i])

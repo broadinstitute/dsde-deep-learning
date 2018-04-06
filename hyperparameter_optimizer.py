@@ -82,8 +82,8 @@ class HyperparameterOptimizer(object):
 
 		self.max_pool_sets_2d = [ 
 									[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
-									[(1,2),(1,2)], [(2,1),(2,1)], [(2,1),(6,1)],
-								  	[(3,1),(3,1)], [(1,3), (1,3)], [(4,1),(4,1)], [(4,1),(8,1)], 
+									[(1,2),(1,2)], [(2,1),(2,1)], [(3,1),(3,1)], [(1,3), (1,3)],
+								  	[(2,1),(6,1)],[(4,1),(4,1)], [(4,1),(8,1)], 
 								  	[(3,3), (3,3)], [(4,4), (4,4)], [(4,8), (4,8)],
 								  	[(1,2),(1,2),(1,2)], [(2,1),(2,1),(2,1)], [(3,1),(3,1),(3,1)]
 								]
@@ -94,9 +94,8 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.fc_layer_sets = [
-									[24], [32], [48], 
-									[32, 16], [16, 32], [32, 32], [48, 32], [32, 32],
-									[24, 24, 24], [24, 32, 24]
+									[24], [32], 
+									[32, 16], [16, 32], [32, 32], [48, 32], [32, 32]
 							 ]
 
 		self.mlp_layer_sets = [
@@ -324,8 +323,8 @@ class HyperparameterOptimizer(object):
 			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
-			{'name':'residual_layers', 'type':'discrete', 'domain':range(len(self.residual_layers_sets))},
-			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
+			#{'name':'residual_layers', 'type':'discrete', 'domain':range(len(self.residual_layers_sets))},
+			#{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
 		]
@@ -346,10 +345,9 @@ class HyperparameterOptimizer(object):
 										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
 										max_pools = max_pool_set,
-										residual_layers = residual_layers,
 										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 										kernel_single_channel = bool(p[param_keys['kernel_single_channel']]),
-										annotation_units = int(p[param_keys['annotation_units']]),
+										#annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 										fc_layers = fc_layers,
 										)

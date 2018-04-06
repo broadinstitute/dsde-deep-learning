@@ -34,7 +34,7 @@ def parse_args():
 
 	# Tensor defining dictionaries
 	parser.add_argument('--tensor_map', default='read_tensor',
-		help='Key which looks up the map from tensor channels to their meaning:'+str(defines.architectures.keys()))
+		help='Key which looks up the map from tensor channels to their meaning.')
 	parser.add_argument('--input_symbols', default=defines.inputs_indel,
 		help='Dict mapping input symbols to their index within input tensors.')
 	parser.add_argument('--labels', default=defines.snp_indel_labels,
