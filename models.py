@@ -32,6 +32,7 @@ from collections import namedtuple
 from keras import layers
 from keras import metrics
 import keras.backend as K
+import keras_resnet.models
 from keras.preprocessing import image
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import plot_model, to_categorical
@@ -1478,6 +1479,21 @@ def conv2d_bn(x,
 	x = BatchNormalization(axis=bn_axis, scale=False, name=bn_name)(x)
 	x = Activation('relu', name=name)(x)
 	return x
+
+
+def build_read_tensor_keras_resnet(args):
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		channel_axis = 3
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		channel_axis = 1
+
+	x = Input(in_shape)
+	model = keras_resnet.models.ResNet50(x, classes=len(args.labels))
+	model.compile("adam", "categorical_crossentropy", get_metrics(args.labels))
+	return model
 
 
 def build_read_tensor_2d_residual_model(args):

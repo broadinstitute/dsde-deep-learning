@@ -535,7 +535,7 @@ def train_ref_read_model_c(args):
 
 
 
-def train_ref_read_resnet_model(args):
+def train_ref_read_resnet(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -548,19 +548,14 @@ def train_ref_read_resnet_model(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
+	args.annotation_set = '_'
+	
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-
-	in_channels = defines.total_input_channels_from_args(args)
-	if args.channels_last:
-		tensor_shape = (args.read_limit, args.window_size, in_channels)
-	else:
-		tensor_shape = (in_channels, args.read_limit, args.window_size) 
-
-	generate_train = td.tensor_generator(args, train_paths, tensor_shape)
-	generate_valid = td.tensor_generator(args, valid_paths, tensor_shape)
+	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
 
 	weight_path = arguments.weight_path_from_args(args)
-	model = models.build_read_tensor_2d_residual_model(args)
+	model = models.build_read_tensor_keras_resnet(args)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max=800)
@@ -691,7 +686,7 @@ def train_ref_read_annotation_exome_model(args):
 	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id, batch_size=args.batch_size)
 
 
-def train_ref_read_anno_model_b(args):
+def train_ref_read_anno_b(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -710,18 +705,19 @@ def train_ref_read_anno_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 21, # 25
-									conv_height = 21, # 25
-									conv_layers = [64, 48, 32, 24],
-									conv_dropout = 0.2, #0
+									conv_width = 3,
+									conv_height = 11,
+									conv_layers = [128, 96, 64, 48],
+									conv_dropout = 0,
 									conv_batch_normalize = False,
-									spatial_dropout = True, # False,
-									max_pools = [(3,1),(3,1)],
-									padding='valid',
-									annotation_units = 24, #64
-									annotation_shortcut = True, #False,
-									fc_layers = [32], #[24],
-									fc_dropout = 0.4, # 0
+									spatial_dropout = True,
+									kernel_single_channel = False,
+									max_pools = [(3,1),(3,1),(3,1)],
+									padding='same',
+									annotation_units = 16,
+									annotation_shortcut = True,
+									fc_layers = [24],
+									fc_dropout = 0,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
