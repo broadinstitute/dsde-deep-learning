@@ -1490,7 +1490,7 @@ def build_read_tensor_keras_resnet(args):
 		in_shape = (in_channels, args.read_limit, args.window_size)
 		channel_axis = 1
 
-	x = Input(in_shape)
+	x = Input(in_shape, name=args.tensor_map)
 	model = keras_resnet.models.ResNet50(x, classes=len(args.labels))
 	model.compile("adam", "categorical_crossentropy", get_metrics(args.labels))
 	return model
