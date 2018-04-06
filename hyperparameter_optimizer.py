@@ -336,7 +336,7 @@ class HyperparameterOptimizer(object):
 			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
 			max_pool_set = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
-			residual_layers = self.residual_layers_sets[int(p[param_keys['residual_layers']])]
+			#residual_layers = self.residual_layers_sets[int(p[param_keys['residual_layers']])]
 
 			try:
 				print(self.str_from_params_and_keys(p, param_keys))
