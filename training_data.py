@@ -2627,7 +2627,7 @@ def input_data_from_generator(args, generator):
 
 def label_data_from_generator(args, generator):
 	test = big_batch_from_minibatch_generator(args, generator)
-	return test[1][args.tensor_map]
+	return [test[1][args.tensor_map]]
 
 def positions_from_generator(args, generator):
 	test = big_batch_from_minibatch_generator(args, generator, with_positions=True)
