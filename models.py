@@ -1520,7 +1520,6 @@ def build_ref_read_anno_keras_resnet(args):
 	annotations_bn = BatchNormalization(axis=1)(annotations)
 	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations_bn)
 	anno_model = Model(inputs=[annotations], outputs=[annotation_mlp])
-	anno_model.compile()
 	
 	anno_x = anno_model(annotations)
 	last_x = conv_model(read_tensor)[-1]
