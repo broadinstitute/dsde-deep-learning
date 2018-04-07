@@ -1513,7 +1513,7 @@ def build_ref_read_anno_keras_resnet(args):
 		channel_axis = 1
 
 	read_tensor = Input(in_shape, name=args.tensor_map)
-	conv_model = keras_resnet.models.ResNet18(read_tensor, include_top=False, epsilon=1e-4)
+	conv_model = keras_resnet.models.ResNet18(read_tensor, include_top=False)
 
 	annotation_units = 16
 	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
