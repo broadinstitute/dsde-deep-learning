@@ -2475,7 +2475,7 @@ def train_model_from_generators(args, model, generate_train, generate_valid, sav
 	serialize_model_semantics(args, save_weight_hd5)
 
 	if args.inspect_model:
-		image_path = a.replace('.json','.png') if args.image_dir is None else args.image_dir + a.replace('.json','.png')
+		image_path = args.id+'.png' if args.image_dir is None else args.image_dir+args.id+'.png'
 		models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
 	history = model.fit_generator(generate_train, 
