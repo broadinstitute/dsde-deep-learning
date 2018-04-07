@@ -2476,7 +2476,7 @@ def train_model_from_generators(args, model, generate_train, generate_valid, sav
 
 	if args.inspect_model:
 		image_path = args.id+'.png' if args.image_dir is None else args.image_dir+args.id+'.png'
-		models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+		inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
 	history = model.fit_generator(generate_train, 
 		steps_per_epoch=args.training_steps, epochs=args.epochs, verbose=1, 
