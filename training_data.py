@@ -2616,6 +2616,20 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 		return input_data, np.array(labels)
 
 
+def input_data_from_generator(args, generator):
+	test = td.big_batch_from_minibatch_generator(args, test_generator)
+
+	test_data = [test[0][args.tensor_map]]
+	if defines.annotations_from_args(args):
+		test_data.append(test[0][args.annotation_set])	
+	
+	return test_data
+
+def label_data_from_generator(args, generator):
+	test = td.big_batch_from_minibatch_generator(args, test_generator)
+	return [test[1][args.tensor_map]]
+
+
 def load_images_from_class_dirs(args, train_paths, shape=(224,224), per_class_max=2500, position_dict=None):
 	import cv2
 	count = 0
