@@ -1503,6 +1503,48 @@ def build_read_tensor_keras_resnet(args):
 	return model
 
 
+def build_ref_read_anno_keras_resnet(args):
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		channel_axis = 3
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		channel_axis = 1
+
+	read_tensor = Input(in_shape, name=args.tensor_map)
+	conv_model = keras_resnet.models.ResNet18(read_tensor, include_top=False, epsilon=1e-4)
+
+	annotation_units = 16
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	annotations_bn = BatchNormalization(axis=1)(annotations)
+	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations_bn)
+	
+	x = conv_model(read_tensor)
+	x = Flatten()(x)
+	x = layers.concatenate([x, annotations_mlp], axis=1)
+
+	# Fully connected layers
+	fc_units = [32]
+	for fc_units in fc_layers:
+		x = Dense(units=fc_units, activation='relu')(x)		
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor, annotations], outputs=[prob_output])
+	adamo = Adam(lr=0.000001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))	
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model
+
+
 def build_read_tensor_2d_residual_model(args):
 	"""Build Read Tensor 2d Residual Network model for classifying variants.
 

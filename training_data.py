@@ -3661,7 +3661,7 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 		if allele_idx and override_vcf:
 			v_negative = variant_in_vcf(variant, vcf_negative)
 			if not v_negative or allele_idx >= len(v_negative.ALT):
-				stats['Variant allele missing from override_vcf VCF, wrong VCF perhaps?'] += 1
+				stats['Variant allele missing from override_vcf VCF:'+override_vcf+', wrong VCF perhaps?'] += 1
 				continue
 			allele = v_negative.ALT[allele_idx]
 		elif allele_idx:
