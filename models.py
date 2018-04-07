@@ -1520,8 +1520,8 @@ def build_ref_read_anno_keras_resnet(args):
 	annotations_bn = BatchNormalization(axis=1)(annotations)
 	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations_bn)
 	
-	x = conv_model(read_tensor)
-	x = Flatten()(x)
+	last_x = conv_model(read_tensor)[-1]
+	x = Flatten()(last_x)
 	x = layers.concatenate([x, annotations_mlp], axis=1)
 
 	# Fully connected layers
