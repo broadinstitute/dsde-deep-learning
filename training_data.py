@@ -2617,7 +2617,7 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 
 
 def input_data_from_generator(args, generator):
-	test = big_batch_from_minibatch_generator(args, test_generator)
+	test = big_batch_from_minibatch_generator(args, generator)
 
 	test_data = [test[0][args.tensor_map]]
 	if defines.annotations_from_args(args):
@@ -2626,11 +2626,11 @@ def input_data_from_generator(args, generator):
 	return test_data
 
 def label_data_from_generator(args, generator):
-	test = big_batch_from_minibatch_generator(args, test_generator)
+	test = big_batch_from_minibatch_generator(args, generator)
 	return test[1][args.tensor_map]
 
 def positions_from_generator(args, generator):
-	test = big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
+	test = big_batch_from_minibatch_generator(args, generator, with_positions=True)
 	return test[-1]
 
 def load_images_from_class_dirs(args, train_paths, shape=(224,224), per_class_max=2500, position_dict=None):
