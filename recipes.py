@@ -553,13 +553,17 @@ def train_ref_read_resnet(args):
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
 	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_read_tensor_keras_resnet(args)
+
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max=800)
-	plots.plot_roc_per_class(model, test[0], test[1], args.labels, args.id, batch_size=args.batch_size)
+	test_data = td.input_data_from_generator(args, generate_test)
+	test_labels = td.label_data_from_generator(args, generate_test)
+
+	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id, batch_size=args.batch_size)
 
 
 def train_ref_read_inception_model(args):
@@ -724,8 +728,8 @@ def train_ref_read_anno_b(args):
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	test_data = td.input_data_from_generator(args, test_generator)
-	test_labels = td.label_data_from_generator = (args, test_generator)
+	test_data = td.input_data_from_generator(args, generate_test)
+	test_labels = td.label_data_from_generator(args, generate_test)
 	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id)
 
 

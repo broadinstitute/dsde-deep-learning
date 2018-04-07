@@ -1493,8 +1493,13 @@ def build_read_tensor_keras_resnet(args):
 	x = Input(in_shape, name=args.tensor_map)
 	model = keras_resnet.models.ResNet50(x, classes=len(args.labels))
 	adamo = Adam(lr=0.000001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
-	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))	
 	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
 	return model
 
 
@@ -2468,6 +2473,10 @@ def train_model_from_generators(args, model, generate_train, generate_valid, sav
 	if not os.path.exists(os.path.dirname(save_weight_hd5)):
 		os.makedirs(os.path.dirname(save_weight_hd5))	
 	serialize_model_semantics(args, save_weight_hd5)
+
+	if args.inspect_model:
+		image_path = a.replace('.json','.png') if args.image_dir is None else args.image_dir + a.replace('.json','.png')
+		models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
 	history = model.fit_generator(generate_train, 
 		steps_per_epoch=args.training_steps, epochs=args.epochs, verbose=1, 
