@@ -566,7 +566,6 @@ def train_ref_read_resnet(args):
 	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id, batch_size=args.batch_size)
 
 
-
 def train_ref_read_anno_resnet(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 

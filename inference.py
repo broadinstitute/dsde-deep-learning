@@ -60,9 +60,6 @@ def annotate_vcf_with_inference(args):
 	positions = []
 	variant_batch = []
 	time_batch = time.time()
-	# tensor_batch = np.zeros(((args.batch_size,) + tensor_shape))
-	# reference_batch = np.zeros(((args.batch_size,) + reference_shape))
-	# annotation_batch = np.zeros((args.batch_size, len(args.annotations)))
 
 	batch = {}
 	for tm in input_tensors:
@@ -96,7 +93,7 @@ def annotate_vcf_with_inference(args):
 				read_tensor = td.make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
 				batch[tm][stats[batch_key]] = read_tensor
 				if read_tensor is None:
-					continue
+					batch[tm][stats[batch_key]] = np.zeros(input_tensors[tm])
 				stats[batch_key] += 1
 
 			if tm in defines.reference_tensor_maps:
@@ -115,8 +112,6 @@ def annotate_vcf_with_inference(args):
 			# Reset the batch
 			positions = []		
 			variant_batch = []
-			#tensor_batch = np.zeros(((args.batch_size,)+tensor_shape))
-			#annotation_batch = np.zeros((args.batch_size, len(args.annotations)))		
 			for tm in batch:
 				batch_key = tm+'_in_batch'
 				batch[tm] = np.zeros(((args.batch_size,) + input_tensors[tm]))

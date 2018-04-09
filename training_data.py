@@ -145,7 +145,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", args.annotations)):
 					stats['Missing ALL annotations'] += 1
 					continue # Require at least 1 annotation...
-				annotation_data = get_annotation_data(args, variant, stats)
+				annotation_data = get_annotation_data(args, variant, stats, allele_idx)
 					
 			good_reads, insert_dict = get_good_reads(args, samfile, variant)
 			if len(good_reads) >= args.read_limit:
@@ -1227,7 +1227,7 @@ def get_variant_window(args, variant):
 	return index_offset, reference_start, reference_end
 
 
-def get_annotation_data(args, annotation_variant, stats):
+def get_annotation_data(args, annotation_variant, stats, allele_index=0):
 	'''Return an array annotation data about the variant.
 
 	Arguments:
@@ -1247,27 +1247,34 @@ def get_annotation_data(args, annotation_variant, stats):
 				annotation_data[i] = annotation_variant.INFO[a][0]
 			elif a in annotation_variant.INFO and not math.isnan(annotation_variant.INFO[a]):
 				annotation_data[i] = annotation_variant.INFO[a]
-			elif a == 'MBQ':
+			elif len(annotation_variant.samples) > 0:
 				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MBQ
-			elif a == 'MPOS':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MPOS 
-			elif a == 'MMQ':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MMQ 
-			elif a == 'MFRL_0':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MFRL[0] 
-			elif a == 'MFRL_1':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MFRL[1] 
-			elif a == 'AD_0':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.AD[0] 
-			elif a == 'AD_1':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.AD[1]
+				#print('call data:', call.data)
+				if a == 'MBQ' and hasattr(call.data, a):
+					if len(annotation_variant.ALT) > 1:
+						annotation_data[i] = call.data.MBQ[allele_index]
+					else:
+						annotation_data[i] = call.data.MBQ
+				elif a == 'MPOS' and hasattr(call.data, a):
+					if len(annotation_variant.ALT) > 1:
+						annotation_data[i] = call.data.MPOS[allele_index]
+					else:
+						annotation_data[i] = call.data.MPOS
+				elif a == 'MMQ' and hasattr(call.data, a):
+					if len(annotation_variant.ALT) > 1:
+						annotation_data[i] = call.data.MMQ[allele_index]
+					else:
+						annotation_data[i] = call.data.MMQ		
+				elif a == 'MFRL_0' and hasattr(call.data, 'MFRL'):
+					annotation_data[i] = call.data.MFRL[allele_index] 
+				elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
+					annotation_data[i] = call.data.MFRL[allele_index+1] 
+				elif a == 'AD_0' and hasattr(call.data, 'AD'):
+					annotation_data[i] = call.data.AD[allele_index] 
+				elif a == 'AD_1' and hasattr(call.data, 'AD'):
+					annotation_data[i] = call.data.AD[allele_index+1]
+				else:
+					stats['Could not handle genotyped annotation:'+a] += 1
 			else:
 				stats['Could not handle annotation:'+a] += 1
 
@@ -4411,9 +4418,8 @@ def inspect_dataset(args):
 	data_paths = get_train_valid_test_paths(args)
 	vcf_ram = vcf.Reader(open(args.negative_vcf, 'r'))
 
-	if args.normalize_annotations:
-		norms = {a:[0,0,0,0] for a in args.annotations} # X, X^2, count, k for shifted variance calculation
-		maxed_out = False
+	norms = {a:[0,0,0,0] for a in args.annotations} # X, X^2, count, k for shifted variance calculation
+	maxed_out = False
 
 	for dp in data_paths:
 		for tp in dp:
@@ -4439,11 +4445,12 @@ def inspect_dataset(args):
 					elif v.POS == pos and v.is_indel:
 						stats[cur_label+' insertion'] += 1
 
-					if args.normalize_annotations and v.POS == pos and not maxed_out:
+					if defines.annotations_from_args(args) and v.POS == pos and not maxed_out:
 						with h5py.File(os.path.join(tp,t),'r') as hf:
-							annotation_data = np.array(hf.get(args.anotation_set))
+							annotation_data = np.array(hf.get(args.annotation_set))
 							for i,a in enumerate(args.annotations):
 								if annotation_data[i] == 0:
+									stats[a+' is zero:'] += 1
 									continue
 								if norms[a][3] == 0:
 									norms[a][3] = annotation_data[i]
@@ -4466,7 +4473,7 @@ def inspect_dataset(args):
 			print('%s has: %.2f' % (k, stats[k]))
 	
 	dataset_summary_latex_table_line(stats)
-	if args.normalize_annotations:
+	if defines.annotations_from_args(args):
 		means_and_stds = np.zeros((len(args.annotations), 2))
 		for i,a in enumerate(args.annotations):
 			means_and_stds[i,0] = (norms[a][0] / norms[a][2]) + norms[a][3]
