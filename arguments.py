@@ -17,7 +17,14 @@ import os
 import defines
 import argparse
 import numpy as np
-import keras.backend as K
+
+print('uname is:', os.uname())
+# def is_broad_cluster():
+# 	machine = os.uname()[1]
+#  	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
+
+# if not is_broad_cluster():
+# 	import keras.backend as K
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -28,7 +35,7 @@ def parse_args():
 
 	# Tensor defining dictionaries
 	parser.add_argument('--tensor_map', default='read_tensor',
-		help='Key which looks up the map from tensor channels to their meaning:'+str(defines.architectures.keys()))
+		help='Key which looks up the map from tensor channels to their meaning.')
 	parser.add_argument('--input_symbols', default=defines.inputs_indel,
 		help='Dict mapping input symbols to their index within input tensors.')
 	parser.add_argument('--labels', default=defines.snp_indel_labels,
@@ -36,6 +43,8 @@ def parse_args():
 	
 
 	# Tensor defining arguments
+	parser.add_argument('--label_smoothing', default=0.0, type=float,
+		help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
 	parser.add_argument('--batch_size', default=32, type=int,
 		help='Mini batch size for stochastic gradient descent algorithms.')
 	parser.add_argument('--read_limit', default=128, type=int,
@@ -77,6 +86,8 @@ def parse_args():
 		help='Number of validation batches to examine in an epoch validation.')
 	parser.add_argument('--iterations', default=5, type=int,
 		help='Generic iteration limit for hyperparameter optimization, animation, and other counts.')
+	parser.add_argument('--max_parameters', default=5e6, type=int,
+		help='Maximum number of model parameters used for hyperparameter optimization, etc.')
 
 
 	# Dataset generation related arguments
@@ -117,10 +128,6 @@ def parse_args():
 		help='Path to a VCF that has annotations (typically from Haplotype Caller).')
 	parser.add_argument('--negative_vcf', default=defines.negative_vcf,
 		help='Haplotype Caller or VQSR generated VCF with raw annotation values [and quality scores].')
-	parser.add_argument('--negative_vcf_2', default=None,
-		help='Additional Haplotype Caller or VQSR generated VCF with raw annotation values [and quality scores].')
-	parser.add_argument('--negative_vcf_3', default=None,
-		help='Additional Haplotype Caller or VQSR generated VCF with raw annotation values [and quality scores].')
 	parser.add_argument('--ignore_vcf', default=None,
 		help='Optional VCF of sites to ignore when doing evaluations.')
 	parser.add_argument('--include_vcf', default=None,
@@ -156,6 +163,10 @@ def parse_args():
 		help='List of variant score keys for performance comparisons.')
 	parser.add_argument('--inspect_model', default=False, action='store_true',
 		help='Plot model architecture, measure inference and training speeds.')
+	parser.add_argument('--gnomad_compare', default=False, action='store_true',
+		help='Compare to gnomad random forest and VQSR.')
+	parser.add_argument('--hard_filter_compare', default=False, action='store_true',
+		help='Compare to GATK best practices hard filters and filter from CHM syndip paper.')
 
 	# Run specific arguments
 	parser.add_argument('--id', default='no_id',
@@ -169,10 +180,11 @@ def parse_args():
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
 
-	if args.channels_last:
-		K.set_image_data_format('channels_last')
-	else:
-		K.set_image_data_format('channels_first')
+	# if not is_broad_cluster():
+	# 	if args.channels_last:
+	# 		K.set_image_data_format('channels_last')
+	# 	else:
+	# 		K.set_image_data_format('channels_first')
 
 	print('Arguments are', args)
 	
@@ -188,4 +200,5 @@ def weight_path_from_args(args):
 	save_weight_hd5 =  args.output_dir + args.id + '.hd5'
 	print('save weight path:' , save_weight_hd5)
 	return save_weight_hd5
+
 

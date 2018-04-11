@@ -79,7 +79,8 @@ indel_labels = {'INDEL':0, 'NOT_INDEL':1}
 genotype_labels = {'HET', 'HOM_REF', 'HOM_ALT'}
 snp_indel_labels = {'NOT_SNP':0, 'NOT_INDEL':1, 'SNP':2, 'INDEL':3}
 calling_labels = {
-					'REFERENCE':0, 'HET_SNP':1, 'HOM_SNP':2, 
+					'REFERENCE':0, 
+					'HET_SNP':1, 'HOM_SNP':2, 
 					'HET_DELETION':3, 'HOM_DELETION':4, 
 					'HET_INSERTION':5, 'HOM_INSERTION':6
 				 }
@@ -89,26 +90,16 @@ bqsr_annotations = ['reverse', 'first_in_pair', 'mapping_quality', 'read_positio
 
 reference_beds = [exon_bed_file, repeat_bed_file]
 cigar_code = {'M':0, 'I':1, 'D':2, 'N':3, 'S':4}
+code2cigar = 'MIDNSHP=XB'
+cigar2code = dict([y, x] for x, y in enumerate(code2cigar))
 
-
-architectures = {
-				'2d':data_path+'tensors/g94982_allele_specific/', 
-				'2d_annotations':data_path+'tensors/g94982_allele_specific/',
-				'read_tensor':data_path+'tensors/g94982_allele_specific/',
-				'1d':data_path+'tensors/g94982_na12878_1d_ws_128_ds/', 
-				'bqsr':'/dsde/data/deep/bqsr/tensors/bqsr_bigger/', 
-				'1d_annotations':data_path+'tensors/g94982_na12878_1d_ws_128_ds/',
-				'mlp':data_path+'tensors/g94982_na12878_1d_ws_128_ds/',
-				'1d_calling':data_path+'tensors/g94982_calling_tensors_1d/',
-				'deep_variant':data_path+'tensors/g94982_deep_variant_ref_sort/',
-				}
-
+reference_tensor_maps = ['reference']
+read_tensor_maps = ['read_tensor', '2d_mapping_quality']
 
 def annotations_from_args(args):
-	if args.annotation_set and args.annotation_set in annotations:
+	if args.annotation_set and args.annotation_set in annotations and args.annotation_set != '_':
 		return annotations[args.annotation_set]
 	return None
-
 
 
 def get_tensor_channel_map_from_args(args):

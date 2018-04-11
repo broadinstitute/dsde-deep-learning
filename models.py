@@ -26,11 +26,13 @@ import json
 import plots
 import defines
 import numpy as np
+from collections import namedtuple
 
 # Keras Imports
 from keras import layers
 from keras import metrics
 import keras.backend as K
+import keras_resnet.models
 from keras.preprocessing import image
 from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import plot_model, to_categorical
@@ -39,7 +41,9 @@ from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
 from keras.layers.convolutional import Convolution1D, Convolution2D, Convolution3D, MaxPooling1D, MaxPooling2D, AveragePooling2D
-from keras.layers import Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+
+ResidualLayer = namedtuple("ResidualLayer", "identity filters strides")
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -217,7 +221,7 @@ def annotation_multilayer_perceptron_from_args(args,
 		if skip_connection:
 			x = layers.concatenate([x, annotations], axis=1)	
 
-	prob_output = Dense(units=len(args.labels), kernel_initializer=initializer, activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), kernel_initializer=initializer, activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[annotations_in], outputs=[prob_output])
 	
@@ -284,20 +288,23 @@ def build_reference_1d_1layer_model(args):
 	Returns
 		The keras model
 	'''	
-	channel_map = defines.get_tensor_channel_map_1d()	
+	channel_map = defines.get_tensor_channel_map_from_args(args)	
 	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	
 	x = Conv1D(filters=256, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(reference)
 	x = SpatialDropout1D(0.5)(x)
+
+	#x = Conv1D(filters=128, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(x)
+	#x = SpatialDropout1D(0.4)(x)	
 	#x = MaxPooling1D(3)(x)
 	x = Flatten()(x)
 
-	#x = Dense(units=64, kernel_initializer='glorot_normal', activation='relu')(x)
-	#x = Dropout(0.5)(x)
-	x = Dense(units=32, kernel_initializer='glorot_normal', activation='relu')(x)
-	#x = Dropout(0.3)(x)
+	x = Dense(units=48, activation='relu')(x)
+	x = Dropout(0.1)(x)
+	#x = Dense(units=48, activation='relu')(x)
+	#x = Dropout(0.2)(x)
 
-	prob_output = Dense(units=len(args.labels), kernel_initializer='glorot_normal', activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), name='softmax_predictions', activation='softmax')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
@@ -424,13 +431,13 @@ def build_reference_annotation_skip_model(args):
 def build_reference_1d_model_from_args(args,
 										conv_width = 6, 
 										conv_layers = [128, 128, 128, 128],
-										conv_dropout = 0.1,
+										conv_dropout = 0.0,
 										conv_batch_normalize = False,			
 										spatial_dropout = True,
 										max_pools = [3, 1],
 										padding='valid',
 										fc_layers = [64],
-										fc_dropout = 0.3,
+										fc_dropout = 0.0,
 										fc_batch_normalize = False,
 										fc_initializer='glorot_normal',
 										kernel_initializer='glorot_normal'):
@@ -483,34 +490,38 @@ def build_reference_1d_model_from_args(args,
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
 	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=get_metrics(args.labels))
 	model.summary()
+
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
 	
 	return model
 
 
 def build_reference_annotation_1d_model_from_args(args,
-											conv_width = 6, 
-											conv_layers = [128, 128, 128, 128],
-											conv_dropout = 0.1,
-											conv_batch_normalize = False,		
-											spatial_dropout = True,
-											max_pools = [3, 1],
-											padding='valid',
-											annotation_units = 16,
-											annotation_shortcut = False,
-											annotation_batch_normalize = True,	
-											fc_layers = [64],
-											fc_dropout = 0.3,
-											fc_batch_normalize = False,
-											fc_initializer='glorot_normal',
-											kernel_initializer='glorot_normal'
-											):
+													conv_width = 6, 
+													conv_layers = [128, 128, 128, 128],
+													conv_dropout = 0.0,
+													conv_batch_normalize = False,		
+													spatial_dropout = True,
+													max_pools = [],
+													padding='valid',
+													annotation_units = 16,
+													annotation_shortcut = False,
+													annotation_batch_normalize = True,	
+													fc_layers = [64],
+													fc_dropout = 0.0,
+													fc_batch_normalize = False,
+													fc_initializer='glorot_normal',
+													kernel_initializer='glorot_normal'
+												):
 	'''Build Reference 1d CNN model for classifying variants.
 
 	Architecture specified by parameters.
@@ -569,13 +580,17 @@ def build_reference_annotation_1d_model_from_args(args,
 	if annotation_shortcut:
 		x = layers.concatenate([x, annotations_in], axis=1)
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference, annotations], outputs=[prob_output])
 	
 	adam = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
 	model.compile(optimizer=adam, loss='categorical_crossentropy', metrics=get_metrics(args.labels))
 	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
 	
 	return model
 
@@ -584,13 +599,13 @@ def read_tensor_2d_model_from_args(args,
 									conv_width = 6, 
 									conv_height = 6,
 									conv_layers = [128, 128, 128, 128],
-									conv_dropout = 0.1,
+									conv_dropout = 0.0,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
 									max_pools = [(3,1), (3,1)],
 									padding='valid',
 									fc_layers = [64],
-									fc_dropout = 0.3,
+									fc_dropout = 0.0,
 									fc_batch_normalize = False,
 									fc_initializer='glorot_normal',
 									kernel_initializer='glorot_normal'
@@ -661,7 +676,7 @@ def read_tensor_2d_model_from_args(args,
 			x = Dropout(fc_dropout)(x)
 
 	# Softmax output
-	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
 	
 	# Map inputs to outputs
 	model = Model(inputs=[read_tensor_in], outputs=[prob_output])
@@ -684,6 +699,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 											conv_dropout = 0.0,
 											conv_batch_normalize = False,
 											spatial_dropout = True,
+											residual_layers = [],
 											max_pools = [(3,1), (3,3)],
 											padding='valid',
 											annotation_units = 16,
@@ -693,6 +709,8 @@ def read_tensor_2d_annotation_model_from_args(args,
 											fc_dropout = 0.0,
 											fc_batch_normalize = False,
 											kernel_initializer='glorot_normal',
+											kernel_single_channel=True,
+											freeze_bn=False,
 											fc_initializer='glorot_normal'):
 	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
 
@@ -715,22 +733,23 @@ def read_tensor_2d_annotation_model_from_args(args,
 	in_channels = defines.total_input_channels_from_args(args)
 	if args.channels_last:
 		in_shape = (args.read_limit, args.window_size, in_channels)
-		K.set_image_data_format('channels_last')
 		concat_axis = -1
-		#print('image df:', K.image_data_format(), 'concat:', concat_axis)
 	else:
 		in_shape = (in_channels, args.read_limit, args.window_size)
 		concat_axis = 1
 
 	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
+	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
+
 	# Add convolutional layers
-	max_pool_diff = len(conv_layers)-len(max_pools)
-	for i,f in enumerate(conv_layers):
-		if i%2 == 0:
+	for i,f in enumerate(conv_layers):	
+		if kernel_single_channel and i%2 == 0:
 			cur_kernel = (conv_width, 1)
-		else:
+		elif kernel_single_channel:
 			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
 
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
@@ -746,6 +765,34 @@ def read_tensor_2d_annotation_model_from_args(args,
 
 		if i >= max_pool_diff:
 			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
+
+	for i,r in enumerate(residual_layers):
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		y = Conv2D(r.filters[0], (1, 1), strides=r.strides)(x)
+		y = BatchNormalization(axis=concat_axis)(y)
+		y = Activation('relu')(y)
+
+		y = Conv2D(r.filters[1], cur_kernel, padding='same')(y)
+		y = BatchNormalization(axis=concat_axis)(y)
+		y = Activation('relu')(y)
+
+		y = Conv2D(r.filters[2], (1, 1))(y)
+		y = BatchNormalization(axis=concat_axis)(y)
+
+		if r.identity:
+			x = layers.add([y, x])
+		else:
+			shortcut = Conv2D(r.filters[2], (1, 1), strides=r.strides)(x)
+			shortcut = BatchNormalization(axis=concat_axis)(shortcut)
+			x = layers.add([y, shortcut])
+		
+		x = Activation('relu')(x)
 
 	x = Flatten()(x)
 
@@ -774,7 +821,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 		x = layers.concatenate([x, annotations_in], axis=concat_axis)
 
 	# Softmax output
-	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
 	
 	# Map inputs to outputs
 	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
@@ -1114,7 +1161,7 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	conv11 = layers.concatenate([conv10, piled_up], axis=-1)
 
 	conv_label = Conv1D(len(args.labels), 1, activation="linear", padding=padding_mode)(conv11)
-	conv_out = Activation('softmax')(conv_label)
+	conv_out = Activation('softmax', name='softmax_predictions')(conv_label)
 
 	model = Model(inputs=read_tensor, outputs=conv_out)
 	weights = np.array([0.5,3,2,1,1,1,1])
@@ -1432,6 +1479,72 @@ def conv2d_bn(x,
 	x = BatchNormalization(axis=bn_axis, scale=False, name=bn_name)(x)
 	x = Activation('relu', name=name)(x)
 	return x
+
+
+def build_read_tensor_keras_resnet(args):
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		channel_axis = 3
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		channel_axis = 1
+
+	x = Input(in_shape, name=args.tensor_map)
+	model = keras_resnet.models.ResNet50(x, classes=len(args.labels))
+	adamo = Adam(lr=0.000001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))	
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model
+
+
+def build_ref_read_anno_keras_resnet(args):
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		channel_axis = 3
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		channel_axis = 1
+
+	read_tensor = Input(in_shape, name=args.tensor_map)
+	conv_model = keras_resnet.models.ResNet18(read_tensor, include_top=False)
+
+	annotation_units = 16
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	annotations_bn = BatchNormalization(axis=1)(annotations)
+	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations_bn)
+	anno_model = Model(inputs=[annotations], outputs=[annotation_mlp])
+	
+	anno_x = anno_model(annotations)
+	last_x = conv_model(read_tensor)[-1]
+	x = Flatten()(last_x)
+	x = layers.concatenate([x, anno_x], axis=1)
+
+	# Fully connected layers
+	fc_layers = [32]
+	for fc_units in fc_layers:
+		x = Dense(units=fc_units, activation='relu')(x)		
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor, annotations], outputs=[prob_output])
+	adamo = Adam(lr=0.000001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))	
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model
 
 
 def build_read_tensor_2d_residual_model(args):
@@ -2157,6 +2270,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 
 	if 'input_annotations' in semantics:
 		args.annotations = semantics['input_annotations']
+		args.annotation_set = semantics['input_annotation_set']
 
 	if 'channels_last' in semantics:
 		args.channels_last = semantics['channels_last']
@@ -2219,16 +2333,18 @@ def plot_dot_model_in_color(dot, image_path):
 				n.set_fillcolor("deepskyblue1")				
 			elif 'BatchNormalization' in n.get_label():
 				n.set_fillcolor("goldenrod1")		
+			elif 'softmax' in n.get_label():
+				n.set_fillcolor("chartreuse")										
 			elif 'Activation' in n.get_label():
 				n.set_fillcolor("yellow")	
 			elif 'MaxPooling' in n.get_label():
 				n.set_fillcolor("aquamarine")
-			elif 'softmax' in n.get_label():
-				n.set_fillcolor("darkolivegreen4")										
 			elif 'Dense' in n.get_label():
 				n.set_fillcolor("gold")
 			elif 'Flatten' in n.get_label():
 				n.set_fillcolor("coral3")
+			elif 'Reshape' in n.get_label():
+				n.set_fillcolor("coral")			
 			elif 'Input' in n.get_label():
 				n.set_fillcolor("darkolivegreen1")
 			elif 'Concatenate' in n.get_label():
@@ -2400,14 +2516,18 @@ def train_model_from_generators(args, model, generate_train, generate_valid, sav
 	'''
 	if not os.path.exists(os.path.dirname(save_weight_hd5)):
 		os.makedirs(os.path.dirname(save_weight_hd5))	
-	
+	serialize_model_semantics(args, save_weight_hd5)
+
+	if args.inspect_model:
+		image_path = args.id+'.png' if args.image_dir is None else args.image_dir+args.id+'.png'
+		inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 	history = model.fit_generator(generate_train, 
 		steps_per_epoch=args.training_steps, epochs=args.epochs, verbose=1, 
 		validation_steps=args.validation_steps, validation_data=generate_valid,
 		callbacks=get_callbacks(args, save_weight_hd5))
 
 	plots.plot_metric_history(history, plots.weight_path_to_title(save_weight_hd5))
-	serialize_model_semantics(args, save_weight_hd5)
 	print('Model weights saved at: %s' % save_weight_hd5)
 	
 	return model
@@ -2417,8 +2537,8 @@ def get_callbacks(args, save_weight_hd5):
 	callbacks = []
 	
 	callbacks.append(ModelCheckpoint(filepath=save_weight_hd5, verbose=1, save_best_only=True))
-	callbacks.append(EarlyStopping(monitor='val_loss', patience=args.patience*4, verbose=1))
-	callbacks.append(ReduceLROnPlateau(monitor='val_loss', patience=args.patience, verbose=1))
+	callbacks.append(EarlyStopping(monitor='val_loss', patience=args.patience*3, verbose=1))
+	callbacks.append(ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=args.patience, verbose=1))
 	
 	# if args.channels_last:
 	# 	callbacks.append(TensorBoard())

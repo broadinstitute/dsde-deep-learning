@@ -27,6 +27,7 @@ import pysam
 import random
 import defines
 import operator
+import arguments
 import numpy as np
 
 from random import shuffle
@@ -37,7 +38,62 @@ from collections import Counter, defaultdict
 tensor_exts = ['.h5', '.hd5']
 
 
-def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
+def run_training_data():
+	'''Dispatch on args.mode command-line supplied recipe'''
+	args = arguments.parse_args()
+
+	# Writing tensor datasets for training
+	if 'write_tensors' == args.mode:
+		tensors_from_tensor_map(args, include_annotations=True)
+	elif 'write_paired_read_tensors' == args.mode:
+		paired_read_tensors_from_map(args, include_annotations=True)
+	elif 'write_tensors_2bit' == args.mode:
+		tensors_from_tensor_map_2channel(args, include_annotations=True)
+	elif 'write_tensors_no_annotations' == args.mode:
+		tensors_from_tensor_map(args, include_annotations=False)
+	elif 'write_tensors_gnomad_annotations' == args.mode:
+		tensors_from_tensor_map_gnomad_annos(args)
+	elif 'write_tensors_gnomad_annotations_per_allele_1d' == args.mode:
+		tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=False, include_reference=True)
+	elif 'write_tensors_gnomad_1d' == args.mode:
+		tensors_from_tensor_map_gnomad_annos(args, include_reads=False, include_reference=True)		
+	elif 'write_depristo' == args.mode:
+		nist_samples_to_png(args)
+	elif 'write_calling_tensors' == args.mode:
+		calling_tensors_from_tensor_map(args)
+	elif 'write_pileup_filter_tensors' == args.mode:
+		tensors_from_tensor_map(args, pileup=True)		
+	elif 'write_calling_tensors_1d' == args.mode:
+		calling_tensors_from_tensor_map(args, pileup=True)		
+	elif 'write_dna_tensors' == args.mode:
+		write_dna_and_annotations(args)
+	elif 'write_bed_tensors' == args.mode:
+		write_dna_multisource_annotations(args)
+	elif 'write_bed_tensors_dna' == args.mode:
+		write_dna_multisource_annotations(args, include_annotations=False)		
+	elif 'write_bed_tensors_annotations' == args.mode:
+		write_dna_multisource_annotations(args, include_dna=False)	
+	elif 'write_bqsr_tensors' == args.mode:
+		bqsr_tensors_from_tensor_map(args, include_annotations=True)	
+	elif 'write_tranches' == args.mode:
+		write_tranches(args)
+
+	# Inspections			
+	elif 'inspect_tensors' == args.mode:
+		inspect_read_tensors(args)
+	elif 'inspect_dataset' == args.mode:
+		inspect_dataset(args)
+	elif 'inspect_gnomad' == args.mode:
+		inspect_gnomad_low_ac(args)
+	elif 'combine_vcfs' == args.mode:
+		combine_vcfs(args)	
+	
+	# Ooops
+	else:
+		raise ValueError('Unknown recipe mode:', args.mode)
+
+
+def tensors_from_tensor_map(args, include_annotations=True, pileup=False, reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -89,7 +145,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", args.annotations)):
 					stats['Missing ALL annotations'] += 1
 					continue # Require at least 1 annotation...
-				annotation_data = get_annotation_data(args, variant, stats)
+				annotation_data = get_annotation_data(args, variant, stats, allele_idx)
 					
 			good_reads, insert_dict = get_good_reads(args, samfile, variant)
 			if len(good_reads) >= args.read_limit:
@@ -99,6 +155,17 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 				continue
 
 			reference_seq = record.seq
+			if reference_map is not None:
+				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
+				for i,b in enumerate(reference_seq):
+					b = b.upper()
+					if b in defines.inputs:
+						reference_tensor[i, defines.inputs[b]] = 1.0
+					elif b in defines.ambiguity_codes:
+						reference_tensor[i] = defines.ambiguity_codes[b]
+					else:
+						raise ValueError('Error! Unknown code:', b)
+
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
 				if i < 0:
 					reference_seq = defines.indel_char*insert_dict[i] + reference_seq
@@ -116,12 +183,14 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
-				if pileup:
-					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
-					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
 				if include_annotations:
 					hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
+				if reference_map is not None:
+					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
+				if pileup:
+					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
+					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
 			
 			if debug:
 				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
@@ -136,7 +205,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False):
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
 	if variant:
-		print('Done generating tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf)
+		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
 
 
 def paired_read_tensors_from_map(args, include_annotations=True):
@@ -225,7 +294,7 @@ def paired_read_tensors_from_map(args, include_annotations=True):
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
 	if stats['count'] > 0:
-		print('Done generating tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
+		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
 
 
 def calling_tensors_from_tensor_map(args, pileup=False):
@@ -320,18 +389,22 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 				stats['Downsampled Homozygous'] += 1
 				skip_this = True
 
-		if skip_this:
-			cur_pos += args.window_size
-			continue
-
-		for l in cur_labels:
-			stats[l] += 1	
-
 		if len(cur_labels) == 0:
-			stats['Reference only tensor written'] += 1
+			stats['Reference only tensor'] += 1
 			good_reads, insert_dict = get_good_reads_in_window(args, samfile, cur_pos, cur_pos+args.window_size)
 		else:
 			good_reads, insert_dict = get_good_reads_in_window(args, samfile, cur_pos, cur_pos+args.window_size, variant)
+
+		if len(good_reads) == 0:
+			stats['No reads aligned'] += 1
+			skip_this = True
+
+		if skip_this:
+			cur_pos += args.window_size
+			continue	
+
+		for l in cur_labels:
+			stats[l] += 1	
 
 		reference_seq = record.seq
 		for i in sorted(insert_dict.keys(), key=int, reverse=True):
@@ -515,9 +588,9 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
 			if include_reads:
-				hf.create_dataset('read_tensor', data=read_tensor)
+				hf.create_dataset(args.tensor_map, data=read_tensor)
 			if include_annotations:
-				hf.create_dataset('annotations', data=annotation_data)
+				hf.create_dataset(args.annotation_set, data=annotation_data)
 			if include_reference:
 				hf.create_dataset('reference', data=dna_data)
 
@@ -651,9 +724,9 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
 				if include_reads:
-					hf.create_dataset('read_tensor', data=read_tensor)
+					hf.create_dataset(args.tensor_map, data=read_tensor)
 				if include_annotations:
-					hf.create_dataset('annotations', data=annotation_data)
+					hf.create_dataset(args.annotation_set, data=annotation_data)
 				if include_reference:
 					hf.create_dataset('reference', data=dna_data)
 
@@ -751,9 +824,9 @@ def tensors_from_tensor_map_2channel(args, include_annotations=True):
 				if not os.path.exists(os.path.dirname(tensor_path)):
 					os.makedirs(os.path.dirname(tensor_path))
 				with h5py.File(tensor_path, 'w') as hf:
-					hf.create_dataset('read_tensor', data=read_tensor)
+					hf.create_dataset(args.tensor_map, data=read_tensor)
 					if include_annotations:
-						hf.create_dataset('annotations', data=annotation_data)
+						hf.create_dataset(args.annotation_set, data=annotation_data)
 				
 				if debug:
 					print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
@@ -874,9 +947,9 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
-				hf.create_dataset('read_tensor', data=read_tensor)
+				hf.create_dataset(args.tensor_map, data=read_tensor)
 				if include_annotations:
-					hf.create_dataset('annotations', data=annotation_data)
+					hf.create_dataset(args.annotation_set, data=annotation_data)
 		
 			stats['count'] +=1
 			if stats['count']%400 == 0:
@@ -1148,13 +1221,13 @@ def nist_samples_to_png(args):
 
 def get_variant_window(args, variant):
 	index_offset = (args.window_size//2)
-	reference_start = variant.POS-(index_offset+1)
-	reference_end = variant.POS+index_offset
+	reference_start = (variant.POS-1)-index_offset
+	reference_end = (variant.POS-1)+index_offset + (args.window_size%2)
 
 	return index_offset, reference_start, reference_end
 
 
-def get_annotation_data(args, annotation_variant, stats):
+def get_annotation_data(args, annotation_variant, stats, allele_index=0):
 	'''Return an array annotation data about the variant.
 
 	Arguments:
@@ -1174,27 +1247,34 @@ def get_annotation_data(args, annotation_variant, stats):
 				annotation_data[i] = annotation_variant.INFO[a][0]
 			elif a in annotation_variant.INFO and not math.isnan(annotation_variant.INFO[a]):
 				annotation_data[i] = annotation_variant.INFO[a]
-			elif a == 'MBQ':
+			elif len(annotation_variant.samples) > 0:
 				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MBQ
-			elif a == 'MPOS':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MPOS 
-			elif a == 'MMQ':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MMQ 
-			elif a == 'MFRL_0':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MFRL[0] 
-			elif a == 'MFRL_1':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.MFRL[1] 
-			elif a == 'AD_0':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.AD[0] 
-			elif a == 'AD_1':
-				call = annotation_variant.genotype(args.sample_name)
-				annotation_data[i] = call.data.AD[1]
+				#print('call data:', call.data)
+				if a == 'MBQ' and hasattr(call.data, a):
+					if len(annotation_variant.ALT) > 1:
+						annotation_data[i] = call.data.MBQ[allele_index]
+					else:
+						annotation_data[i] = call.data.MBQ
+				elif a == 'MPOS' and hasattr(call.data, a):
+					if len(annotation_variant.ALT) > 1:
+						annotation_data[i] = call.data.MPOS[allele_index]
+					else:
+						annotation_data[i] = call.data.MPOS
+				elif a == 'MMQ' and hasattr(call.data, a):
+					if len(annotation_variant.ALT) > 1:
+						annotation_data[i] = call.data.MMQ[allele_index]
+					else:
+						annotation_data[i] = call.data.MMQ		
+				elif a == 'MFRL_0' and hasattr(call.data, 'MFRL'):
+					annotation_data[i] = call.data.MFRL[allele_index] 
+				elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
+					annotation_data[i] = call.data.MFRL[allele_index+1] 
+				elif a == 'AD_0' and hasattr(call.data, 'AD'):
+					annotation_data[i] = call.data.AD[allele_index] 
+				elif a == 'AD_1' and hasattr(call.data, 'AD'):
+					annotation_data[i] = call.data.AD[allele_index+1]
+				else:
+					stats['Could not handle genotyped annotation:'+a] += 1
 			else:
 				stats['Could not handle annotation:'+a] += 1
 
@@ -1283,6 +1363,45 @@ def downsample(args, cur_label_key, stats):
 	return False
 
 
+def make_reference_tensor(args, reference_seq):
+	reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
+	
+	for i,b in enumerate(reference_seq):
+		if i >= args.window_size:
+			break
+			
+		b = b.upper()
+		if b in defines.inputs:
+			reference_tensor[i, defines.inputs[b]] = 1.0
+		elif b in defines.ambiguity_codes:
+			reference_tensor[i] = defines.ambiguity_codes[b]
+		else:
+			raise ValueError('Error! Unknown code:', b)
+
+	return reference_tensor
+
+
+
+def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, reference_start, stats):
+	good_reads, insert_dict = get_good_reads(args, samfile, variant)
+	if len(good_reads) >= args.read_limit:
+		stats['More reads than read_limit'] += 1
+	if len(good_reads) == 0:
+		stats['No reads aligned'] += 1
+		return None
+
+	for i in sorted(insert_dict.keys(), key=int, reverse=True):
+		if i < 0:
+			reference_seq = defines.indel_char*insert_dict[i] + reference_seq
+		else:
+			reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
+
+	read_tensor = good_reads_to_tensor(args, good_reads, reference_start, insert_dict)
+	reference_sequence_into_tensor(args, reference_seq, read_tensor)
+
+	return read_tensor
+
+
 def get_good_reads(args, samfile, variant, sort_by='base'):
 	'''Return an array of usable reads centered at the variant.
 	
@@ -1308,7 +1427,7 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 
 	idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 
-	for read in samfile.fetch(variant.CHROM, variant.POS-1, variant.POS+1):
+	for read in samfile.fetch(variant.CHROM, variant.POS-1, variant.POS):
 
 		if not read or not hasattr(read, 'cigarstring') or read.cigarstring is None:
 			continue
@@ -1339,7 +1458,7 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 	if len(good_reads) > args.read_limit:
 		good_reads = np.random.choice(good_reads, size=args.read_limit, replace=False).tolist()
 
-	good_reads.sort(key=lambda x: x.reference_start + x.query_alignment_start)
+	good_reads.sort(key=lambda x: x.reference_start+x.query_alignment_start)
 	if sort_by == 'base':
 		good_reads.sort(key=lambda read: get_base_to_sort_by(read, variant))
 
@@ -1350,11 +1469,11 @@ def get_base_to_sort_by(read, variant):
 	if len(read.query_alignment_sequence) > 0:
 		max_idx = len(read.query_alignment_sequence)-1
 	else:
-		return -2
+		return 'Z'
 
 	if variant.is_snp:
 		return read.query_alignment_sequence[clamp((variant.POS-read.reference_start)-1, 0, max_idx)]
-	elif variant.is_indel:
+	else:
 		var_idx = variant.POS-read.reference_start
 		cur_idx = 0
 		for cur_op, length in read.cigartuples:
@@ -1363,8 +1482,8 @@ def get_base_to_sort_by(read, variant):
 				if cur_op == defines.cigar_code['M']:
 					return read.query_alignment_sequence[clamp(var_idx, 0, max_idx)]
 				else:
-					return cur_op
-		return -1
+					return defines.code2cigar[cur_op]
+		return 'Y'
 		
 
 def clamp(n, minn, maxn):
@@ -1973,7 +2092,7 @@ def pileup_tensor_generator(args, train_paths, include_annotations=False):
 				label_matrix[cur_example, label] = 1.0
 				with h5py.File(tensor_path,'r') as hf:
 					if include_annotations:
-						annotation_data[cur_example,:] = np.array(hf.get('annotations'))
+						annotation_data[cur_example,:] = np.array(hf.get(args.tensor_map))
 					if args.window_size > 0:
 						tensor[cur_example,:,:] = np.array(hf.get('pileup_tensor'))
 				
@@ -1990,7 +2109,7 @@ def pileup_tensor_generator(args, train_paths, include_annotations=False):
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
 		if args.window_size > 0 and include_annotations:
-			yield ({'pileup_tensor':tensor, 'annotations':annotation_data}, label_matrix)
+			yield ({'pileup_tensor':tensor, args.annotation_set:annotation_data}, label_matrix)
 		elif args.window_size > 0:
 			yield ({'pileup_tensor':tensor}, label_matrix)
 		else:
@@ -2103,8 +2222,8 @@ def bqsr_tensor_annotation_generator(args, train_paths):
 				tensor_path = tensors[label][tensor_counts[label]]
 				try:
 					with h5py.File(tensor_path,'r') as hf:
-						tensor[cur_example] = np.array(hf.get('read_tensor'))
-						annotation_data[cur_example] = np.array(hf.get('annotations'))
+						tensor[cur_example] = np.array(hf.get(args.tensor_map))
+						annotation_data[cur_example] = np.array(hf.get(args.annotation_set))
 				except:
 					e = sys.exc_info()
 					print('\nError', e, ' \n could be corrupt tensor at:', tensor_path)
@@ -2124,7 +2243,7 @@ def bqsr_tensor_annotation_generator(args, train_paths):
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
-		yield ({'read_tensor':tensor, 'annotations':annotation_data}, label_matrix)
+		yield ({args.tensor_map:tensor, args.annotation_set:annotation_data}, label_matrix)
 		label_matrix = np.zeros((args.batch_size, len(args.labels)))
 
 
@@ -2343,8 +2462,8 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 
 				try:
 					with h5py.File(tensor_path, 'r') as hf:
-						tensor[cur_example] = np.array(hf.get('read_tensor'))
-						annotations[cur_example] = np.array(hf.get('annotations'))
+						tensor[cur_example] = np.array(hf.get(args.tensor_map))
+						annotations[cur_example] = np.array(hf.get(args.annotation_set))
 					if args.normalize_annotations:
 						for i,a in enumerate(args.annotations):
 							if annotations[cur_example][i] == 0:
@@ -2372,7 +2491,7 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
-		yield ({'read_tensor':tensor, 'annotations':annotations}, label_matrix)
+		yield ({args.tensor_map:tensor, args.annotation_set:annotations}, label_matrix)
 		label_matrix = np.zeros((args.batch_size, len(args.labels)))		
 		annotations = np.zeros((args.batch_size,len(args.annotations)))
 
@@ -2437,7 +2556,9 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 						else:
 							raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
 
-				label_matrix[cur_example, label] = 1.0
+				label_matrix[cur_example, :] = args.label_smoothing/(len(args.labels)-1)
+				label_matrix[cur_example, label] = 1.0-args.label_smoothing
+
 				tensor_counts[label] += 1
 				if tensor_counts[label] == len(tensors[label]):
 					np.random.shuffle(tensors[label])
@@ -2454,7 +2575,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 			print('batch keys:', batch.keys())
-			print(batch['annotations'])
+
 		if with_positions:
 			yield (batch, label_matrix, positions)
 			positions = []
@@ -2466,7 +2587,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 			batch[args.tensor_map] = np.zeros(((args.batch_size,)+tensor_shape))
 		
 		if with_positions and defines.annotations_from_args(args):
-			batch['annotations'] = np.zeros((args.batch_size, len(args.annotations)))		
+			batch[args.annotation_set] = np.zeros((args.batch_size, len(args.annotations)))		
 
 
 def big_batch_from_minibatch_generator(args, generator, with_positions=False):
@@ -2480,17 +2601,17 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 
 	annotations = defines.annotations_from_args(args)
 	if annotations:
-		input_data['annotations'] = []	
+		input_data[args.annotation_set] = []	
 
 	if with_positions:
 		positions = []
 
 	for _ in range(minibatches):
-		next_batch = generator.next()
+		next_batch = next(generator)
 		if tm:
 			input_data[args.tensor_map].extend(next_batch[0][args.tensor_map])
 		if annotations:
-			input_data['annotations'].extend(next_batch[0]['annotations'])
+			input_data[args.annotation_set].extend(next_batch[0][args.annotation_set])
 		labels.extend(next_batch[1])
 		if with_positions:
 			positions.extend(next_batch[-1])
@@ -2504,6 +2625,23 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 	else:
 		return input_data, np.array(labels)
 
+
+def input_data_from_generator(args, generator):
+	test = big_batch_from_minibatch_generator(args, generator)
+
+	test_data = [test[0][args.tensor_map]]
+	if defines.annotations_from_args(args):
+		test_data.append(test[0][args.annotation_set])	
+	
+	return test_data
+
+def label_data_from_generator(args, generator):
+	test = big_batch_from_minibatch_generator(args, generator)
+	return test[1]
+
+def positions_from_generator(args, generator):
+	test = big_batch_from_minibatch_generator(args, generator, with_positions=True)
+	return test[-1]
 
 def load_images_from_class_dirs(args, train_paths, shape=(224,224), per_class_max=2500, position_dict=None):
 	import cv2
@@ -2619,7 +2757,7 @@ def load_tensors_and_annotations_from_class_dirs(args, train_paths, per_class_ma
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get('read_tensor')))
+				tensors.append(np.array(hf.get(args.tensor_map)))
 				annotations.append(np.array(hf.get(args.annotation_set)))
 
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
@@ -2660,7 +2798,7 @@ def load_bqsr_tensors_from_class_dirs(args, train_paths, per_class_max=4000):
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get('read_tensor')))
+				tensors.append(np.array(hf.get(args.tensor_map)))
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -2697,8 +2835,8 @@ def load_bqsr_tensors_annotations_from_class_dirs(args, train_paths, per_class_m
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get('read_tensor')))
-				annotations.append(np.array(hf.get('annotations')))
+				tensors.append(np.array(hf.get(args.tensor_map)))
+				annotations.append(np.array(hf.get(args.annotation_set)))
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -2737,9 +2875,9 @@ def load_dna_annotations_positions_from_class_dirs(args, train_paths, per_class_
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
 				if include_annotations:
-					annotation_data.append(np.array(hf.get('annotations')))
+					annotation_data.append(np.array(hf.get(args.annotation_set)))
 				if include_dna:
-					reference_data.append(np.array(hf.get('reference')))
+					reference_data.append(np.array(hf.get(args.tensor_map)))
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -3026,10 +3164,9 @@ def reference_sequence_into_tensor(args, reference_seq, tensor):
 				tensor[ref_offset+args.input_symbols[b], :, i] = 1.0
 		elif b in defines.ambiguity_codes:
 			if args.channels_last:
-				tensor[:, i, ref_offset:ref_offset+4] = np.transpose(np.tile(defines.ambiguity_codes[b], (args.read_limit, 1)))
+				tensor[:, i, ref_offset:ref_offset+4] = np.tile(defines.ambiguity_codes[b], (args.read_limit, 1))
 			else:
 				tensor[ref_offset:ref_offset+4, :, i] = np.transpose(np.tile(defines.ambiguity_codes[b], (args.read_limit, 1)))		
-
 
 
 def reads_to_2bit_tensor(args, sequences, qualities=None, reference_seq=None):
@@ -3475,18 +3612,18 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 	stats = Counter()
 
 	bed_dict = bed_file_to_dict(args.bed_file)
-	vcf_truth = vcf.Reader(open(args.train_vcf, 'r'))
+	vcf_truth = vcf.Reader(open(args.train_vcf, 'rb'))
 
 	if override_vcf:
-		vcf_ram = vcf.Reader(open(override_vcf, 'r'))
-		vcf_negative = vcf.Reader(open(args.negative_vcf, 'r'))
+		vcf_ram = vcf.Reader(open(override_vcf, 'rb'))
+		vcf_negative = vcf.Reader(open(args.negative_vcf, 'rb'))
 	else:
-		vcf_ram = vcf.Reader(open(args.negative_vcf, 'r'))
+		vcf_ram = vcf.Reader(open(args.negative_vcf, 'rb'))
 
 	if args.ignore_vcf:
-		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'r'))
+		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'rb'))
 	if args.include_vcf:
-		vcf_include = vcf.Reader(open(args.include_vcf, 'r'))
+		vcf_include = vcf.Reader(open(args.include_vcf, 'rb'))
 
 	snp_data = {}
 	indel_data = {}
@@ -3533,7 +3670,7 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 		if allele_idx and override_vcf:
 			v_negative = variant_in_vcf(variant, vcf_negative)
 			if not v_negative or allele_idx >= len(v_negative.ALT):
-				stats['Variant allele missing from override_vcf VCF, wrong VCF perhaps?'] += 1
+				stats['Variant allele missing from override_vcf VCF:'+override_vcf+', wrong VCF perhaps?'] += 1
 				continue
 			allele = v_negative.ALT[allele_idx]
 		elif allele_idx:
@@ -4184,12 +4321,12 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 				variant = v
 				v_negative = variant_in_vcf(variant, vcf_negative)
 
-		if not v_negative:
-			stats['Not in negative VCF'] += 1
-			continue
-
 		if not variant:
 			stats['Not in gnomad'] += 1
+			continue
+
+		if not v_negative:
+			stats['Not in negative VCF'] += 1
 			continue
 
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):
@@ -4283,9 +4420,8 @@ def inspect_dataset(args):
 	data_paths = get_train_valid_test_paths(args)
 	vcf_ram = vcf.Reader(open(args.negative_vcf, 'r'))
 
-	if args.normalize_annotations:
-		norms = {a:[0,0,0,0] for a in args.annotations} # X, X^2, count, k for shifted variance calculation
-		maxed_out = False
+	norms = {a:[0,0,0,0] for a in args.annotations} # X, X^2, count, k for shifted variance calculation
+	maxed_out = False
 
 	for dp in data_paths:
 		for tp in dp:
@@ -4311,11 +4447,12 @@ def inspect_dataset(args):
 					elif v.POS == pos and v.is_indel:
 						stats[cur_label+' insertion'] += 1
 
-					if args.normalize_annotations and v.POS == pos and not maxed_out:
+					if defines.annotations_from_args(args) and v.POS == pos and not maxed_out:
 						with h5py.File(os.path.join(tp,t),'r') as hf:
-							annotation_data = np.array(hf.get('annotations'))
+							annotation_data = np.array(hf.get(args.annotation_set))
 							for i,a in enumerate(args.annotations):
 								if annotation_data[i] == 0:
+									stats[a+' is zero:'] += 1
 									continue
 								if norms[a][3] == 0:
 									norms[a][3] = annotation_data[i]
@@ -4338,7 +4475,7 @@ def inspect_dataset(args):
 			print('%s has: %.2f' % (k, stats[k]))
 	
 	dataset_summary_latex_table_line(stats)
-	if args.normalize_annotations:
+	if defines.annotations_from_args(args):
 		means_and_stds = np.zeros((len(args.annotations), 2))
 		for i,a in enumerate(args.annotations):
 			means_and_stds[i,0] = (norms[a][0] / norms[a][2]) + norms[a][3]
@@ -4730,3 +4867,6 @@ def is_insertion(variant):
 def is_deletion(variant):
 	return any( map(lambda x: x and len(x) < len(variant.REF), variant.ALT) )
 
+# Back to the top!
+if "__main__" == __name__:
+	run_training_data()

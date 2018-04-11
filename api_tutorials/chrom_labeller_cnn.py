@@ -65,23 +65,24 @@ def parse_args():
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--mode', default='bp')
-	parser.add_argument('--window_size', default=128, type=int)
+	parser.add_argument('--window_size', default=64, type=int)
 	parser.add_argument('--samples', default=1000, type=int)
+	parser.add_argument('--min_consensus', default=0, type=int)
 	parser.add_argument('--reference_fasta', default=reference_fasta)
 	parser.add_argument('--bed_file',default=breakpoint_bed_file)	
 	parser.add_argument('--inputs', default={'A':0, 'C':1, 'T':2, 'G':3})
 	parser.add_argument('--label_set', default='breakpoint', choices=label_sets.keys())
 	parser.add_argument('--labels', default={})
-	parser.add_argument('--conv_width', default=15, type=int, help='Width of 1D convolutional kernels.')
+	parser.add_argument('--conv_width', default=5, type=int, help='Width of 1D convolutional kernels.')
 	parser.add_argument('--conv_dropout', default=0.0, type=float, 
 		help='Dropout rate in convolutional layers.')
 	parser.add_argument('--conv_batch_normalize', default=False, action='store_true',
 		help='Batch normalize convolutional layers.')
-	parser.add_argument('--conv_layers', nargs='+', default=[128, 64, 32], type=int,
+	parser.add_argument('--conv_layers', nargs='+', default=[128, 96, 64, 48], type=int,
 		help='List of sizes for each convolutional filter layer')
 	parser.add_argument('--same_padding', default=False, action='store_true',
 		help='Valid or same border padding on the convolutional layers.')	
-	parser.add_argument('--spatial_dropout', default=False, action='store_true',
+	parser.add_argument('--spatial_dropout', default=True, action='store_true',
 		help='Spatial dropout on the convolutional layers.')	
 	parser.add_argument('--max_pools', nargs='+', default=[], type=int,
 		help='List of maxpooling layers.')	
@@ -135,7 +136,7 @@ def make_big_model(args):
 def make_breakpoint_model(args):
 	model = build_breakpoint_classifier(args)
 	training_data = load_dna_and_breakpoint_labels(args)
-	train, valid, test = split_data(training_data)
+	train, valid, test = split_data(training_data, valid_ratio=0.4, test_ratio=0.1)
 	
 	weight_path = weight_path_from_args(args)
 	model = train_chrom_labeller(model, train, valid, weight_path)
@@ -324,7 +325,7 @@ def train_chrom_labeller(model, train_tuple, valid_tuple, save_weight_hd5):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def load_dna_and_breakpoint_labels(args):
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	bed_dict, bed_labels = bed_file_labels_to_dict(args.bed_file)
+	bed_dict, bed_labels = bed_file_labels_to_dict(args.bed_file, args.min_consensus)
 
 	train_data = np.zeros(( args.samples, args.window_size, len(args.inputs) ))
 	train_labels = np.zeros(( args.samples, 2 ))
@@ -395,7 +396,7 @@ def load_dna_and_chrom_label(args, only_labels=None):
 	return (train_data, train_labels)
 
 
-def bed_file_labels_to_dict(bed_file):
+def bed_file_labels_to_dict(bed_file, min_consensus=0):
 	bed = {}
 	labels = {}
 
@@ -409,6 +410,9 @@ def bed_file_labels_to_dict(bed_file):
 			lower = int(parts[1])
 			upper = int(parts[2])
 			label = parts[3]
+
+			if min_consensus > 0 and label == 'BREAKPOINT' and int(parts[4]) < min_consensus:
+				continue
 
 			if contig not in bed.keys():
 				bed[contig] = ([], [], [])

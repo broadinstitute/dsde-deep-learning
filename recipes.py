@@ -27,269 +27,32 @@ import plots
 import pysam
 import models
 import defines
+import inspect
 import operator
 import arguments
 import numpy as np
 import training_data as td
 from collections import Counter
 
-def run():
-	'''Dispatch on args.mode command-line supplied recipe'''
-	args = arguments.parse_args()
 
-	# Model training recipes
-	if 'train_reference' == args.mode:
-		make_reference_net(args)
-	elif 'train_reference_annotation' == args.mode:
-		make_reference_annotation_net(args)
-	elif 'train_reference_annotation_b' == args.mode:
-		train_reference_annotation_b(args)		
-	elif 'train_reference_1layer' == args.mode:
-		make_reference_annotation_net_1layer(args)		
-	elif 'train_annotation_mlp' == args.mode:
-		make_annotation_multilayer_perceptron(args)
-	elif 'train_ref_read' == args.mode:
-		train_ref_read_model(args)
-	elif 'train_ref_read_resnet' == args.mode:
-		train_ref_read_resnet_model(args)
-	elif 'train_ref_read_dilated' == args.mode:
-		train_ref_read_dilated_model(args)
-	elif 'train_ref_read_b' == args.mode:
-		train_ref_read_model_b(args)
-	elif 'train_ref_read_bayes' == args.mode:
-		train_ref_read_inception_model(args)
-	elif 'train_pileup_filter' == args.mode:
-		train_pileup_filter(args)
-	elif 'train_calling_model' == args.mode:
-		train_calling_model(args)
-	elif 'train_calling_full2d' == args.mode:
-		train_calling_model_full(args)		
-	elif 'train_calling_model_1d' == args.mode:
-		train_calling_model_1d(args)		
-	elif 'train_ref_read_anno' == args.mode:
-		train_ref_read_annotation_model(args)								
-	elif 'train_ref_read_anno_exome' == args.mode:
-		train_ref_read_annotation_exome_model(args)
-	elif 'train_ref_read_anno_b' == args.mode:
-		train_ref_read_anno_model_b(args)
-	elif 'train_ref_read_anno_tiny' == args.mode:
-		train_ref_read_anno_model_tiny(args)			
-	elif 'train_bqsr' == args.mode:
-		bqsr_train_tensor(args)
-	elif 'train_bqsr_anno' == args.mode:
-		bqsr_train_annotation_tensor(args)		
-	elif 'train_bqsr_lstm' == args.mode:
-		bqsr_lstm_train_tensor(args)								
-	elif 'train_depristo_inception' == args.mode:
-		depristo_inception(args)
+def run(file_fxns):
+	'''Dispatch on args.mode command-line supplied recipe
+	
+	Any function defined in this file is considered a recipe.
+	They must take the args namespace as input.
+	Recipes are run via:
 
-	# Model testing recipes
-	elif 'test_tensor' == args.mode:
-		test_tensor_and_annotations(args)
-	elif 'test_tensor_exome' == args.mode:
-		test_ref_read_annotation_exome_model(args)		
-	elif 'test_tensor_vcf' == args.mode:
-		test_tensor_vs_vcf(args)
-	elif 'test_tensor_multi_vcf' == args.mode:
-		test_tensor_vs_multiple_vcfs(args)
-	elif 'test_tensor_filters' == args.mode:
-		test_tensor_and_annotations_vs_filters(args)		
-	elif 'test_tensor_gnomad' == args.mode:
-		test_tensor_vs_gnomad(args)
-	elif 'test_refconv_gnomad' == args.mode:
-		test_refconv_vs_gnomad(args)									
-	elif 'test_refconv' == args.mode:
-		test_reference_annotation_net(args)
-	elif 'test_ref' == args.mode:
-		test_reference_net(args)
-	elif 'test_anno_mlp' == args.mode:
-		test_annotation_multilayer_perceptron(args)
-	elif 'test_caller' == args.mode:
-		test_caller_pileup(args)
-	elif 'test_caller_2d' == args.mode:
-		test_caller_2d(args)
-	elif 'test_architectures' == args.mode:
-		test_architectures(args)
-
-	# Plotting recipes
-	elif 'plot_vcf_roc' == args.mode:
-		plot_vcf_roc(args)
-	elif 'plot_vcf_roc_gnomad' == args.mode:
-		plot_vcf_roc_gnomad_scores(args)
-	elif 'plot_vcf_roc_gnomad_like' == args.mode:
-		plot_vcf_roc_gnomad_like_scores(args)		
-	elif 'plot_multi_vcf_roc' == args.mode:
-		plot_multi_vcf_roc(args)	
-	elif 'roc_animation' == args.mode:
-		roc_curve_through_learning(args)
-	elif 'pr_segmentation_animation' == args.mode:
-		roc_curve_through_learning_segmentation(args)
-
-	# Writing tensor datasets for training
-	elif 'write_tensors' == args.mode:
-		td.tensors_from_tensor_map(args, include_annotations=True)
-	elif 'write_paired_read_tensors' == args.mode:
-		td.paired_read_tensors_from_map(args, include_annotations=True)
-	elif 'write_tensors_2bit' == args.mode:
-		td.tensors_from_tensor_map_2channel(args, include_annotations=True)
-	elif 'write_tensors_no_annotations' == args.mode:
-		td.tensors_from_tensor_map(args, include_annotations=False)
-	elif 'write_tensors_gnomad_annotations' == args.mode:
-		td.tensors_from_tensor_map_gnomad_annos(args)
-	elif 'write_tensors_gnomad_annotations_per_allele_1d' == args.mode:
-		td.tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=False, include_reference=True)
-	elif 'write_tensors_gnomad_1d' == args.mode:
-		td.tensors_from_tensor_map_gnomad_annos(args, include_reads=False, include_reference=True)		
-	elif 'write_depristo' == args.mode:
-		td.nist_samples_to_png(args)
-	elif 'write_calling_tensors' == args.mode:
-		td.calling_tensors_from_tensor_map(args)
-	elif 'write_pileup_filter_tensors' == args.mode:
-		td.tensors_from_tensor_map(args, pileup=True)		
-	elif 'write_calling_tensors_1d' == args.mode:
-		td.calling_tensors_from_tensor_map(args, pileup=True)		
-	elif 'write_dna_tensors' == args.mode:
-		td.write_dna_and_annotations(args)
-	elif 'write_bed_tensors' == args.mode:
-		td.write_dna_multisource_annotations(args)
-	elif 'write_bed_tensors_dna' == args.mode:
-		td.write_dna_multisource_annotations(args, include_annotations=False)		
-	elif 'write_bed_tensors_annotations' == args.mode:
-		td.write_dna_multisource_annotations(args, include_dna=False)	
-	elif 'write_bqsr_tensors' == args.mode:
-		td.bqsr_tensors_from_tensor_map(args, include_annotations=True)	
-	elif 'write_filters_2d' == args.mode:
-		model = models.build_read_tensor_2d_and_annotations_model(args)
-		models.write_filters_2d(args, model)
-	elif 'write_filters_1d' == args.mode:
-		model = models.build_reference_model(args)
-		models.write_filters_1d(args, model)
-	elif 'write_tranches' == args.mode:
-		td.write_tranches(args)
-
-	# Inspections			
-	elif 'inspect_tensors' == args.mode:
-		td.inspect_read_tensors(args)
-	elif 'inspect_dataset' == args.mode:
-		td.inspect_dataset(args)
-	elif 'inspect_architectures' == args.mode:
-		inspect_architectures(args)
-	elif 'inspect_gnomad' == args.mode:
-		td.inspect_gnomad_low_ac(args)
-	elif 'combine_vcfs' == args.mode:
-		td.combine_vcfs(args)
-
-	# Ooops
-	else:
-		raise ValueError('Unknown recipe mode:', args.mode)
-
-
-def inspect_architectures(args):
-	'''Run one batch of training and inference for each architecture in defines.architectures.
-
-	Many command line arguments are ignored to give each architecture required values.
-	Calls models.inspect_model() on each model for timing, etc
+	python recipes.py <NAME_OF_RECIPE_FUNCTION> [Additional arguments]
 
 	Arguments:
-		args.batch_size The size of the batch to time 
+		file_fxns: a dict mapping function names as strings to function objects
 	'''	
-	args.samples = 10
-	for a in defines.architectures.keys():
+	args = arguments.parse_args()
 
-		args.tensor_map = a
-		args.window_size = 128
-		args.labels = defines.snp_indel_labels
-		args.input_symbols = defines.inputs_indel
-		in_channels = defines.total_input_channels_from_args(args)
-		if args.channels_last:
-			tensor_shape = (args.read_limit, args.window_size, in_channels)
-		else:
-			tensor_shape = (in_channels, args.read_limit, args.window_size) 
-
-		per_class_max = 300
-		args.data_dir = defines.architectures[a]
-		args.weights_hd5 = args.data_dir + a +'.hd5'
-		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-		print('Inspecting architecture:', a, 'tensor shape:', tensor_shape)
-
-		if '1d_calling' == a:
-			args.labels = defines.calling_labels
-			train_paths, valid_paths, test_paths = td.get_train_valid_test_paths_all(args)
-			
-			generate_train = td.calling_pileup_tensors_generator(args, train_paths)
-			generate_valid = td.calling_pileup_tensors_generator(args, valid_paths)
-			generate_test = td.calling_pileup_tensors_generator(args, test_paths)
-			
-			test = generate_test.next()
-
-			model = models.build_1d_cnn_calling_segmentation_1d(args)			
-		
-		elif 'bqsr' == a:
-			args.window_size = 11
-			args.labels = defines.base_labels_binary
-			args.input_symbols = defines.bqsr_tensor_channel_map()
-
-			generate_train = td.bqsr_tensor_generator(args, train_paths)
-			generate_valid = td.bqsr_tensor_generator(args, valid_paths)
-			test = td.load_bqsr_tensors_from_class_dirs(args, test_paths, per_class_max)
-
-			model = models.build_bqsr_model(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)	
-		
-		elif '2d_annotations' == a:
-			generate_train = td.tensor_annotation_generator(args, train_paths, tensor_shape)
-			generate_valid = td.tensor_annotation_generator(args, valid_paths, tensor_shape)
-			test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max)
-			model = models.build_read_tensor_2d_and_annotations_model(args)
-			plots.print_auc_per_class(model, [test[0], test[1]], test[2], args.labels)		
-
-		elif '2d' == a:
-			generate_train = td.tensor_generator(args, train_paths, tensor_shape)
-			generate_valid = td.tensor_generator(args, valid_paths, tensor_shape)
-			test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max)
-			model = models.build_read_tensor_2d_model(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)			
-		
-		elif '1d_annotations' == a:
-			generate_train = td.dna_annotation_generator(args, train_paths)
-			generate_valid = td.dna_annotation_generator(args, valid_paths)
-			test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max)
-			model = models.build_reference_plus_model(args)
-			plots.print_auc_per_class(model, [test[0], test[1]], test[2], args.labels)
-		
-		elif '1d' == a:
-			generate_train = td.dna_annotation_generator(args, train_paths)
-			generate_valid = td.dna_annotation_generator(args, valid_paths)
-			test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max, dataset_id='reference')
-			model = models.build_reference_model(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)			
-		
-		elif 'mlp' == a:
-			args.window_size = 0
-			generate_train = td.dna_annotation_generator(args, train_paths)
-			generate_valid = td.dna_annotation_generator(args, valid_paths)
-			test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max, dataset_id='annotations')
-			model = models.build_annotation_multilayer_perceptron(args)
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)			
-
-		elif 'deep_variant' == a:
-			args.read_limit = 299
-			args.window_size = 299
-			image_shape = (args.read_limit, args.window_size)
-			generate_train = td.image_generator(args, train_paths, shape=image_shape)
-			generate_valid = td.image_generator(args, valid_paths, shape=image_shape)
-			test = td.load_images_from_class_dirs(args, test_paths, shape=image_shape, per_class_max=args.samples)
-			model = models.inception_v3_max(args, architecture=args.weights_hd5)	
-			plots.print_auc_per_class(model, test[0], test[1], args.labels)
-		
-		elif '2d_2bit' == a:
-			raise ValueError('Error 2d_2bit not implemented yet.')
-		
-		else:
-			raise ValueError('Error Unknown architecture:', a)			
-
-		models.train_model_from_generators(args, model, generate_train, generate_valid, args.weights_hd5)
-		models.inspect_model(args, model, generate_train, generate_valid)
+	if args.mode in file_fxns:
+		file_fxns[args.mode](args)
+	else:
+		raise ValueError('Unknown recipe mode:', args.mode)
 
 
 def train_calling_model(args):
@@ -305,21 +68,22 @@ def train_calling_model(args):
 	'''
 	args.labels = defines.calling_labels
 	model = models.build_2d_cnn_calling_segmentation_1d(args)
-
+	
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths_all(args)
-
 	generate_train = td.calling_tensors_generator(args, train_paths)
 	generate_valid = td.calling_tensors_generator(args, valid_paths)
 	generate_test = td.calling_tensors_generator(args, test_paths)
 
 	weight_path = arguments.weight_path_from_args(args)
+	if args.inspect_model:
+		models.inspect_model(args, model, generate_train, generate_valid, weight_path.replace('.hd5', '.png'))
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test_tensors = np.zeros((args.iterations*args.batch_size,) + defines.tensor_shape_from_args(args))
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -361,7 +125,7 @@ def train_calling_model_full(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -399,7 +163,7 @@ def train_calling_model_1d(args):
 
 	args.batch_size = args.samples # hack
 	generate_test = td.calling_pileup_tensors_generator(args, test_paths)
-	test_batch = generate_test.next()
+	test_batch = next(generate_test)
 	predictions = model.predict(test_batch[0])
 	for i in range(30):
 		print('\n\n\npredictions ', i,' is:\n', np.argmax(predictions[i,:,:], axis =-1), '\n for truth labels:\n', np.argmax(test_batch[1][i,:,:], axis=-1))
@@ -449,7 +213,7 @@ def train_pileup_filter(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_pileups[i*args.batch_size:(i+1)*args.batch_size,:,:] = next_batch[0]['pileup_tensor']
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -484,7 +248,7 @@ def test_caller_pileup(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_pileups[i*args.batch_size:(i+1)*args.batch_size,:,:] = next_batch[0]['pileup_tensor']
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -535,7 +299,7 @@ def test_caller_2d(args):
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
@@ -725,8 +489,7 @@ def train_ref_read_model_b(args):
 	plots.plot_roc_per_class(model, [test[0]], test[1], args.labels, args.id)
 
 
-
-def train_ref_read_resnet_model(args):
+def train_ref_read_model_c(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -751,11 +514,83 @@ def train_ref_read_resnet_model(args):
 	generate_valid = td.tensor_generator(args, valid_paths, tensor_shape)
 
 	weight_path = arguments.weight_path_from_args(args)
-	model = models.build_read_tensor_2d_residual_model(args)
+	model = models.read_tensor_2d_model_from_args(args, 
+									conv_width = 3, 
+									conv_height = 3,
+									conv_layers =  [96, 96, 64, 64, 48, 48, 32, 32, 24, 24],
+									conv_dropout = 0.0,
+									conv_batch_normalize = False,
+									spatial_dropout = True,
+									max_pools = [(1,3), (3,1)],
+									padding='same',
+									fc_layers = [24],
+									fc_dropout = 0.0,
+									fc_batch_normalize = False)
+	
+	models.serialize_model_semantics(args, weight_path)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max=800)
-	plots.plot_roc_per_class(model, test[0], test[1], args.labels, args.id, batch_size=args.batch_size)
+	plots.plot_roc_per_class(model, [test[0]], test[1], args.labels, args.id)
+
+
+
+def train_ref_read_resnet(args):
+	'''Trains a reference and read based architecture on tensors at the supplied data directory.
+
+	This architecture looks at reads, and read flags.
+	Tensors must be generated by calling td.write_tensors() before this function is used.
+	After training with early stopping a performance curves are plotted on the test dataset.
+	
+	Arguments:
+		args.data_dir: must be set to an appropriate directory with
+			subdirectories of test, valid and train, each containing
+			subdirectories for each label with tensors stored as hd5 files. 
+
+	'''
+	args.annotation_set = '_'
+	
+	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
+	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
+
+	weight_path = arguments.weight_path_from_args(args)
+	model = models.build_read_tensor_keras_resnet(args)
+
+	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+
+	test_data = td.input_data_from_generator(args, generate_test)
+	test_labels = td.label_data_from_generator(args, generate_test)
+
+	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id, batch_size=args.batch_size)
+
+
+def train_ref_read_anno_resnet(args):
+	'''Trains a reference and read based architecture on tensors at the supplied data directory.
+
+	This architecture looks at reads, and read flags.
+	Tensors must be generated by calling td.write_tensors() before this function is used.
+	After training with early stopping a performance curves are plotted on the test dataset.
+	
+	Arguments:
+		args.data_dir: must be set to an appropriate directory with
+			subdirectories of test, valid and train, each containing
+			subdirectories for each label with tensors stored as hd5 files. 
+
+	'''	
+	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
+	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
+
+	weight_path = arguments.weight_path_from_args(args)
+	model = models.build_ref_read_anno_keras_resnet(args)
+	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+
+	test_data = td.input_data_from_generator(args, generate_test)
+	test_labels = td.label_data_from_generator(args, generate_test)
+	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id, batch_size=args.batch_size)
 
 
 def train_ref_read_inception_model(args):
@@ -882,7 +717,50 @@ def train_ref_read_annotation_exome_model(args):
 	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id, batch_size=args.batch_size)
 
 
-def train_ref_read_anno_model_b(args):
+def train_ref_read_anno_b(args):
+	'''Trains a reference and read based architecture on tensors at the supplied data directory.
+
+	This architecture looks at reads, and read flags.
+	Tensors must be generated by calling td.write_tensors() before this function is used.
+	After training with early stopping a performance curves are plotted on the test dataset.
+	
+	Arguments:
+		args.data_dir: must be set to an appropriate directory with
+			subdirectories of test, valid and train, each containing
+			subdirectories for each label with tensors stored as hd5 files. 
+
+	'''
+	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
+	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
+	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
+
+	weight_path = arguments.weight_path_from_args(args)
+	model = models.read_tensor_2d_annotation_model_from_args(args, 
+									conv_width = 3,
+									conv_height = 11,
+									conv_layers = [128, 96, 64, 48],
+									conv_dropout = 0.2,
+									conv_batch_normalize = False,
+									spatial_dropout = True,
+									kernel_single_channel = False,
+									max_pools = [(3,1),(3,1),(3,1)],
+									padding='same',
+									annotation_units = 16,
+									annotation_shortcut = True,
+									fc_layers = [24],
+									fc_dropout = 0.3,
+									fc_batch_normalize = False)
+	
+	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+
+	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
+	test_data = td.input_data_from_generator(args, generate_test)
+	test_labels = td.label_data_from_generator(args, generate_test)
+	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id)
+
+
+def train_ref_read_anno_c(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -901,18 +779,19 @@ def train_ref_read_anno_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 11, 
-									conv_height = 19,
-									conv_layers = [128, 128, 96, 96, 32, 32, 16, 16],
-									conv_dropout = 0.0,
+									conv_width = 3,
+									conv_height = 3,
+									conv_layers = [96, 96, 64, 64, 48, 48, 32, 32, 24, 24],
+									conv_dropout = 0.2,
 									conv_batch_normalize = False,
+									kernel_single_channel = False,
 									spatial_dropout = False,
-									max_pools = [(2,1),(2,1)],
+									max_pools = [(3,1),(3,1),(3,1)],
 									padding='same',
-									annotation_units = 32,
+									annotation_units = 64,
 									annotation_shortcut = False,
-									fc_layers = [32, 32],
-									fc_dropout = 0.0,
+									fc_layers = [24],
+									fc_dropout = 0.3,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -1487,39 +1366,6 @@ def roc_curve_through_learning(args):
 	model = models.build_read_tensor_2d_and_annotations_model(args)
 
 	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	for i in range(args.epochs):
-		model.fit_generator(generate_train, 
-			samples_per_epoch=args.batch_size*2, nb_epoch=1, verbose=1, 
-			nb_val_samples=args.batch_size, validation_data=generate_valid,
-			callbacks=models.get_callbacks(weight_path, patience=4))
-		plots.plot_roc_per_class(model, [test[0], test[1], test[2]], test[3], args.labels, args.id+str(i), prefix='./figures/animations/')
-
-def roc_curve_through_learning(args):
-	"""Plot ROC curves during optimization.
-
-	Arguments:
-		args.data_dir tensors to train and evaluate model
-		args.samples number of ROC curves to plot during training.
-
-	Tensors must be generated by calling 
-	td.nist_samples_to_tensors_flags_and_annotations(args) 
-	before this function is used.
-	"""		
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-
-	in_channels = defines.total_input_channels_from_args(args)
-	if args.channels_last:
-		tensor_shape = (args.read_limit, args.window_size, in_channels)
-	else:
-		tensor_shape = (in_channels, args.read_limit, args.window_size) 
-
-	generate_train = td.tensor_annotation_generator(args, train_paths, tensor_shape)
-	generate_valid = td.tensor_annotation_generator(args, valid_paths, tensor_shape)
-
-	weight_path = arguments.weight_path_from_args(args)
-	model = models.build_read_tensor_2d_and_annotations_model(args)
-
-	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
 	for i in range(args.iterations):
 		model.fit_generator(generate_train, 
 			samples_per_epoch=args.batch_size*2, nb_epoch=1, verbose=1, 
@@ -1528,7 +1374,7 @@ def roc_curve_through_learning(args):
 		plots.plot_roc_per_class(model, [test[0], test[1], test[2]], test[3], args.labels, args.id+str(i), prefix='./figures/animations/')
 
 
-def roc_curve_through_learning_segmentation(args):
+def animate_learning_segmentation(args):
 	"""Plot ROC curves during optimization of segmenting architecture.
 
 	Arguments:
@@ -1542,23 +1388,30 @@ def roc_curve_through_learning_segmentation(args):
 	generate_valid = td.calling_tensors_generator(args, valid_paths)
 	generate_test = td.calling_tensors_generator(args, test_paths)
 
-	model = models.build_2d_cnn_calling_segmentation_1d(args)
+	#model = models.build_2d_cnn_calling_segmentation_1d(args)
+	model = models.build_2d_cnn_calling_segmentation_full_2d(args)
 
 	test_tensors = np.zeros((args.iterations*args.batch_size,) + defines.tensor_shape_from_args(args))
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
 
 	for i in range(args.iterations):
-		next_batch = generate_test.next()
+		next_batch = next(generate_test)
 		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:,:] = next_batch[0][args.tensor_map]
 		test_labels[i*args.batch_size:(i+1)*args.batch_size,:] = next_batch[1]
 
 	melt_shape = (test_labels.shape[0]*test_labels.shape[1], test_labels.shape[2])
-
+	predictions = model.predict(test_tensors)
+	predictions = predictions.reshape(melt_shape)
+	print('random predictions are:\n', predictions)
 	for i in range(args.samples):
 		predictions = model.predict(test_tensors)
 		predictions = predictions.reshape(melt_shape)
 		test_truth = test_labels.reshape(melt_shape)
-		plots.plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), prefix='./figures/animations/')
+		plots.plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), 
+			prefix='./figures/animations/seg_prauc2/pr_')
+		plots.plot_roc_per_class_predictions(predictions, test_truth, args.labels, args.id+str(i), 
+			prefix='./figures/animations/seg_roc2/roc_')
+
 		model.fit_generator(generate_train, 
 			steps_per_epoch=args.batch_size, epochs=1, verbose=1, 
 			validation_steps=args.batch_size*8, validation_data=generate_valid)
@@ -1698,18 +1551,19 @@ def train_reference_annotation_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = 19, 
-											conv_layers = [128, 128, 96, 96, 32, 32],
-											conv_dropout = 0.0,
-											conv_batch_normalize = False,
-											spatial_dropout = False,
-											max_pools = [2],
+											conv_width = 7, 
+											conv_layers = [256, 216, 128, 64, 32],
+											conv_dropout = 0.1, # was .3
+											conv_batch_normalize = True,
+											spatial_dropout = True,
+											max_pools = [],
 											padding = 'same',
 											annotation_units = 64,
 											annotation_shortcut = True,
-											fc_layers = [32],
-											fc_dropout = 0.0,
+											fc_layers = [64, 64],
+											fc_dropout = 0.2,
 											fc_batch_normalize = False)
+	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
@@ -1735,7 +1589,12 @@ def make_reference_annotation_net_1layer(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_reference_1d_1layer_model(args)
-	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+#	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+	for i in range(args.epochs):
+		model.save(args.output_dir + args.id + '_epoch_' + str(i) + '.hd5')
+		model.fit_generator(generate_train, 
+			steps_per_epoch=args.training_steps, epochs=1, verbose=1, 
+			validation_steps=args.validation_steps, validation_data=generate_valid)
 
 	test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
 	plots.plot_roc_per_class(model, test[0], test[2], args.labels, args.id)
@@ -1893,14 +1752,15 @@ def test_architectures(args):
 	'''
 	cnn_snp_dicts = {}
 	cnn_indel_dicts = {}
-	for a in args.architectures:
-		print('Processing architecture:', a)
-		
+	for a in args.architectures:	
+		print('Processing architecture:', a)		
 		model = models.set_args_and_get_model_from_semantics(args, a)
-		if args.inspect_model:
-			generate_train, generate_valid, _  = td.train_valid_test_generators_from_args(args, with_positions=False)
-			models.inspect_model(args, model, generate_train, generate_valid, args.output_dir+td.plain_name(a)+'.png')
 		
+		if args.inspect_model:
+			generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
+			image_path = a.replace('.json','.png') if args.image_dir is None else args.image_dir + a.replace('.json','.png')
+			models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
+
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
 		test = td.big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
 
@@ -1914,58 +1774,65 @@ def test_architectures(args):
 		cnn_indel_dicts[a] = indel_dict
 		cnn_snp_dicts[a] = snp_dict
 
-	snp_vqsr, indel_vqsr = td.gnomad_scores_from_positions(args, positions)
-	snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
+	snp_key_sets = []
+	indel_key_sets = []
 
-	snp_key_sets = [ set(snp_vqsr.keys()), set(snp_rf.keys()) ]
-	indel_key_sets = [ set(indel_vqsr.keys()), set(indel_rf.keys()) ]
+	if args.gnomad_compare:
+		snp_vqsr, indel_vqsr = td.gnomad_scores_from_positions(args, positions)
+		snp_rf, indel_rf = td.gnomad_scores_from_positions(args, positions, score_key='AS_RF')
+		snp_key_sets.extend([set(snp_vqsr.keys()), set(snp_rf.keys())])
+		indel_key_sets.extend([set(indel_vqsr.keys()), set(indel_rf.keys())])
+		snp_truth_dict = snp_vqsr
+		indel_truth_dict = indel_vqsr
 
 	if args.single_sample_vqsr:
 		snp_single_sample, indel_single_sample = td.scores_from_positions(args, positions)
 		snp_key_sets.append(set(snp_single_sample.keys()))
 		indel_key_sets.append(set(indel_single_sample.keys()))
+		snp_truth_dict = snp_single_sample
+		indel_truth_dict = indel_single_sample
 
 	if args.deep_variant_vcf:
 		snp_deep_variant, indel_deep_variant = td.scores_from_positions(args, positions, 'QUAL', args.deep_variant_vcf)
 		snp_key_sets.append(set(snp_deep_variant.keys()))
 		indel_key_sets.append(set(indel_deep_variant.keys()))		
+		snp_truth_dict = snp_deep_variant
+		indel_truth_dict = indel_deep_variant
+
+	if args.hard_filter_compare:
+		snp_gatk_scores, indel_gatk_scores = td.scores_from_gatk_hard_filters(args, positions, distance_score=True)
+		snp_gatk, indel_gatk = td.scores_from_gatk_hard_filters(args, positions)
+		snp_heng_li, indel_heng_li = td.scores_from_heng_li_filters(args, positions)
+		snp_key_sets.extend([set(snp_gatk_scores.keys()), set(snp_gatk.keys()), set(snp_heng_li.keys())])		
+		indel_key_sets.extend([set(indel_gatk_scores.keys()), set(indel_gatk.keys()), set(indel_heng_li.keys())])		
+		snp_truth_dict = snp_gatk
+		indel_truth_dict = indel_gatk
 
 	shared_snp_keys = set.intersection(*snp_key_sets)
 	shared_indel_keys = set.intersection(*indel_key_sets)
 
-	snp_truth = [snp_vqsr[p][1] for p in shared_snp_keys]
-	indel_truth = [indel_vqsr[p][1] for p in shared_indel_keys]
+	snp_truth = [snp_truth_dict[p][1] for p in shared_snp_keys]
+	indel_truth = [indel_truth_dict[p][1] for p in shared_indel_keys]
 	
 	if 'SNP' in args.labels:
 		snp_scores = {}
-		snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
-		snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
 
 		for a in args.architectures:
 			snp_scores['GATK4:'+td.plain_name(a)] = [cnn_snp_dicts[a][p] for p in shared_snp_keys]
 
+		if args.gnomad_compare:
+			snp_scores['VQSR gnomAD'] = [snp_vqsr[p][0] for p in shared_snp_keys]
+			snp_scores['Random Forest'] = [snp_rf[p][0] for p in shared_snp_keys]
 		if args.single_sample_vqsr:
 			snp_scores['VQSR Single Sample'] = [snp_single_sample[p][0] for p in shared_snp_keys]
 		if args.deep_variant_vcf:
 			snp_scores['Deep Variant'] = [snp_deep_variant[p][0] for p in shared_snp_keys]
+		if args.hard_filter_compare:
+			snp_scores['GATK Signed Distance'] = [snp_gatk_scores[p][0] for p in shared_snp_keys]
+			snp_scores['GATK Hard Filters'] = [snp_gatk[p][0] for p in shared_snp_keys]	
+			snp_scores['Heng Li Hard Filters'] = [snp_heng_li[p][0] for p in shared_snp_keys]			
 
 		if args.emit_interesting_sites:
-			# Find CNN wrong RF and VQSR correct sites
-			vqsr_thresh = (np.max(snp_scores['VQSR gnomAD']) + np.min(snp_scores['VQSR gnomAD']))/2
-
-			#NEED to fix this
-
-			cnn_thresh = (np.max(snp_scores['Neural Net']) + np.min(snp_scores['Neural Net']))/2
-			rf_thresh = (np.max(snp_scores['Random Forest']) + np.min(snp_scores['Random Forest']))/2
-			
-			for p in shared_snp_keys:
-				truth = snp_vqsr[p][1]
-				vqsr_label = int(vqsr_thresh < snp_vqsr[p][0])
-				cnn_label = int(cnn_thresh < cnn_snp_dict[p])
-				rf_label = int(rf_thresh < snp_rf[p][0])
-				if truth == rf_label and truth == vqsr_label and truth != cnn_label:
-					print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at SNP:', p, 'CNN Score:', cnn_snp_dict[p])
-
 			sorted_snps = sorted(cnn_snp_dict.items(), key=operator.itemgetter(1))
 			for i in range(5):	
 				print('Got Bad SNP score:', sorted_snps[i])
@@ -1973,38 +1840,29 @@ def test_architectures(args):
 				print('Got Good SNP score:', sorted_snps[i])
 			print('Total true SNPs:', np.sum(snp_truth), ' Total false SNPs:', (len(snp_truth)-np.sum(snp_truth)))
 
-		title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
+		title_suffix = args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
 		plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
 		plots.plot_precision_recall_from_scores(snp_truth, snp_scores, 'SNP_Precision_Recall_'+title_suffix)		
 	
 	if 'INDEL' in args.labels:
 		indel_scores = {}
-		indel_scores['VQSR gnomAD'] = [indel_vqsr[p][0] for p in shared_indel_keys]
-		indel_scores['Random Forest'] = [indel_rf[p][0] for p in shared_indel_keys]
 
 		for a in args.architectures:
 			indel_scores['GATK4:'+td.plain_name(a)] = [cnn_indel_dicts[a][p] for p in shared_indel_keys]
 
+		if args.gnomad_compare:
+			indel_scores['VQSR gnomAD'] = [indel_vqsr[p][0] for p in shared_indel_keys]
+			indel_scores['Random Forest'] = [indel_rf[p][0] for p in shared_indel_keys]
 		if args.single_sample_vqsr:
 			indel_scores['VQSR Single Sample'] = [indel_single_sample[p][0] for p in shared_indel_keys]
 		if args.deep_variant_vcf:
 			indel_scores['Deep Variant'] = [indel_deep_variant[p][0] for p in shared_indel_keys]
+		if args.hard_filter_compare:
+			indel_scores['GATK Signed Distance'] = [indel_gatk_scores[p][0] for p in shared_indel_keys]
+			indel_scores['GATK Hard Filters'] = [indel_gatk[p][0] for p in shared_indel_keys]
+			indel_scores['Heng Li Hard Filters'] = [indel_heng_li[p][0] for p in shared_indel_keys]
 
 		if args.emit_interesting_sites:
-			# Find CNN wrong RF and VQSR correct sites
-			vqsr_thresh = (np.max(indel_scores['VQSR gnomAD']) + np.min(indel_scores['VQSR gnomAD']))/2
-
-			#NEED to fix this
-			cnn_thresh = (np.max(indel_scores['Neural Net']) + np.min(indel_scores['Neural Net']))/2
-			rf_thresh = (np.max(indel_scores['Random Forest']) + np.min(indel_scores['Random Forest']))/2
-			for p in shared_indel_keys:
-				truth = int(indel_vqsr[p][1])
-				vqsr_label = int(vqsr_thresh < indel_vqsr[p][0])
-				cnn_label = int(cnn_thresh < cnn_indel_dict[p])
-				rf_label = int(rf_thresh < indel_rf[p][0])
-				if truth == rf_label and truth == vqsr_label and truth != cnn_label:
-					print('CNN different label:', cnn_label,' and everyone else agrees on label:', truth,' at INDEL:', p, 'CNN Score:', cnn_indel_dict[p])	
-
 			sorted_indels = sorted(cnn_indel_dict.items(), key=operator.itemgetter(1))
 			for i in range(5):	
 				print('Got Bad INDEL score:', sorted_indels[i])
@@ -2012,11 +1870,12 @@ def test_architectures(args):
 				print('Got Good INDEL score:', sorted_indels[i])
 			print('Total true INDELs:', np.sum(indel_truth), ' Total false INDELs:', (len(indel_truth)-np.sum(indel_truth)))
 		
-		title_suffix = a.split('/')[-1].split('.')[0] +'_'+ args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
+		title_suffix = args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
 		plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
 		plots.plot_precision_recall_from_scores(indel_truth, indel_scores, 'INDEL_Precision_Recall_'+title_suffix)
 
 
 # Back to the top!
 if "__main__" == __name__:
-	run()
+	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunction(obj) }
+	run(file_fxns)

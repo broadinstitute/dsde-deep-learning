@@ -63,33 +63,39 @@ class HyperparameterOptimizer(object):
 
 	def __init__(self):
 		self.performances = {}
+		self.paddings = ['valid']
+		self.annotation_units = [12, 16, 20]
+		self.conv_dropouts = [0.0, 0.2, 0.4]
+		self.fc_dropouts =  [0.0, 0.2, 0.3, 0.4]
+		self.batch_normalizations =  [False]
+		self.kernel_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']
+		self.fc_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']		
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
 		self.conv_layers_sets = [
-									#[16], [32], [64], [128], 
-									[16,32], [32,16], [32,32], [64,32], [64,64], [128,64],
-									[32,32,32], [64,64,64], [64,32,16], [64,48,32], [32,48,64],
-									[64,48,32,24], [128,64,32,16], [32,32,32,32]
-									#[48,64,96], [128,32,16], [128,64,32]
+									[48, 64, 96], [96, 64, 48], [32, 64, 128], [128, 64, 32],
+									[64,48,32,24], [24,32,48,64], [48,64,96,128],  [128,96,64,48], 
+									[48, 48, 64, 64, 96, 96], [96, 96, 64, 64, 48, 32], 
+									[96, 96, 64, 64, 48, 48, 32, 32], [32, 32, 48, 48, 64, 64, 96, 96],
+									[96, 96, 64, 64, 48, 48, 32, 32, 24, 24], [24, 24, 32, 32, 48, 48, 64, 64, 96, 96]
 								]
 
 		self.max_pool_sets_2d = [ 
-									#[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
-									#[(1,2),(1,2)], [(2,1),(2,1)], [(2,1),(6,1)],
-								  	[(3,1),(3,1)], [(1,3), (1,3)], [(4,1),(4,1)], [(4,1),(8,1)], 
+									[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
+									[(1,2),(1,2)], [(2,1),(2,1)], [(3,1),(3,1)], [(1,3), (1,3)],
+								  	[(2,1),(6,1)],[(4,1),(4,1)], [(4,1),(8,1)], 
 								  	[(3,3), (3,3)], [(4,4), (4,4)], [(4,8), (4,8)],
 								  	[(1,2),(1,2),(1,2)], [(2,1),(2,1),(2,1)], [(3,1),(3,1),(3,1)]
 								]
 
 		self.max_pool_sets_1d = [ 
 									[], [2], [3], [6], [8], [2,2], 
-									[3,3], [4,4], [8,8], [2,6], [] 
+									[3,3], [2,6], [4,4], [8,8] 
 								]
 
 		self.fc_layer_sets = [
-									[8], [12], [16], [24], [32], [48], [32, 16], [16, 32], 
-									[16,8], [12,16], [16,12],
-									[48,16], [32, 32], [48, 32]
+									[24], [32], 
+									[32, 16], [16, 32], [32, 32], [48, 32], [32, 32]
 							 ]
 
 		self.mlp_layer_sets = [
@@ -98,13 +104,38 @@ class HyperparameterOptimizer(object):
 									[256,128,64,32], [64, 128, 256, 128, 64]
 								]
 
-		self.paddings = ['valid']
-		self.annotation_units = [12, 16, 20]
-		self.conv_dropouts = [0.0, 0.2, 0.4]
-		self.fc_dropouts =  [0.0, 0.2, 0.3, 0.4]
-		self.batch_normalizations =  [False]
-		self.kernel_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']
-		self.fc_initializers = ['normal', 'he_normal', 'he_uniform', 'glorot_normal', 'glorot_uniform']
+		self.residual_layers_sets = [
+										[],
+										# [ 	
+										# 	models.ResidualLayer(False, [64, 64, 256], [1,1]), 
+										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]), 
+										# 	models.ResidualLayer(True, [64, 64, 256], [1,1])
+										# ],										
+										# [ 	
+										# 	models.ResidualLayer(False, [64, 64, 256], [1,1]), 
+										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]), 
+										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]),
+										# 	models.ResidualLayer(False, [128, 128, 512], [2,2]),
+										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
+										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
+										# 	models.ResidualLayer(True, [128, 128, 512], [1,1])
+										# ],
+										# [ 	
+										# 	models.ResidualLayer(False, [64, 64, 256], [1,1]), 
+										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]), 
+										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]),
+										# 	models.ResidualLayer(False, [128, 128, 512], [2,2]),
+										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
+										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
+										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
+										# 	models.ResidualLayer(False, [256, 256, 512], [2,2]),
+										# 	models.ResidualLayer(True, [256, 256, 512], [1,1]),
+										# 	models.ResidualLayer(True, [256, 256, 512], [1,1]),
+										# 	models.ResidualLayer(True, [256, 256, 512], [1,1]),
+										# 	models.ResidualLayer(True, [256, 256, 512], [1,1])
+										# ]
+									]
+
 
 	def grid_search_2d(self, args):
 		'''Grid search in hyperparameter space over convolution size and max pooling tuples.
@@ -207,9 +238,8 @@ class HyperparameterOptimizer(object):
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))}
 		]
@@ -226,14 +256,12 @@ class HyperparameterOptimizer(object):
 										conv_width = int(p[param_keys['conv_width']]),
 										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
-										conv_batch_normalize = p[param_keys['conv_batch_normalize']],
 										max_pools = max_pools,
 										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-										fc_layers = fc_layers,
-										fc_batch_normalize = p[param_keys['fc_batch_normalize']]
+										fc_layers = fc_layers
 										)
 
-				if model.count_params() > 5000000:
+				if model.count_params() > args.max_parameters:
 					print('Model too big')
 					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
@@ -289,49 +317,51 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(11,15,19,25,35,43)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(11,15,19,25,35,43)},
+			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
+			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
+			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
+			#{'name':'residual_layers', 'type':'discrete', 'domain':range(len(self.residual_layers_sets))},
+			#{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
-			#{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
 		]
 
 		param_keys = { d['name']:i for i,d in enumerate(bounds)}
 
 		def loss_from_params_2d_anno(x):
 			p = x[0]
+			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
 			max_pool_set = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
-			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
+			#residual_layers = self.residual_layers_sets[int(p[param_keys['residual_layers']])]
+
 			try:
+				print(self.str_from_params_and_keys(p, param_keys))
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
 										conv_width = int(p[param_keys['conv_width']]),
 										conv_height = int(p[param_keys['conv_height']]),
 										conv_layers = conv_layers,
-										conv_batch_normalize =  bool(p[param_keys['conv_batch_normalize']]),
 										max_pools = max_pool_set,
-										#padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-										annotation_units = int(p[param_keys['annotation_units']]),
+										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
+										kernel_single_channel = bool(p[param_keys['kernel_single_channel']]),
+										#annotation_units = int(p[param_keys['annotation_units']]),
 										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
 										fc_layers = fc_layers,
-										fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']])
 										)
 
-				if model.count_params() > 5000000:
+				if model.count_params() > args.max_parameters:
 					print('Model too big')
 					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
-
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
 				print(self.str_from_params_and_keys(p, param_keys))
+
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
@@ -380,13 +410,12 @@ class HyperparameterOptimizer(object):
 		stats = Counter()
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
+			#{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
-			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
+			#{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
+			#{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
+			#{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))}
 		]
@@ -402,16 +431,16 @@ class HyperparameterOptimizer(object):
 				model = models.build_reference_1d_model_from_args(args, 
 											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
-											conv_dropout = float(p[param_keys['conv_dropout']]),
-											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
-											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
+											#conv_dropout = float(p[param_keys['conv_dropout']]),
+											#conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
+											#spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-											fc_layers = fc_layers,
-											fc_dropout = float(p[param_keys['fc_dropout']]),
-											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
+											fc_layers = fc_layers
+											#fc_dropout = float(p[param_keys['fc_dropout']])
+											)
 
-				if model.count_params() > 5000000:
+				if model.count_params() > args.max_parameters:
 					print('Model too big')
 					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
@@ -468,16 +497,14 @@ class HyperparameterOptimizer(object):
 		stats = Counter()
 		bounds = [
 			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
+			#{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
-			{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'annotation_units', 'type':'discrete', 'domain':(8,16,32,64)},
+			#{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
+			{'name':'annotation_units', 'type':'discrete', 'domain':(24,32,48,64)},
 			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
+			#{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
 			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'fc_batch_normalize', 'type':'categorical', 'domain':(0, 1)},
+			#{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
 			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
 			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))},
 		]
@@ -493,19 +520,14 @@ class HyperparameterOptimizer(object):
 				model = models.build_reference_annotation_1d_model_from_args(args, 
 											conv_width = int(p[param_keys['conv_width']]), 
 											conv_layers = conv_layers,
-											conv_dropout = float(p[param_keys['conv_dropout']]),
-											conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
-											spatial_dropout = bool(p[param_keys['spatial_dropout']]),
 											max_pools = max_pool_set,
 											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
 											annotation_units = int(p[param_keys['annotation_units']]),
 											annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
-											annotation_batch_normalize = bool(p[param_keys['annotation_batch_normalize']]),								
-											fc_layers = fc_layers,
-											fc_dropout = float(p[param_keys['fc_dropout']]),
-											fc_batch_normalize = bool(p[param_keys['fc_batch_normalize']]))
+											fc_layers = fc_layers
+											)
 
-				if model.count_params() > 5000000:
+				if model.count_params() > args.max_parameters:
 					print('Model too big')
 					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
@@ -583,7 +605,7 @@ class HyperparameterOptimizer(object):
 											batch_normalize_input = bool(p[param_keys['batch_normalize_input']])
 											)
 											
-				if model.count_params() > 1000000:
+				if model.count_params() > args.max_parameters:
 					print('Model too big')
 					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
 
@@ -629,7 +651,7 @@ class HyperparameterOptimizer(object):
 
 	def str_from_params_and_keys(self, x, param_keys):
 		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
-				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize']
+				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
 		s = ''
 		for k in param_keys:
 			s += '\n' + k + ' = '
@@ -642,7 +664,9 @@ class HyperparameterOptimizer(object):
 			elif k == 'max_pools_1d':
 				s += str(self.max_pool_sets_1d[int(x[param_keys[k]])])
 			elif k == 'max_pools_2d':
-				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])	
+				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])
+			elif k == 'residual_layers':
+				s += str(self.residual_layers_sets[int(x[param_keys[k]])])					
 			elif k in bools:
 				s += str(bool(x[param_keys[k]]))
 			else:

@@ -28,7 +28,10 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score, precision_recall_curv
 
 image_ext = '.png'
 
-color_array = ['red', 'indigo', 'cyan', 'pink', 'purple']
+color_array = ['red', 'indigo', 'cyan', 'pink', 'purple', 'cyan', 'chartreuse', 'yellow', 'darkseagreen',
+				'aquamarine', 'gold', 'coral',  'tomato', 'grey', 'black', 'maroon', 'hotpink' 'steelblue',
+				'goldenrod', 'deepskyblue',  'darkolivegreen', 'peachpuff', 'firebrick', 'plum', 'seagreen' ]
+
 key_colors = {
 				'Neural Net':'green', 'CNN_SCORE':'green', 'CNN_2D':'green',
 				'Heng Li Hard Filters':'lightblue',
@@ -60,7 +63,7 @@ def plot_precision_recall_from_scores(truth, scores, title):
 		if k in key_colors:
 			c = key_colors[k]
 		else:
-			c = np.random.choice(color_array)
+			c = color_array[abs(hash(k))%len(color_array)]
 		precision[k], recall[k], _ = precision_recall_curve(truth, scores[k])
 		average_precision[k] = average_precision_score(truth, scores[k])
 		plt.plot(recall[k], precision[k], lw=lw, color=c, label=k+' area = %0.3f' % average_precision[k])
@@ -117,7 +120,7 @@ def plot_rocs_from_scores(truth, scores, title):
 		if k in key_colors:
 			c = key_colors[k]
 		else:
-			c = np.random.choice(color_array)
+			c = color_array[abs(hash(k))%len(color_array)]
 
 		fpr[k], tpr[k], _ = roc_curve(truth, scores[k])
 
