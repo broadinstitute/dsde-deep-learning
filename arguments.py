@@ -20,7 +20,8 @@ import numpy as np
 
 print('uname is:', os.uname())
 # def is_broad_cluster():
-# 	return os.uname()[1].startswith('node') and os.uname()[1].endswith('broadinstitute.org')
+# 	machine = os.uname()[1]
+#  	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
 
 # if not is_broad_cluster():
 # 	import keras.backend as K
@@ -42,6 +43,8 @@ def parse_args():
 	
 
 	# Tensor defining arguments
+	parser.add_argument('--label_smoothing', default=0.0, type=float,
+		help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
 	parser.add_argument('--batch_size', default=32, type=int,
 		help='Mini batch size for stochastic gradient descent algorithms.')
 	parser.add_argument('--read_limit', default=128, type=int,

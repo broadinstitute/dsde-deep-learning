@@ -205,7 +205,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
 	if variant:
-		print('Done generating tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf)
+		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
 
 
 def paired_read_tensors_from_map(args, include_annotations=True):
@@ -294,7 +294,7 @@ def paired_read_tensors_from_map(args, include_annotations=True):
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
 	if stats['count'] > 0:
-		print('Done generating tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
+		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
 
 
 def calling_tensors_from_tensor_map(args, pileup=False):
@@ -1221,8 +1221,8 @@ def nist_samples_to_png(args):
 
 def get_variant_window(args, variant):
 	index_offset = (args.window_size//2)
-	reference_start = variant.POS-index_offset
-	reference_end = variant.POS+index_offset + (args.window_size%2)
+	reference_start = (variant.POS-1)-index_offset
+	reference_end = (variant.POS-1)+index_offset + (args.window_size%2)
 
 	return index_offset, reference_start, reference_end
 
@@ -1398,6 +1398,7 @@ def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, refer
 
 	read_tensor = good_reads_to_tensor(args, good_reads, reference_start, insert_dict)
 	reference_sequence_into_tensor(args, reference_seq, read_tensor)
+
 	return read_tensor
 
 
@@ -1426,7 +1427,7 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 
 	idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 
-	for read in samfile.fetch(variant.CHROM, variant.POS-1, variant.POS+1):
+	for read in samfile.fetch(variant.CHROM, variant.POS-1, variant.POS):
 
 		if not read or not hasattr(read, 'cigarstring') or read.cigarstring is None:
 			continue
@@ -1457,7 +1458,7 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 	if len(good_reads) > args.read_limit:
 		good_reads = np.random.choice(good_reads, size=args.read_limit, replace=False).tolist()
 
-	good_reads.sort(key=lambda x: x.reference_start + x.query_alignment_start)
+	good_reads.sort(key=lambda x: x.reference_start+x.query_alignment_start)
 	if sort_by == 'base':
 		good_reads.sort(key=lambda read: get_base_to_sort_by(read, variant))
 
@@ -2555,7 +2556,9 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 						else:
 							raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
 
-				label_matrix[cur_example, label] = 1.0
+				label_matrix[cur_example, :] = args.label_smoothing/(len(args.labels)-1)
+				label_matrix[cur_example, label] = 1.0-args.label_smoothing
+
 				tensor_counts[label] += 1
 				if tensor_counts[label] == len(tensors[label]):
 					np.random.shuffle(tensors[label])
@@ -3164,7 +3167,6 @@ def reference_sequence_into_tensor(args, reference_seq, tensor):
 				tensor[:, i, ref_offset:ref_offset+4] = np.tile(defines.ambiguity_codes[b], (args.read_limit, 1))
 			else:
 				tensor[ref_offset:ref_offset+4, :, i] = np.transpose(np.tile(defines.ambiguity_codes[b], (args.read_limit, 1)))		
-
 
 
 def reads_to_2bit_tensor(args, sequences, qualities=None, reference_seq=None):

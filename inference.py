@@ -43,7 +43,8 @@ def annotate_vcf_with_inference(args):
 	for a in args.architectures:	
 		print('Annotating with architecture:', a)		
 		cnns[a] = models.set_args_and_get_model_from_semantics(args, a)
-		vcf_reader.header.info.add(score_key_from_json(a), '1', 'Float', 'Site-level score from Convolutional Neural Net named '+a+'.')
+		if not score_key_from_json(a) in vcf_reader.header.info:
+			vcf_reader.header.info.add(score_key_from_json(a), '1', 'Float', 'Site-level score from Convolutional Neural Net named '+a+'.')
 		if defines.annotations_from_args(args) is not None:
 			input_tensors[args.annotation_set] = (len(args.annotations),)
 		input_tensors[args.tensor_map] = defines.tensor_shape_from_args(args)
@@ -102,7 +103,6 @@ def annotate_vcf_with_inference(args):
 				batch[tm][stats[batch_key]] = reference_tensor
 				stats[batch_key] += 1
 
-
 		positions.append(variant.contig + '_' + str(variant.pos))
 		variant_batch.append(variant)
 
@@ -138,14 +138,10 @@ def pysam_variant_to_pyvcf(v):
 def score_key_from_json(json_file):
 	return td.plain_name(json_file).upper() 
 
-def is_snp(variant):  # SNP means ref and alt both are length 1
-	return len(variant.ref) == 1 and any(map(lambda x: len(x) == 1, variant.alts))
-
 def get_variant_window(args, variant):
 	index_offset = (args.window_size//2)
-	reference_start = variant.pos-(index_offset+1)
-	reference_end = variant.pos+index_offset
-
+	reference_start = (variant.pos-1)-index_offset
+	reference_end = (variant.pos-1)+index_offset+(args.window_size%2)
 	return index_offset, reference_start, reference_end
 
 
@@ -169,8 +165,10 @@ def apply_cnns_to_batch(args, cnns, batch, positions, variant_batch, vcf_writer,
 				v_out.info[score_key_from_json(a)] = float(indel_dicts[a][position])
 			else:
 				stats['Not SNP or INDEL'] += 1
-				break
+				v_out.info[score_key_from_json(a)] = float(max(snp_dicts[a][position],indel_dicts[a][position]))
 
+		print('predictions:', predictions)
+		print('Writing v_out:', v_out)
 		vcf_writer.write(v_out)
 		stats['variants_written'] += 1
 
@@ -243,10 +241,11 @@ def interval_file_to_dict(interval_file, shift1=0, skip=['@']):
 
 
 def is_snp(variant):
-	return len(variant.ref) == 1 and any(map(lambda x: len(x) == 1, variant.alts))
+	return len(variant.ref) == 1 and all(map(lambda x: len(x) == 1, variant.alts))
 
 def is_indel(variant):
-	return len(variant.ref) > 1 or any(map(lambda x: len(x) > 1, variant.alts))
+	return all(map(lambda x: len(x) != len(variant.ref), variant.alts))
+		
 
 if __name__=='__main__':
 	run()

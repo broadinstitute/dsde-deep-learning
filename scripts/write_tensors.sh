@@ -84,6 +84,18 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 
+# Clinical 24149 Ashkenazi Father HG003
+# ANNOTATION_SET=m2
+SAMPLE_NAME=SM-G947J
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g947j_o1d2v1_na24149_cf_bp/
+BAM_FILE=/dsde/data/deep/vqsr/bams/g947j_o1d2v1_na24149_bamout.bam 
+TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947j_o1d2v1_na24149_hc4_merged.vcf.gz
+SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
+
 # Clinical 24143 Ashkenazi Mother HG004
 # READ_LIMIT=192
 # WINDOW_SIZE=256
@@ -94,6 +106,19 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG004_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
+
+# Clinical 24143 Ashkenazi Mother HG004
+#ANNOTATION_SET=m2
+# SAMPLE_NAME=SM-G947K
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947k_o2d1v1_na24143_cf_bp/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947k_o2d1v1_na24143_bamout.bam 
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24143_hg38_v3_3_2.vcf.gz 
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947k_o2d1v1_na24143_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
 
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, replicate 1
@@ -152,7 +177,7 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # Project G94982 snapshot NA12878 with Mapping Quality
 # DOWNSAMPLE_SNPS=0.01
 # DOWNSAMPLE_INDELS=0.2
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_balanced_channels_last/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_test_up/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
@@ -176,13 +201,13 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # DOWNSAMPLE_INDELS=0.03
 # DOWNSAMPLE_NOT_SNPS=1.0
 # DOWNSAMPLE_NOT_INDELS=0.9
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g96830_na12878_hg38_channels_first/
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
-BAM_FILE=/dsde/data/deep/vqsr/bams/g96830_na12878_hg38_bamout.bam
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g96830_na12878_hg38.vcf.gz
-SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g96830_na12878_hg38_channels_first/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g96830_na12878_hg38_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g96830_na12878_hg38.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 
 # Clinical NA12878 bigger g947m
