@@ -137,7 +137,27 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 			contig = record_dict[variant.CHROM]	
 			record = contig[ ref_start : ref_end ]
 
-			cur_label_key = get_true_label(allele, variant, bed_dict, vcf_ram, stats)
+			skip_this = False
+			reference_seq = record.seq
+			if reference_map is not None:
+				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
+				for i,b in enumerate(reference_seq):
+					if not args.use_lowercase_dna and b.islower():
+						skip_this = True
+						break						
+					b = b.upper()
+					if b in defines.inputs:
+						reference_tensor[i, defines.inputs[b]] = 1.0
+					elif b in defines.ambiguity_codes:
+						reference_tensor[i] = defines.ambiguity_codes[b]
+					else:
+						raise ValueError('Error! Unknown code:', b)
+			
+			if skip_this:
+				stats['Skipped lowercase DNA'] += 1
+				continue
+
+			cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
@@ -153,18 +173,6 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 			if len(good_reads) == 0:
 				stats['No reads aligned'] += 1
 				continue
-
-			reference_seq = record.seq
-			if reference_map is not None:
-				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
-				for i,b in enumerate(reference_seq):
-					b = b.upper()
-					if b in defines.inputs:
-						reference_tensor[i, defines.inputs[b]] = 1.0
-					elif b in defines.ambiguity_codes:
-						reference_tensor[i] = defines.ambiguity_codes[b]
-					else:
-						raise ValueError('Error! Unknown code:', b)
 
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
 				if i < 0:
@@ -252,7 +260,7 @@ def paired_read_tensors_from_map(args, include_annotations=True):
 			contig = record_dict[variant.CHROM]	
 			record = contig[ ref_start : ref_end ]
 
-			cur_label_key = get_true_label(allele, variant, bed_dict, vcf_ram, stats)
+			cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
@@ -653,7 +661,7 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 			contig = record_dict[variant.CHROM]	
 			record = contig[variant.POS-idx_offset: variant.POS+idx_offset]
 
-			cur_label_key = get_true_label(allele, variant, bed_dict, vcf_ram, stats)
+			cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
@@ -741,9 +749,6 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 	print('Done generating gnomAD annotated tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
 
 
-
-
-
 def tensors_from_tensor_map_2channel(args, include_annotations=True):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
@@ -790,7 +795,7 @@ def tensors_from_tensor_map_2channel(args, include_annotations=True):
 			contig = record_dict[variant.CHROM]	
 			record = contig[ ref_start : ref_end ]
 
-			cur_label_key = get_true_label(allele, variant, bed_dict, vcf_ram, stats)
+			cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
@@ -1249,7 +1254,6 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0):
 				annotation_data[i] = annotation_variant.INFO[a]
 			elif len(annotation_variant.samples) > 0:
 				call = annotation_variant.genotype(args.sample_name)
-				#print('call data:', call.data)
 				if a == 'MBQ' and hasattr(call.data, a):
 					if len(annotation_variant.ALT) > 1:
 						annotation_data[i] = call.data.MBQ[allele_index]
@@ -1266,11 +1270,11 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0):
 					else:
 						annotation_data[i] = call.data.MMQ		
 				elif a == 'MFRL_0' and hasattr(call.data, 'MFRL'):
-					annotation_data[i] = call.data.MFRL[allele_index] 
+					annotation_data[i] = call.data.MFRL[0] 
 				elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
 					annotation_data[i] = call.data.MFRL[allele_index+1] 
 				elif a == 'AD_0' and hasattr(call.data, 'AD'):
-					annotation_data[i] = call.data.AD[allele_index] 
+					annotation_data[i] = call.data.AD[0] 
 				elif a == 'AD_1' and hasattr(call.data, 'AD'):
 					annotation_data[i] = call.data.AD[allele_index+1]
 				else:
@@ -1284,7 +1288,44 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0):
 	return annotation_data
 
 
-def get_true_label(allele, variant, bed_dict, truth_vcf, stats):
+def get_true_site_label(variant, bed_dict, truth_vcf, stats):
+	'''Defines the truth status of a variant site given a truth vcf and confident region.
+
+	Arguments:
+		variant: the variant whose allele we will check
+		bed_dict: confident region dict defined by intervals e.g. from bed_file_to_dict()
+		truth_vcf: vcf of validated variants
+		stats: Counter dict used to keep track of the label distribution, etc.
+
+	Returns:
+		None if outside the confident region
+		Otherwise a label string:
+			SNP if variant is snp and in truth vcf
+			INDEL if variant is indel and in truth vcf
+			NOT_SNP if variant is snp and not in truth vcf
+			NOT_INDEL if variant is indel and not in truth vcf
+	'''
+	in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
+	if variant_in_vcf(variant, truth_vcf) and in_bed:
+		class_prefix = ''
+	elif in_bed:
+		class_prefix = 'NOT_'
+	else:
+		stats['Variant outside confident bed file'] += 1
+		return None
+
+	if variant.is_snp:
+		cur_label_key = class_prefix + 'SNP'
+	elif variant.is_indel:
+		cur_label_key = class_prefix + 'INDEL'
+	else:
+		stats['Not SNP or INDEL'] += 1
+		return None
+
+	return cur_label_key	
+
+
+def get_true_allele_label(allele, variant, bed_dict, truth_vcf, stats):
 	'''Defines the truth status of a variant allele given a truth vcf and confident region.
 
 	Arguments:
@@ -1319,8 +1360,7 @@ def get_true_label(allele, variant, bed_dict, truth_vcf, stats):
 		stats['Not SNP or INDEL'] += 1
 		return None
 
-	return cur_label_key	
-
+	return cur_label_key
 
 def downsample(args, cur_label_key, stats):
 	'''Indicates whether or not to downsample a variant.
@@ -1384,6 +1424,7 @@ def make_reference_tensor(args, reference_seq):
 
 def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, reference_start, stats):
 	good_reads, insert_dict = get_good_reads(args, samfile, variant)
+	print('Got reads:', len(good_reads))
 	if len(good_reads) >= args.read_limit:
 		stats['More reads than read_limit'] += 1
 	if len(good_reads) == 0:
@@ -4420,8 +4461,9 @@ def inspect_dataset(args):
 	data_paths = get_train_valid_test_paths(args)
 	vcf_ram = vcf.Reader(open(args.negative_vcf, 'r'))
 
-	norms = {a:[0,0,0,0] for a in args.annotations} # X, X^2, count, k for shifted variance calculation
-	maxed_out = False
+	if defines.annotations_from_args(args):
+		norms = {a:[0,0,0,0] for a in args.annotations} # X, X^2, count, k for shifted variance calculation
+		maxed_out = False
 
 	for dp in data_paths:
 		for tp in dp:

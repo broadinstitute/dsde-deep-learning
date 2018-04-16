@@ -23,6 +23,7 @@ dependencies:
   - html5lib==0.9999999
   - joblib==0.11
   - keras==2.1.4
+  - keras-resnet==0.1.0
   - markdown==2.6.9
   - matplotlib==2.1.0
   - numpy==1.13.3
@@ -39,7 +40,7 @@ dependencies:
   - scikit-learn==0.19.1
   - scipy==1.0.0
   - six==1.11.0
-  - tensorflow==1.4.0
+  - https://anaconda.org/intel/tensorflow/1.4.0/download/tensorflow-1.4.0-cp36-cp36m-linux_x86_64.whl
   - tensorflow-gpu==1.4.0
   - tensorflow-tensorboard==0.4.0rc3
   - theano==0.9.0

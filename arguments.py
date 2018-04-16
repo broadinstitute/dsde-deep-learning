@@ -109,6 +109,8 @@ def parse_args():
 		help='Genomic position end for parallel tensor writing.')
 	parser.add_argument('--skip_positive_class', default=False, action='store_true',
 		help='Whether to skip positive examples when writing tensors.')
+	parser.add_argument('--use_lowercase_dna', default=False, action='store_true',
+		help='Whether to include tensors covering lower case bases when writing tensors.')
 	parser.add_argument('--chrom', help='Chromosome to load for parallel tensor writing.')
 
 
