@@ -52,6 +52,7 @@ ANNOTATIONS = {
 	'm2':['AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
 	'combine': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
 	'gnomad': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'DP_MEDIAN', 'DREF_MEDIAN', 'GQ_MEDIAN', 'AB_MEDIAN'],
+	'no_het0':['MQ', 'DP', 'SOR', 'QD', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS' ],
 }
 
 SNP_INDEL_LABELS = {'NOT_SNP':0, 'NOT_INDEL':1, 'SNP':2, 'INDEL':3}
@@ -191,36 +192,45 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 ###### High-Level Image-Making Functions #######
 ################################################
 
-def write_filters(args, model): 
+def write_filters(args, model):
+	#K.set_learning_phase(0.0)
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+	exclude = [args.annotation_set, 'read_tensor', 'conv2d', 'max_pooling2d', 'dropout',
+				'flatten', 'activation', 'batch_normalization', 'concatenate',
+				'dense_1', 'dense_2', 'dense_3']
 
-	for filter_index in range(2, 25, 4):
-		exclude = ['read_tensor', 'dense', 'dropout','flatten','predictions', 'activation', 'batch_normalization', 'max_pooling2d_3']
-		for layer in model.layers:
-			if any([ex in layer.name for ex in exclude]):
-				continue
-			print(" layer name:", layer.name, "filter index:", filter_index)
+	for layer in model.layers:
+		if any([ex in layer.name for ex in exclude]):
+			continue
+		
+		for filter_index in range(num_layer_channels(layer)):
+			print("Layer name:", layer.name, "filter index:", filter_index)
 
-			iterate = iterate_channel(args, model, layer_dict, layer.name, filter_index)
-			
+			if 'dense' in layer.name or 'softmax' in layer.name:
+				iterate = iterate_softmax(args, model, layer_dict, layer.name, filter_index)
+			else:
+				iterate = iterate_channel(args, model, layer_dict, layer.name, filter_index)
+	
 			expand_dim_shape = (1,)+tensor_shape_from_args(args)
-			read_tensor = np.random.random(expand_dim_shape) 
+			read_tensor = np.random.random(expand_dim_shape)
+			annos = np.random.random((1, len(args.annotations)))
+			
 			if os.path.exists(args.tensor_example):
 				with h5py.File(args.tensor_example, 'r') as hf:
 					read_tensor[0] = np.array(hf.get(args.tensor_name))
-				out_file = args.output_dir + '%s/%s/write_%s_filter_%d.hd5' % (plain_name(args.weights_hd5), plain_name(args.tensor_example), layer.name, filter_index)
+				out_file = args.output_dir + '%s/%s/write_%s_filter_%d.hd5' % (plain_name(args.semantics_json), plain_name(args.tensor_example), layer.name, filter_index)
 			else:
-				out_file = args.output_dir + '%s/random/write_filters/%s_filter_%d.hd5' % (plain_name(args.weights_hd5), layer.name, filter_index)
+				out_file = args.output_dir + '%s/random/write_filters/%s_filter_%d.hd5' % (plain_name(args.semantics_json), layer.name, filter_index)
 
 			# run gradient ascent
 			for i in range(args.iterations):
 				random_jitter = args.jitter * (np.random.random(expand_dim_shape) - 0.5)
 				read_tensor += random_jitter
-				loss_value, grads_value = iterate([read_tensor])
+				loss_value, grads_value = iterate([read_tensor, annos])
 				read_tensor -= random_jitter
 
 				read_tensor += args.learning_rate*grads_value
-				if i % 4 == 0:
+				if i % (args.iterations//4) == 0:
 					print("After iteration:", i, "of:", args.iterations, "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index)
 			
 			if not os.path.exists(os.path.dirname(out_file)):
@@ -269,7 +279,7 @@ def excite_neuron(args, model):
 ########################################
 
 def iterate_channel(args, model, layer_dict, layer_name='conv5_1', channel=0):
-	input_tensor = model.input
+	input_tensor = model.input[0]
 	if K.image_data_format()== 'channels_first':
 		x = layer_dict[layer_name].output[:,channel,:,:]
 	else:
@@ -368,7 +378,8 @@ def iterate_layer(args, model, layer_dict, layer_name):
 
 
 def iterate_softmax(args, model, layer_dict, layer_name, neuron):
-	input_tensor = model.input
+	input_tensor = model.inputs[0]
+	annos = model.inputs[1]
 
 	x = layer_dict[layer_name].output[:, neuron]
 
@@ -389,7 +400,7 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
-	iterate = K.function([input_tensor], [objective, grads])
+	iterate = K.function([input_tensor, annos], [objective, grads])
 	return iterate
 
 
@@ -533,6 +544,13 @@ def total_variation_norm(x):
 ##############################
 ###### Image Utilities #######
 ##############################
+def num_layer_channels(layer):
+	if len(layer.output_shape) < 4:
+		return layer.output_shape[-1]
+	elif K.image_data_format()== 'channels_first':
+		return layer.output_shape[1]
+	else:
+		return layer.output_shape[3]
 
 def preprocess_image(image_path):
 	# Util function to open, resize and format pictures

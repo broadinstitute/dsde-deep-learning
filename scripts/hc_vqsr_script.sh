@@ -40,6 +40,13 @@ SCATTER=210
 # BAMOUT=/dsde/working/sam/cnn/chmi_chmi3_wgs4_g94794_bamout_all_calls.bam
 # VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794_all_calls.vcf.gz
 
+# The synthetic diploid wgs1 HG38
+BAM=/dsde/data/deep/vqsr/bams/g94794_wgs1_hg38.bam
+BAMOUT=/dsde/data/deep/vqsr/bams/g94794_wgs1_hg38_bamout.bam
+VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+
 # Good ole NA12878 CEPH CEU Utah wife
 # BAM=/dsde/data/deep/vqsr/bams/NA12878_10X.bam
 # BAMOUT=/dsde/data/deep/vqsr/bams/na12878_10x_bamout.bam
@@ -57,13 +64,12 @@ SCATTER=210
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
-# Clinical project g47m NA12878 HG38
+# Clinical project g947m NA12878 HG38
 # BAM=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878.bam
 # BAMOUT=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878_bamout.bam
 # VCF=/dsde/data/deep/vqsr/vcfs/g947m_o1d1v1_na12878.vcf.gz
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
-
 
 # NA12877 CEPH CEU Utah husband Solexa 269364
 # BAM=/seq/picard_aggregation/LCSET-6205/Solexa-269364,_PCR-Free_pool/v1/Solexa-269364,_PCR-Free_pool.bam

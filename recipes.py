@@ -800,7 +800,7 @@ def train_ref_read_anno_c(args):
 	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id)
 
 
-def train_ref_read_anno_model_tiny(args):
+def train_ref_read_anno_d(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -819,18 +819,19 @@ def train_ref_read_anno_model_tiny(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 11, 
-									conv_height = 5,
-									conv_layers = [32, 32],
-									conv_dropout = 0.0,
+									conv_width = 15, 
+									conv_height = 3,
+									conv_layers = [96, 96, 64, 64, 48, 32],
+									conv_dropout = 0.2,
 									conv_batch_normalize = False,
-									spatial_dropout = False,
-									max_pools = [(2,1),(8,1)],
-									padding='valid',
-									annotation_units = 10,
-									annotation_shortcut = False,
-									fc_layers = [16],
-									fc_dropout = 0.0,
+									kernel_single_channel = True,
+									spatial_dropout = True,
+									max_pools = [(3,1),(3,1),(3,1)],
+									padding='same',
+									annotation_units = 16,
+									annotation_shortcut = True,
+									fc_layers = [32, 32],
+									fc_dropout = 0.4,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)

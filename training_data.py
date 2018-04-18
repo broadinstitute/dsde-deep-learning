@@ -157,7 +157,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 				stats['Skipped lowercase DNA'] += 1
 				continue
 
-			cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
+			cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
@@ -1314,6 +1314,7 @@ def get_true_site_label(variant, bed_dict, truth_vcf, stats):
 		stats['Variant outside confident bed file'] += 1
 		return None
 
+
 	if variant.is_snp:
 		cur_label_key = class_prefix + 'SNP'
 	elif variant.is_indel:
@@ -1352,9 +1353,9 @@ def get_true_allele_label(allele, variant, bed_dict, truth_vcf, stats):
 		stats['Variant outside confident bed file'] += 1
 		return None
 
-	if variant.is_snp:
+	if is_snp_allele(allele, variant):
 		cur_label_key = class_prefix + 'SNP'
-	elif variant.is_indel:
+	elif is_indel_allele(allele, variant):
 		cur_label_key = class_prefix + 'INDEL'
 	else:
 		stats['Not SNP or INDEL'] += 1
@@ -2992,11 +2993,16 @@ def split_and_symlink_images(args, valid_ratio=0.1):
 				print('symlinked:', count)
 
 
-def get_path_to_train_valid_or_test(path, valid_ratio=0.1, test_ratio=0.2, valid_contig='-19_', test_contig='-20_'):
-	dice = np.random.rand() 
-	if dice < valid_ratio or valid_contig in path:
+def get_path_to_train_valid_or_test(path, 
+									valid_ratio=0.1, 
+									test_ratio=0.2, 
+									valid_contigs=['-18_', '-19_', '-chr18_', '-chr19_'], 
+									test_contigs=['-20_','-21_', '-chr20_', '-chr21_']):
+	dice = np.random.rand()
+	
+	if dice < valid_ratio or any(map(lambda x: x in path, valid_contigs)):
 		return os.path.join(path, 'valid/')
-	elif dice < valid_ratio+test_ratio or test_contig in path:	
+	elif dice < valid_ratio+test_ratio or any(map(lambda x: x in path, test_contigs)):	
 		return os.path.join(path, 'test/')
 	else:	
 		return os.path.join(path, 'train/')
@@ -4901,6 +4907,11 @@ def plain_name(full_name):
 	name = os.path.basename(full_name)
 	return name.split('.')[0]
 
+def is_snp_allele(allele, variant):
+	return len(allele) == len(variant.REF) and len(allele) == 1
+
+def is_indel_allele(allele, variant):
+	return len(allele) > 1 or len(variant.REF) > 1
 
 def is_insertion(variant):
 	return any( map(lambda x: x and len(x) > len(variant.REF), variant.ALT) )
