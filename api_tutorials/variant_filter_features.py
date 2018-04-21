@@ -88,7 +88,7 @@ def parse_args():
 	parser = argparse.ArgumentParser()
 
 	parser.add_argument('--maxfun', default=9, type=int)
-	parser.add_argument('--fps', default=6, type=int)
+	parser.add_argument('--fps', default=1, type=int)
 	parser.add_argument('--learning_rate', default=0.01, type=float)
 	parser.add_argument('--jitter', default=0.0, type=float)
 	parser.add_argument('--l2', default=0.0, type=float)
@@ -126,7 +126,8 @@ def parse_args():
 	# Training and optimization related arguments
 	parser.add_argument('--epochs', default=25, type=int, help='Number of epochs, typically passes through the entire dataset, not always well-defined.')
 	parser.add_argument('--iterations', default=5, type=int, help='Generic iteration limit for hyperparameter optimization, animation, and other counts.')
-
+	parser.add_argument('--layers', nargs='+', default=['conv', 'dense'], type=int,
+		help='List of sizes for each convolutional filter layer')
 
 	# Run specific arguments
 	parser.add_argument('--mode', help='High level recipe: write tensors, train, test or evaluate models.')
@@ -195,15 +196,13 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 def write_filters(args, model):
 	#K.set_learning_phase(0.0)
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	exclude = [args.annotation_set, 'read_tensor', 'conv2d', 'max_pooling2d', 'dropout',
-				'flatten', 'activation', 'batch_normalization', 'concatenate',
-				'dense_1', 'dense_2', 'best_practices']
+	exclude = [args.annotation_set, 'dropout', 'flatten', 'activation', 'batch_normalization', 'concatenate']
 
 	for layer in model.layers:
-		if any([ex in layer.name for ex in exclude]):
+		if not any([l in layer.name for l in args.layers]):
 			continue
 		
-		for filter_index in range(num_layer_channels(layer)):
+		for filter_index in range(0,num_layer_channels(layer), args.fps):
 			print("Layer name:", layer.name, "filter index:", filter_index)
 
 			if 'dense' in layer.name or 'softmax' in layer.name:
