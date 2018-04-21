@@ -158,7 +158,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 				continue
 
 			cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
-			if not cur_label_key or downsample(args, cur_label_key, stats):
+			if not cur_label_key or downsample(args, cur_label_key, stats, variant):
 				continue
 
 			if include_annotations:
@@ -1363,7 +1363,7 @@ def get_true_allele_label(allele, variant, bed_dict, truth_vcf, stats):
 
 	return cur_label_key
 
-def downsample(args, cur_label_key, stats):
+def downsample(args, cur_label_key, stats, variant=None):
 	'''Indicates whether or not to downsample a variant.
 
 	Arguments:
@@ -1379,6 +1379,10 @@ def downsample(args, cur_label_key, stats):
 	if args.skip_positive_class and cur_label_key in ['SNP', 'INDEL']:
 		return True
 
+	if args.multiallelics == 'ignore' and not variant is None and len(variant.ALT) > 1:
+		stats['Skipped multiallelic'] += 1
+		return True
+
 	if args.downsample_snps < 1.0 and cur_label_key == 'SNP':
 		dice = np.random.rand()
 		if dice > args.downsample_snps:
@@ -1389,7 +1393,7 @@ def downsample(args, cur_label_key, stats):
 		if dice > args.downsample_indels:
 			stats['Downsampled INDELs'] += 1
 			return True
-	if args.downsample_not_snps < 1.0 and cur_label_key == 'NOT_SNP':
+	elif args.downsample_not_snps < 1.0 and cur_label_key == 'NOT_SNP':
 		dice = np.random.rand()
 		if dice > args.downsample_not_snps:
 			stats['Downsampled NOT_SNPs'] += 1
@@ -1441,6 +1445,26 @@ def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, refer
 	read_tensor = good_reads_to_tensor(args, good_reads, reference_start, insert_dict)
 	reference_sequence_into_tensor(args, reference_seq, read_tensor)
 
+	return read_tensor
+
+
+def make_calling_tensor(args, samfile, reference_seq, reference_start, stats):
+	good_reads, insert_dict = td.get_good_reads_in_window(args, samfile, reference_start, reference_start+args.window_size)
+	print('Got reads:', len(good_reads))
+	if len(good_reads) >= args.read_limit:
+		stats['More reads than read_limit'] += 1
+	if len(good_reads) == 0:
+		stats['No reads aligned'] += 1
+		return None
+
+	for i in sorted(insert_dict.keys(), key=int, reverse=True):
+		if i < 0:
+			reference_seq = defines.indel_char*insert_dict[i] + reference_seq
+		else:
+			reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
+
+	read_tensor = good_reads_to_tensor(args, good_reads, reference_start, insert_dict)
+	reference_sequence_into_tensor(args, reference_seq, read_tensor)
 	return read_tensor
 
 
@@ -2999,7 +3023,7 @@ def get_path_to_train_valid_or_test(path,
 									valid_contigs=['-18_', '-19_', '-chr18_', '-chr19_'], 
 									test_contigs=['-20_','-21_', '-chr20_', '-chr21_']):
 	dice = np.random.rand()
-	
+
 	if dice < valid_ratio or any(map(lambda x: x in path, valid_contigs)):
 		return os.path.join(path, 'valid/')
 	elif dice < valid_ratio+test_ratio or any(map(lambda x: x in path, test_contigs)):	
@@ -3691,6 +3715,14 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 			stats['Not in negative vcf'] += 1
 			continue
 
+		if args.multiallelics == 'ignore' and len(variant.ALT) > 1:
+			stats['Skipped multiallelic'] += 1
+			continue
+
+		if args.multiallelics == 'only' and len(variant.ALT) == 1 and variant.is_indel:
+			stats['Skipped biallelic indel'] += 1
+			continue
+
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):
 			stats['In ignore vcf'] += 1
 			continue
@@ -3726,7 +3758,7 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 				continue
 			allele = variant.ALT[allele_idx]
 
-		if allele_idx and allele_in_vcf(allele, variant, vcf_truth):
+		if allele_idx and allele_in_vcf(allele, variant, vcf_truth) and in_bed:
 			truth = 1
 		elif variant_in_vcf(variant, vcf_truth) and in_bed:
 			truth = 1

@@ -197,7 +197,7 @@ def write_filters(args, model):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	exclude = [args.annotation_set, 'read_tensor', 'conv2d', 'max_pooling2d', 'dropout',
 				'flatten', 'activation', 'batch_normalization', 'concatenate',
-				'dense_1', 'dense_2', 'dense_3']
+				'dense_1', 'dense_2', 'best_practices']
 
 	for layer in model.layers:
 		if any([ex in layer.name for ex in exclude]):

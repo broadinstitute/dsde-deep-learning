@@ -29,7 +29,7 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score, precision_recall_curv
 image_ext = '.png'
 
 color_array = ['red', 'indigo', 'cyan', 'pink', 'purple', 'cyan', 'chartreuse', 'yellow', 'darkseagreen',
-				'aquamarine', 'gold', 'coral',  'tomato', 'grey', 'black', 'maroon', 'hotpink' 'steelblue',
+				'aquamarine', 'gold', 'coral',  'tomato', 'grey', 'black', 'maroon', 'hotpink', 'steelblue',
 				'goldenrod', 'deepskyblue',  'darkolivegreen', 'peachpuff', 'firebrick', 'plum', 'seagreen' ]
 
 key_colors = {

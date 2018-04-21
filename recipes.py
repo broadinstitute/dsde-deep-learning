@@ -819,10 +819,10 @@ def train_ref_read_anno_d(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 15, 
-									conv_height = 3,
-									conv_layers = [96, 96, 64, 64, 48, 32],
-									conv_dropout = 0.2,
+									conv_width = 5, 
+									conv_height = 5,
+									conv_layers = [128, 128, 96, 96, 64, 64],
+									conv_dropout = 0.15,
 									conv_batch_normalize = False,
 									kernel_single_channel = True,
 									spatial_dropout = True,
@@ -830,8 +830,8 @@ def train_ref_read_anno_d(args):
 									padding='same',
 									annotation_units = 16,
 									annotation_shortcut = True,
-									fc_layers = [32, 32],
-									fc_dropout = 0.4,
+									fc_layers = [32],
+									fc_dropout = 0.3,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -1758,17 +1758,17 @@ def score_dict_from_shared_positions(args, kind, shared_positions, cnn_scores, c
 	return scores
 
 
-def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_scores, number_of_sites=25):
+def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_scores, number_of_sites=5):
 	for a in args.architectures:
-		sorted_cnn = sorted(cnn_scores[a].items(), key=operator.itemgetter(1))
-		for i in range(number_of_sites):	
+		sorted_cnn = sorted([(p, cnn_scores[a][p]) for p in shared_positions], key=lambda s: s[1])
+		for i in range(min(number_of_sites, len(sorted_cnn))):	
 			p = sorted_cnn[i][0]
 			print(kind, 'Bad CNN score:', sorted_cnn[i])
 			if p in shared_positions:
 				for k in compare_scores:
 					print(k, 'score, truth:', compare_scores[k][p])
 
-		for i in range(len(sorted_cnn)-1, len(sorted_cnn)-number_of_sites, -1):	
+		for i in range(len(sorted_cnn)-1, max(0,len(sorted_cnn)-number_of_sites), -1):	
 			p = sorted_cnn[i][0]
 			print(kind, 'Good CNN score:', sorted_cnn[i])
 

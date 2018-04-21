@@ -150,7 +150,7 @@ def parse_args():
 
 	# Evaluation related arguments
 	parser.add_argument('--multiallelics', default='include', choices=['include', 'only', 'ignore'],
-		help='How to handle multiallelic sites: can be include, only, or ignore. Only used in gnomad evaluation.')
+		help='How to handle multiallelic sites: can be include, only, or ignore.')
 	parser.add_argument('--random_forest_training_sites', default='ignore', choices=['include', 'only', 'ignore'],
 		help='How to handle Random Forest Training sites: can be include, only, or ignore. Only used in gnomad evaluation.')
 	parser.add_argument('--emit_interesting_sites', default=False, action='store_true',

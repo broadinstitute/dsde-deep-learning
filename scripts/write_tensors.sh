@@ -165,13 +165,14 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 DOWNSAMPLE_INDELS=0.25
 ANNOTATION_SET=no_het0
 SAMPLE_NAME=CHMI_CHMI3_WGS1
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38/
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38_full/
 TRAIN_VCF=/dsde/data/palantir/CHM-eval.kit/hybrid.m38.vcf.gz
-BED_FILE=/dsde/data/palantir/CHM-eval.kit/hybrid.m38.bed
+BED_FILE=/dsde/data/deep/vqsr/beds/full.38.bed
 BAM_FILE=/dsde/data/deep/vqsr/bams/g94794_chm_wgs1_hg38_bamout.bam
 NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
 SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+
 
 # From Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x150, 30x coverage target
 # MODE=write_tensors
