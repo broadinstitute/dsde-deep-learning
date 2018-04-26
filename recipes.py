@@ -1434,7 +1434,7 @@ def make_reference_net(args):
 	plots.plot_roc_per_class(model, test[0], test[1], args.labels, args.id)
 
 
-def make_reference_annotation_net(args):
+def train_reference_annotation(args):
 	'''Train a 1D Convolution plus reference tracks and MLP Annotation architecture.
 
 	Arguments:

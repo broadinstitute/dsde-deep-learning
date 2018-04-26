@@ -2683,6 +2683,14 @@ def get_metric_dict(labels):
 		metrics[label_key+'_recall'] = recall_fxns[i]
 	return metrics
 
+
+def get_all_custom_objects(labels):
+	objs = get_metric_dict(labels)
+	weights = np.array([0.5,3,2,1,1,1,1])
+	objs['loss'] = weighted_categorical_crossentropy(weights)
+	return objs
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Evaluation ~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

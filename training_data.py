@@ -44,7 +44,7 @@ def run_training_data():
 
 	# Writing tensor datasets for training
 	if 'write_tensors' == args.mode:
-		tensors_from_tensor_map(args, include_annotations=True)
+		tensors_from_tensor_map(args)
 	elif 'write_paired_read_tensors' == args.mode:
 		paired_read_tensors_from_map(args, include_annotations=True)
 	elif 'write_tensors_2bit' == args.mode:
@@ -93,7 +93,7 @@ def run_training_data():
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-def tensors_from_tensor_map(args, include_annotations=True, pileup=False, reference_map='reference'):
+def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'mix_no0'], pileup=False, reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -161,11 +161,13 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 			if not cur_label_key or downsample(args, cur_label_key, stats, variant):
 				continue
 
-			if include_annotations:
-				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", args.annotations)):
+			annotation_data = {}
+			for a_set in annotation_sets:
+				annos = defines.annotations[a_set]
+				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
 					stats['Missing ALL annotations'] += 1
 					continue # Require at least 1 annotation...
-				annotation_data = get_annotation_data(args, variant, stats, allele_idx)
+				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
 					
 			good_reads, insert_dict = get_good_reads(args, samfile, variant)
 			if len(good_reads) >= args.read_limit:
@@ -192,8 +194,8 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
-				if include_annotations:
-					hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
+				for a_set in annotation_sets:
+					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
 				if reference_map is not None:
 					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
 				if pileup:
@@ -205,7 +207,7 @@ def tensors_from_tensor_map(args, include_annotations=True, pileup=False, refere
 				print(str(reference_seq)+'<- reference sequence\n\n')
 
 			stats['count'] += 1
-			if stats['count']%400 == 0:
+			if stats['count']%500 == 0:
 				print('Wrote', stats['count'], 'tensors out of', args.samples, ' last variant:', str(variant))
 			if stats['count'] >= args.samples:
 				break
@@ -1232,20 +1234,28 @@ def get_variant_window(args, variant):
 	return index_offset, reference_start, reference_end
 
 
-def get_annotation_data(args, annotation_variant, stats, allele_index=0):
+def get_annotation_data(args, annotation_variant, stats, allele_index=0, override_annotations=None):
 	'''Return an array annotation data about the variant.
 
 	Arguments:
 		args.annotations: List of variant annotations to use
 		annotation_variant: the variant with annotation
 		stats: Counter of run statistics
+		allele_index: The allele index used by allele specific annotations
+		override_annotations: optional array of annotations to prevent using arg's annotations 
 
 	Returns:
 		annotation_data: numpy array of annotation values
 	'''
-	annotation_data = np.zeros(( len(args.annotations), ))
+	if not override_annotations is None:
+		annos = override_annotations
+	else:
+		annos = args.annotations
+
+	annotation_data = np.zeros(( len(annos), ))
+	
 	try:
-		for i,a in enumerate(args.annotations):
+		for i,a in enumerate(annos):
 			if a == 'QUAL':
 				annotation_data[i] = annotation_variant.QUAL
 			elif a == 'AF':
@@ -1449,7 +1459,7 @@ def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, refer
 
 
 def make_calling_tensor(args, samfile, reference_seq, reference_start, stats):
-	good_reads, insert_dict = td.get_good_reads_in_window(args, samfile, reference_start, reference_start+args.window_size)
+	good_reads, insert_dict = get_good_reads_in_window(args, samfile, reference_start, reference_start+args.window_size)
 	print('Got reads:', len(good_reads))
 	if len(good_reads) >= args.read_limit:
 		stats['More reads than read_limit'] += 1
@@ -2613,14 +2623,18 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		for label in tensors.keys():
 			for i in range(per_batch_per_label):
 				tensor_path = tensors[label][tensor_counts[label]]
-
-				with h5py.File(tensor_path, 'r') as hf:
-					for key in batch.keys():
-						hf_tensor = hf.get(key)
-						if hf_tensor:
-							batch[key][cur_example] = np.array(hf_tensor)
-						else:
-							raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+				try:
+					with h5py.File(tensor_path, 'r') as hf:
+						for key in batch.keys():
+							hf_tensor = hf.get(key)
+							if hf_tensor:
+								batch[key][cur_example] = np.array(hf_tensor)
+							else:
+								raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+				except IOError as e:
+					print('\n\nSkipping corrupt tensor at:', tensor_path, '\n ')
+					del tensors[label][tensor_counts[label]]
+					continue
 
 				label_matrix[cur_example, :] = args.label_smoothing/(len(args.labels)-1)
 				label_matrix[cur_example, label] = 1.0-args.label_smoothing

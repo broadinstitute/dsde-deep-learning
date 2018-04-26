@@ -1,0 +1,18 @@
+{
+	"HC4Workflow.input_cram": "gs://broad-dsde-methods/palantir/ClinicalGenomeTruthSets/NA12878_NA12878_LOD_100ng_SM-G947Q_v1.cram",
+	"HC4Workflow.reference_fasta": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.fasta",
+	"HC4Workflow.reference_dict": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.dict",
+	"HC4Workflow.reference_fasta_index": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai",
+	"HC4Workflow.output_prefix": "g947q_lod_100ng_na12878",
+	"HC4Workflow.gatk4_jar": "gs://broad-dsde-methods/sam/jars/gatk.jar",
+	"HC4Workflow.tensor_dir": "gs://broad-dsde-methods/cnn-variant-score/tensors/test_wdl_tensors/",
+	"HC4Workflow.truth_vcf": "gs://broad-dsde-methods/cnn-variant-score/vcfs/nist_na12878_giab_hg38.vcf.gz",
+	"HC4Workflow.truth_vcf_index": "gs://broad-dsde-methods/cnn-variant-score/vcfs/nist_na12878_giab_hg38.vcf.gz.tbi",
+	"HC4Workflow.truth_bed": "gs://broad-dsde-methods/cnn-variant-score/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed",
+	"HC4Workflow.picard_jar": "gs://broad-dsde-methods/skwalker/picard_2.12.1.jar",
+	"HC4Workflow.calling_intervals": "gs://broad-references/hg38/v0/wgs_calling_regions.hg38.interval_list",
+	"HC4Workflow.extra_args": "--dont-trim-active-regions -stand-call-conf 0 -A Coverage -A ChromosomeCounts -A BaseQuality -A FragmentLength -A MappingQuality -A ReadPosition ",
+	"HC4Workflow.scatter_count": 400,
+	"HC4Workflow.disk_size": 300
+}
+
