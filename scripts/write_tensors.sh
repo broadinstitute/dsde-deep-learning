@@ -142,20 +142,24 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex1
 # DOWNSAMPLE_SNPS=0.1
+# DOWNSAMPLE_INDELS=1.0
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
 # TRAIN_VCF=/dsde/data/hybrid.m37m.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex1_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex1.vcf.gz
 
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex2
-# DOWNSAMPLE_SNPS=0.1
-# TRAIN_VCF=/dsde/data/hybrid.m37m.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex2_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex2.vcf.gz
+DOWNSAMPLE_SNPS=0.1
+DOWNSAMPLE_INDELS=1.0
+CHANNEL_ORDER=channels_last
+DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
+TRAIN_VCF=/dsde/data/hybrid.m37m.vcf.gz
+BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
+BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex2_bamout.bam
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex2.vcf.gz
 
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, replicate 4
@@ -279,14 +283,14 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 
 # Clinical NA12878 100ng
-SAMPLE_NAME=SM-G947Q
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_all_anno/
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
-BAM_FILE=/dsde/data/deep/vqsr/bams/g947q_lod_100ng_na12878_bamout.bam
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947q_lod_100ng_na12878_hc4_merged.vcf.gz
-SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+# SAMPLE_NAME=SM-G947Q
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_all_anno/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947q_lod_100ng_na12878_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947q_lod_100ng_na12878_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 
 # Project G94982 snapshot NA12878 HG38 Tensors
@@ -395,7 +399,9 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 
 # Project D5800 exome sample NA12877 The Husband from Utah CEPH CEU
 # DOWNSAMPLE_SNPS=0.1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
+# DOWNSAMPLE_INDELS=1.0
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_d5800_na12877_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_d5800_na12877.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
@@ -404,7 +410,8 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 
 # Project C1925 exome sample NA12877 The Husband from Utah CEPH CEU
 # DOWNSAMPLE_SNPS=0.1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1925_na12877_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1925_na12877.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
@@ -491,7 +498,8 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 
 # Project D5800 NA12878 Exome long reads
 # DOWNSAMPLE_SNPS=0.1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_d5800_na12878.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_d5800_na12878_bamout.bam
@@ -500,7 +508,8 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 
 # Project D5301 NA12878 Exome short reads
 # DOWNSAMPLE_SNPS=0.1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_d5301_na12878.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_d5301_na12878_bamout.bam
@@ -509,7 +518,8 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 
 # Project D5227 NA12878 Exome control well
 # DOWNSAMPLE_SNPS=0.1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_first/
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_392292.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_392292_all_calls.vcf.gz

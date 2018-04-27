@@ -91,8 +91,6 @@ task WriteTensors {
     Int disk_size
 
     command {
-        mkdir "./tensors/"
-
         java -Djava.io.tmpdir=tmp -jar ${gatk_jar} \
         CNNVariantWriteTensors \
         -R ${reference_fasta} \
@@ -103,8 +101,9 @@ task WriteTensors {
         -output-tensor-dir "./tensors/" \
         -bam-file ${input_bam}
         
-        #tar -zcvf tensors.tar.gz "./tensors/"
-        gsutil -q -m cp -R "./tensors*" ${tensor_dir}
+        if [ -d "./tensors/" ]; then
+            gsutil -q -m cp -R "./tensors/" ${tensor_dir}
+        fi
     }
 
     output {
