@@ -19,12 +19,12 @@ import argparse
 import numpy as np
 
 print('uname is:', os.uname())
-# def is_broad_cluster():
-# 	machine = os.uname()[1]
-#  	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
+def is_broad_cluster():
+	machine = os.uname()[1]
+ 	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
 
-# if not is_broad_cluster():
-# 	import keras.backend as K
+if not is_broad_cluster():
+	import keras.backend as K
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -182,11 +182,11 @@ def parse_args():
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
 
-	# if not is_broad_cluster():
-	# 	if args.channels_last:
-	# 		K.set_image_data_format('channels_last')
-	# 	else:
-	# 		K.set_image_data_format('channels_first')
+	if not is_broad_cluster():
+		if args.channels_last:
+			K.set_image_data_format('channels_last')
+		else:
+			K.set_image_data_format('channels_first')
 
 	print('Arguments are', args)
 	

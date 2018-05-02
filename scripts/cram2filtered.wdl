@@ -91,6 +91,8 @@ task WriteTensors {
     Int disk_size
 
     command {
+        mkdir "./tensors/"
+
         java -Djava.io.tmpdir=tmp -jar ${gatk_jar} \
         CNNVariantWriteTensors \
         -R ${reference_fasta} \
@@ -101,18 +103,15 @@ task WriteTensors {
         -output-tensor-dir "./tensors/" \
         -bam-file ${input_bam}
         
-        if [ -d "./tensors/" ]; then
-            gsutil -q -m cp -R "./tensors/" ${tensor_dir}
-        fi
+        tar -czf "tensors.tar.gz" "./tensors/"
     }
 
     output {
-      #File tensors = "tensors.tar.gz"
-      #Array[File] tensors=glob("./tensors/*/*/*.hd5")
+      File tensors = "tensors.tar.gz"
     }
     runtime {
         docker: "samfriedman/p3"
-        memory: "7 GB"
+        memory: "3 GB"
         disks: "local-disk " + disk_size + " HDD"
     }
 
@@ -120,31 +119,40 @@ task WriteTensors {
 
 
 task TrainModel {
-    String tensor_dir
+    Array[File] tar_tensors
     String output_prefix
     File gatk_jar
     Int disk_size
 
-    command { 
+    command {
+        for tensors in ${sep=' ' tar_tensors}  ; do
+            tar -xzf $tensors 
+        done
+
         java -Djava.io.tmpdir=tmp -jar ${gatk_jar} \
         CNNVariantTrain \
-        -input-tensor-dir ${tensor_dir} \
+        -input-tensor-dir "./tensors/" \
         -model-name ${output_prefix} \
         -tensor-type read_tensor
     }
 
     output {
-
+        File model_json = "${output_prefix}.json"
+        File model_hd5 = "${output_prefix}.hd5"
     }
 
     runtime {
-      docker: "samfriedman/gpu"
-      gpuType: "nvidia-tesla-k80" 
-      gpuCount: 1 
-      zones: ["us-central1-c"]
-      memory: "16 GB"
-      disks: "local-disk 400 HDD"
-      bootDiskSizeGb: "16" 
+        docker: "samfriedman/p3"
+        memory: "16 GB"
+        disks: "local-disk " + disk_size + " HDD"
+
+#      docker: "samfriedman/gpu"
+#      gpuType: "nvidia-tesla-k80" 
+#      gpuCount: 1 
+#      zones: ["us-central1-c"]
+#      memory: "16 GB"
+#      disks: "local-disk 400 HDD"
+#      bootDiskSizeGb: "16" 
     }
 }
 
@@ -306,19 +314,19 @@ workflow HC4Workflow {
             picard_jar = picard_jar
     }
 
-#    call TrainModel {
-#        input:
-#            tensor_dir = tensor_dir,
-#            output_prefix = output_prefix,
-#            gatk_jar = gatk4_jar,
-#            disk_size = disk_size
-#    }    
+    call TrainModel {
+        input:
+            tar_tensors = WriteTensors.tensors,
+            output_prefix = output_prefix,
+            gatk_jar = gatk4_jar,
+            disk_size = disk_size
+    }    
 
 
     output {
         MergeVCF_HC4.*
         SamtoolsMergeBAMs.*
-        #TrainModel.*
+        TrainModel.*
     }
 
 }

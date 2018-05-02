@@ -82,7 +82,7 @@ def parse_args():
 		help='List of sizes for each convolutional filter layer')
 	parser.add_argument('--same_padding', default=False, action='store_true',
 		help='Valid or same border padding on the convolutional layers.')	
-	parser.add_argument('--spatial_dropout', default=True, action='store_true',
+	parser.add_argument('--spatial_dropout', default=False, action='store_true',
 		help='Spatial dropout on the convolutional layers.')	
 	parser.add_argument('--max_pools', nargs='+', default=[], type=int,
 		help='List of maxpooling layers.')	
