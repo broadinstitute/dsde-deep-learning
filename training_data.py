@@ -46,7 +46,7 @@ def run_training_data():
 	if 'write_tensors' == args.mode:
 		tensors_from_tensor_map(args)
 	elif 'write_paired_read_tensors' == args.mode:
-		paired_read_tensors_from_map(args, include_annotations=True)
+		paired_read_tensors_from_map(args)
 	elif 'write_tensors_2bit' == args.mode:
 		tensors_from_tensor_map_2channel(args, include_annotations=True)
 	elif 'write_tensors_no_annotations' == args.mode:
@@ -93,7 +93,7 @@ def run_training_data():
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'mix_no0'], pileup=False, reference_map='reference'):
+def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine'], pileup=False, reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -218,7 +218,7 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
 
 
-def paired_read_tensors_from_map(args, include_annotations=True):
+def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine']):
 	'''Create tensors structured as tensor map of paired reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -266,12 +266,14 @@ def paired_read_tensors_from_map(args, include_annotations=True):
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
-			if include_annotations:
-				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", args.annotations)):
+			annotation_data = {}
+			for a_set in annotation_sets:
+				annos = defines.annotations[a_set]
+				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
 					stats['Missing ALL annotations'] += 1
 					continue # Require at least 1 annotation...
-				annotation_data = get_annotation_data(args, variant, stats)
-
+				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
+					
 			good_reads, insert_dict = get_good_reads_in_window(args, samfile, variant.POS-1, variant.POS+1, variant)
 			reference_seq = record.seq
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
@@ -288,9 +290,9 @@ def paired_read_tensors_from_map(args, include_annotations=True):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
-				if include_annotations:
-					hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
-			
+				for a_set in annotation_sets:
+					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
+
 			if debug:
 				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
 				print(str(reference_seq)+'<- reference sequence\n\n')
@@ -326,7 +328,6 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 	'''	
 	print('Writing tensors for Variant Calling from tensor channel map:', args.tensor_map)
 	stats = Counter()
-	debug = False
 
 	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
@@ -444,21 +445,19 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
 			hf.create_dataset('site_labels', data=label_vector, compression='gzip')
 		
-		cur_pos += 1 # movie making args.window_size
+		cur_pos += args.window_size
 		stats['count'] += 1
 		if stats['count']%400 == 0:
 			print('Wrote', stats['count'], 'calling tensors out of', args.samples)
 			for s in stats.keys():
 				print(s, 'has:', stats[s])
+			try:
+				print('Last variant was', variant)
+			except NameError as e:
+				print('Have not yet seen a variant...')
+
 		if stats['count'] >= args.samples:
 			break
-
-		if debug:
-			if got_variation and variant.is_indel:
-				print('Got a', cur_label_key,' at:', tensor_path, ' site labels:', label_vector)
-				print('Ref:', variant.REF, 'alt:', variant.ALT)
-				print(zip(str(reference_seq)[:args.window_size], label_vector))
-				print(str(reference_seq)+'<- reference sequence\n\n')
 	
 	if stats['count'] > 0:
 		print('Done generating tensors from vcf:', args.train_vcf, 'count is:', stats['count'])
@@ -1727,7 +1726,15 @@ def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_
 
 	idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 	for read in sam_file.fetch(variant.CHROM, ref_start, ref_end):
-		pairs[read.query_name].append(read)
+		read_already_seen = False
+		for i,p in enumerate(pairs[read.query_name]):
+			if p.flag == read.flag:
+				read_already_seen = True
+				if len(read.seq) > len(p.seq):
+					del pairs[read.query_name][i]
+					pairs[read.query_name].append(read)
+		if not read_already_seen and not read.is_supplementary:
+			pairs[read.query_name].append(read)
 
 	for j,good_read in enumerate(good_reads):
 		
