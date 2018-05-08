@@ -21,7 +21,7 @@ import numpy as np
 print('uname is:', os.uname())
 def is_broad_cluster():
 	machine = os.uname()[1]
- 	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
+	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
 
 if not is_broad_cluster():
 	import keras.backend as K
