@@ -50,7 +50,8 @@ def run(file_fxns):
 	args = arguments.parse_args()
 
 	if args.mode in file_fxns:
-		file_fxns[args.mode](args)
+		ret = file_fxns[args.mode](args)
+		print(args.mode, 'Recipe completed, returned:', ret)
 	else:
 		raise ValueError('Unknown recipe mode:', args.mode)
 
@@ -138,6 +139,7 @@ def train_calling_model_full(args):
 	print('predictions reshaped:', predictions.shape, 'np sum truth:', np.sum(test_truth, axis=0), '\nnp sum pred :', np.sum(predictions, axis=0))
 		
 	plots.plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id)
+
 
 def train_calling_model_1d(args):
 	'''Trains the variant calling as 1D segmentation CNN architecture on tensors at the supplied data directory.
@@ -444,7 +446,7 @@ def train_ref_read_model(args):
 	plots.plot_roc_per_class(model, [test[0]], test[1], args.labels, args.id)
 
 
-def train_ref_read_model_b(args):
+def train_ref_read_b(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -470,16 +472,16 @@ def train_ref_read_model_b(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_model_from_args(args, 
-									conv_width = 15, 
-									conv_height = 15,
-									conv_layers = [256, 128, 64],
-									conv_dropout = 0.15,
+									conv_width = 5, 
+									conv_height = 5,
+									conv_layers = [256, 192, 128, 96, 64],
+									conv_dropout = 0.1,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
-									max_pools = [(1,3), (3,1)],
+									max_pools = [(2,1), (2,1), (2,1)],
 									padding='same',
-									fc_layers = [12],
-									fc_dropout = 0.01,
+									fc_layers = [32],
+									fc_dropout = 0.2,
 									fc_batch_normalize = False)
 	
 	models.serialize_model_semantics(args, weight_path)
@@ -489,7 +491,7 @@ def train_ref_read_model_b(args):
 	plots.plot_roc_per_class(model, [test[0]], test[1], args.labels, args.id)
 
 
-def train_ref_read_model_c(args):
+def train_ref_read_c(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
 
 	This architecture looks at reads, and read flags.
@@ -552,17 +554,15 @@ def train_ref_read_resnet(args):
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
 	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
-	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions=True)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_read_tensor_keras_resnet(args)
 
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test_data = td.input_data_from_generator(args, generate_test)
-	test_labels = td.label_data_from_generator(args, generate_test)
-
-	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id, batch_size=args.batch_size)
+	test = td.big_batch_from_minibatch_generator(args, generate_test)
+	plots.plot_roc_per_class(model, [test[0][args.tensor_map]], test[1], args.labels, args.id, batch_size=args.batch_size)
 
 
 def train_ref_read_anno_resnet(args):
@@ -581,15 +581,15 @@ def train_ref_read_anno_resnet(args):
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
 	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
-	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions=True)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_ref_read_anno_keras_resnet(args)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test_data = td.input_data_from_generator(args, generate_test)
-	test_labels = td.label_data_from_generator(args, generate_test)
-	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id, batch_size=args.batch_size)
+	test = td.big_batch_from_minibatch_generator(args, generate_test)
+	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
+	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id, batch_size=args.batch_size)
 
 
 def train_ref_read_inception_model(args):
@@ -732,7 +732,7 @@ def train_ref_read_anno_b(args):
 	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
 	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
 	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
-	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
+	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions=True)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
@@ -752,11 +752,10 @@ def train_ref_read_anno_b(args):
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
-
-	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	test_data = td.input_data_from_generator(args, generate_test)
-	test_labels = td.label_data_from_generator(args, generate_test)
-	plots.plot_roc_per_class(model, test_data, test_labels, args.labels, args.id)
+	test = td.big_batch_from_minibatch_generator(args, generate_test)
+	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
+	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
+	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
 
 def train_ref_read_anno_c(args):
@@ -780,15 +779,15 @@ def train_ref_read_anno_c(args):
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
 									conv_width = 3,
 									conv_height = 3,
-									conv_layers = [96, 96, 64, 64, 48, 48, 32, 32, 24, 24],
+									conv_layers = [256, 216, 192, 128, 96, 64],
 									conv_dropout = 0.2,
 									conv_batch_normalize = False,
 									kernel_single_channel = False,
 									spatial_dropout = False,
 									max_pools = [(3,1),(3,1),(3,1)],
 									padding='same',
-									annotation_units = 64,
-									annotation_shortcut = False,
+									annotation_units = 16,
+									annotation_shortcut = True,
 									fc_layers = [24],
 									fc_dropout = 0.3,
 									fc_batch_normalize = False)
@@ -797,6 +796,7 @@ def train_ref_read_anno_c(args):
 
 	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
 	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id)
+	return plots.get_per_class_auc(model, [test[0], test[1]], test[2], args.labels)
 
 
 def train_ref_read_anno_d(args):

@@ -227,6 +227,11 @@ def get_auc(model, test_data, test_truth, labels):
 	return mean / len(labels)
 
 
+def get_per_class_auc(model, test_data, test_truth, labels):
+	fpr, tpr, roc_auc = get_fpr_tpr_roc(model, test_data, test_truth, labels)
+	return roc_auc
+
+
 def plot_roc_per_class(model, test_data, test_truth, labels, title, batch_size=32, prefix='./figures/', melt=False):
 	fpr, tpr, roc_auc = get_fpr_tpr_roc(model, test_data, test_truth, labels, batch_size, melt)
 

@@ -2671,7 +2671,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 			batch[args.annotation_set] = np.zeros((args.batch_size, len(args.annotations)))		
 
 
-def big_batch_from_minibatch_generator(args, generator, with_positions=False):
+def big_batch_from_minibatch_generator(args, generator):
 	labels = []
 	input_data = {}
 	minibatches = args.samples // args.batch_size
@@ -2684,8 +2684,7 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 	if annotations:
 		input_data[args.annotation_set] = []	
 
-	if with_positions:
-		positions = []
+	positions = []
 
 	for _ in range(minibatches):
 		next_batch = next(generator)
@@ -2694,35 +2693,14 @@ def big_batch_from_minibatch_generator(args, generator, with_positions=False):
 		if annotations:
 			input_data[args.annotation_set].extend(next_batch[0][args.annotation_set])
 		labels.extend(next_batch[1])
-		if with_positions:
-			positions.extend(next_batch[-1])
+		positions.extend(next_batch[-1])
 
 	for key in input_data:
 		input_data[key] = np.array(input_data[key])
 		print('Input tensor:', key, 'has shape:', input_data[key].shape)
 
-	if with_positions:
-		return input_data, np.array(labels), positions
-	else:
-		return input_data, np.array(labels)
+	return input_data, np.array(labels), positions
 
-
-def input_data_from_generator(args, generator):
-	test = big_batch_from_minibatch_generator(args, generator)
-
-	test_data = [test[0][args.tensor_map]]
-	if defines.annotations_from_args(args):
-		test_data.append(test[0][args.annotation_set])	
-	
-	return test_data
-
-def label_data_from_generator(args, generator):
-	test = big_batch_from_minibatch_generator(args, generator)
-	return test[1]
-
-def positions_from_generator(args, generator):
-	test = big_batch_from_minibatch_generator(args, generator, with_positions=True)
-	return test[-1]
 
 def load_images_from_class_dirs(args, train_paths, shape=(224,224), per_class_max=2500, position_dict=None):
 	import cv2
