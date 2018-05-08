@@ -422,9 +422,10 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 				reference_seq = defines.indel_char*insert_dict[i] + reference_seq
 			else:
 				reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
-			if i not in known_inserts and i < args.window_size: # This does not properly handle complex multi-insertion sites
+			if i not in known_inserts: # This does not properly handle complex multi-insertion sites
 				known_insert_offset = sum(v for k,v in known_inserts.items() if k < i)
-				label_vector = np.insert(label_vector, known_insert_offset+i, np.zeros((insert_dict[i],)))[:args.window_size]
+				if known_insert_offset+i < args.window_size:
+					label_vector = np.insert(label_vector, known_insert_offset+i, np.zeros((insert_dict[i],)))[:args.window_size]
 
 		read_tensor = good_reads_to_tensor(args, good_reads, cur_pos, insert_dict)
 		reference_sequence_into_tensor(args, reference_seq, read_tensor)
@@ -443,10 +444,10 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
 			hf.create_dataset('site_labels', data=label_vector, compression='gzip')
 		
-		cur_pos += args.window_size
+		cur_pos += 1 # movie making args.window_size
 		stats['count'] += 1
 		if stats['count']%400 == 0:
-			print('Wrote', stats['count'], 'calling tensors out of', args.samples, ' last variant:', str(variant))
+			print('Wrote', stats['count'], 'calling tensors out of', args.samples)
 			for s in stats.keys():
 				print(s, 'has:', stats[s])
 		if stats['count'] >= args.samples:
@@ -1534,7 +1535,7 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 	if len(good_reads) > args.read_limit:
 		good_reads = np.random.choice(good_reads, size=args.read_limit, replace=False).tolist()
 
-	good_reads.sort(key=lambda x: x.reference_start+x.query_alignment_start)
+	good_reads.sort(key=lambda x: (x.reference_start+x.query_alignment_start, x.query_alignment_end))
 	if sort_by == 'base':
 		good_reads.sort(key=lambda read: get_base_to_sort_by(read, variant))
 
@@ -1622,7 +1623,7 @@ def get_good_reads_in_window(args, samfile, start_pos, end_pos, variant=None):
 	if len(good_reads) > args.read_limit:
 		good_reads = np.random.choice(good_reads, size=args.read_limit, replace=False).tolist()
 
-	good_reads.sort(key=lambda x: x.reference_start + x.query_alignment_start)
+	good_reads.sort(key=lambda x: (x.reference_start + x.query_alignment_start, x.query_alignment_end))
 	if variant:
 		good_reads.sort(key=lambda read: get_base_to_sort_by(read, variant))
 

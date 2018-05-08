@@ -608,7 +608,8 @@ def read_tensor_2d_model_from_args(args,
 									fc_dropout = 0.0,
 									fc_batch_normalize = False,
 									fc_initializer='glorot_normal',
-									kernel_initializer='glorot_normal'
+									kernel_initializer='glorot_normal',
+									kernel_single_channel=True,
 									):
 	'''Builds Read Tensor 2d CNN model for classifying variants.
 
@@ -642,10 +643,12 @@ def read_tensor_2d_model_from_args(args,
 	# Add convolutional layers
 	max_pool_diff = len(conv_layers)-len(max_pools)
 	for i,f in enumerate(conv_layers):
-		if i%2 == 0:
+		if kernel_single_channel and i%2 == 0:
 			cur_kernel = (conv_width, 1)
-		else:
+		elif kernel_single_channel:
 			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
 
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)

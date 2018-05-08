@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=
+ECHO=echo
 
 MODE=write_tensors
 
@@ -19,6 +19,7 @@ DOWNSAMPLE_INDELS=0.5
 DOWNSAMPLE_NOT_SNPS=1.0
 DOWNSAMPLE_NOT_INDELS=1.0
 DOWNSAMPLE_HOMOZYGOUS=1.0
+DOWNSAMPLE_REFERENCE=0.001
 
 REFERENCE=/seq/references/Homo_sapiens_assembly19/v1/Homo_sapiens_assembly19.fasta
 
@@ -51,17 +52,17 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 
 # Clinical NA24385 Ashkenazi son
-SAMPLE_NAME=SM-G947H
-DOWNSAMPLE_SNPS=0.02
-DOWNSAMPLE_INDELS=0.1
-CHANNEL_ORDER=channels_last
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_all_anno_balanced_channels_last/
-BAM_FILE=/dsde/data/deep/vqsr/bams/g947h_o1d1v1_na24385_bamout.bam
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385_hg38_v3_3_2.vcf.gz
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947h_o1d1v1_na24385_hc4_merged.vcf.gz
-SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+# SAMPLE_NAME=SM-G947H
+# DOWNSAMPLE_SNPS=0.02
+# DOWNSAMPLE_INDELS=0.1
+# CHANNEL_ORDER=channels_last
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_all_anno_balanced_channels_last/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947h_o1d1v1_na24385_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385_hg38_v3_3_2.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947h_o1d1v1_na24385_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 
 # Clinical NA24385 Ashkenazi son
@@ -328,13 +329,15 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-Illsentie
 
 
 # Project G94982 calling tensors
-# MODE=write_calling_tensors
-# DOWNSAMPLE_SNPS=0.5
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_calling_tensors_variant_sort_many_snps/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
+MODE=write_calling_tensors
+CHANNEL_ORDER=channels_last
+DOWNSAMPLE_SNPS=1.0
+DOWNSAMPLE_HOMOZYGOUS=1.0
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_calling_channels_last/
+BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
+TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
 
 
 # Project G94982 calling tensors 1D
@@ -618,6 +621,7 @@ while read line; do
             --downsample_snps $DOWNSAMPLE_SNPS \
             --downsample_indels $DOWNSAMPLE_INDELS \
             --downsample_not_snps $DOWNSAMPLE_NOT_SNPS \
+            --downsample_reference $DOWNSAMPLE_REFERENCE \
             --downsample_not_indels $DOWNSAMPLE_NOT_INDELS \
             --downsample_homozygous $DOWNSAMPLE_HOMOZYGOUS \
             --base_quality_mode $BASE_QUALITY_MODE

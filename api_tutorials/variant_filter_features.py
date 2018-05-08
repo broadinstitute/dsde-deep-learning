@@ -44,16 +44,16 @@ AMBIGUITY_CODES = {'K':[0, 0, 0.5, 0.5], 'M':[0.5, 0.5, 0, 0], 'R':[0.5, 0, 0, 0
 
 # Annotation sets
 ANNOTATIONS = {
-	'_' : [], # Allow command line to unset annotations
-	'gatk_w_qual' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'QUAL', 'ReadPosRankSum'],
-	'gatk' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
-	'annotations' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
-	'best_practices' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
-	'm2':['AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
-	'combine': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
-	'gnomad': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'DP_MEDIAN', 'DREF_MEDIAN', 'GQ_MEDIAN', 'AB_MEDIAN'],
-	'no_het0':['MQ', 'DP', 'SOR', 'QD', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS' ],
-}
+				'_' : [], # Allow command line to unset annotations
+				'gatk_w_qual' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'QUAL', 'ReadPosRankSum'],
+				'best_practices' : ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum'],
+				'm2':['AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
+				'no_het0':['MQ', 'DP', 'SOR', 'QD', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS' ],
+				'mix':['DP', 'SOR', 'QD', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS' ],
+				'mix_no0':['DP', 'SOR', 'QD', 'AD_1', 'MBQ', 'MFRL_1', 'MMQ', 'MPOS' ],
+				'combine': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'AF', 'AD_0', 'AD_1', 'MBQ', 'MFRL_0', 'MFRL_1', 'MMQ', 'MPOS'],
+				'gnomad': ['MQ', 'DP', 'SOR', 'FS', 'QD', 'MQRankSum', 'ReadPosRankSum', 'DP_MEDIAN', 'DREF_MEDIAN', 'GQ_MEDIAN', 'AB_MEDIAN'],
+			  }
 
 SNP_INDEL_LABELS = {'NOT_SNP':0, 'NOT_INDEL':1, 'SNP':2, 'INDEL':3}
 
@@ -95,7 +95,6 @@ def parse_args():
 	parser.add_argument('--l1', default=0.0, type=float)
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=0.00001, type=float)
-	parser.add_argument('--continuity_loss', default=0.00001, type=float)
 	parser.add_argument('--neuron', default=58, type=int)
 
 
@@ -126,8 +125,8 @@ def parse_args():
 	# Training and optimization related arguments
 	parser.add_argument('--epochs', default=25, type=int, help='Number of epochs, typically passes through the entire dataset, not always well-defined.')
 	parser.add_argument('--iterations', default=5, type=int, help='Generic iteration limit for hyperparameter optimization, animation, and other counts.')
-	parser.add_argument('--layers', nargs='+', default=['conv', 'dense'], type=int,
-		help='List of sizes for each convolutional filter layer')
+	parser.add_argument('--layers', nargs='+', default=['conv', 'dense'], type=str,
+		help='List of layer name to investigate.')
 
 	# Run specific arguments
 	parser.add_argument('--mode', help='High level recipe: write tensors, train, test or evaluate models.')
@@ -194,7 +193,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 ################################################
 
 def write_filters(args, model):
-	#K.set_learning_phase(0.0)
+	#
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	exclude = [args.annotation_set, 'dropout', 'flatten', 'activation', 'batch_normalization', 'concatenate']
 
@@ -202,9 +201,8 @@ def write_filters(args, model):
 		if not any([l in layer.name for l in args.layers]):
 			continue
 		
-		for filter_index in range(0,num_layer_channels(layer), args.fps):
+		for filter_index in range(0, num_layer_channels(layer), args.fps):
 			print("Layer name:", layer.name, "filter index:", filter_index)
-
 			if 'dense' in layer.name or 'softmax' in layer.name:
 				iterate = iterate_softmax(args, model, layer_dict, layer.name, filter_index)
 			else:
@@ -217,19 +215,21 @@ def write_filters(args, model):
 			if os.path.exists(args.tensor_example):
 				with h5py.File(args.tensor_example, 'r') as hf:
 					read_tensor[0] = np.array(hf.get(args.tensor_name))
+					annos[0] = np.array(hf.get(args.annotation_set))
 				out_file = args.output_dir + '%s/%s/write_%s_filter_%d.hd5' % (plain_name(args.semantics_json), plain_name(args.tensor_example), layer.name, filter_index)
 			else:
 				out_file = args.output_dir + '%s/random/write_filters/%s_filter_%d.hd5' % (plain_name(args.semantics_json), layer.name, filter_index)
 
 			# run gradient ascent
 			for i in range(args.iterations):
+				#print("predictions:", model.predict([read_tensor, annos])[0])
 				random_jitter = args.jitter * (np.random.random(expand_dim_shape) - 0.5)
 				read_tensor += random_jitter
 				loss_value, grads_value = iterate([read_tensor, annos])
 				read_tensor -= random_jitter
 
 				read_tensor += args.learning_rate*grads_value
-				if i % (args.iterations//4) == 0:
+				if i % (max(args.iterations,4)//4) == 0:
 					print("After iteration:", i, "of:", args.iterations, "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index)
 			
 			if not os.path.exists(os.path.dirname(out_file)):
@@ -388,7 +388,6 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
 	objective -= args.total_variation * total_variation_norm(input_tensor)
-	objective -= args.continuity_loss * continuity_loss(input_tensor)
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
 	objective -= args.l2 * K.sum(K.square(input_tensor))
 
