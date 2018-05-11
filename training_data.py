@@ -218,7 +218,7 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
 
 
-def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine']):
+def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine'], reference_map='reference'):
 	'''Create tensors structured as tensor map of paired reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -273,13 +273,26 @@ def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 
 					stats['Missing ALL annotations'] += 1
 					continue # Require at least 1 annotation...
 				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-					
-			good_reads, insert_dict = get_good_reads_in_window(args, samfile, variant.POS-1, variant.POS+1, variant)
+
+			good_reads, insert_dict, pairs = get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant)	
 			reference_seq = record.seq
+			if reference_map is not None:
+				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
+				for i,b in enumerate(reference_seq):						
+					b = b.upper()
+					if b in defines.inputs:
+						reference_tensor[i, defines.inputs[b]] = 1.0
+					elif b in defines.ambiguity_codes:
+						reference_tensor[i] = defines.ambiguity_codes[b]
+					elif b == '\x00':
+						break
+					else:
+						raise ValueError('Error! Unknown code:', b)
+
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
 				reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
 
-			read_tensor = good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, samfile)
+			read_tensor = good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, pairs)
 			reference_sequence_into_tensor(args, reference_seq, read_tensor)
 			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
@@ -292,6 +305,8 @@ def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 
 				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
 				for a_set in annotation_sets:
 					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
+				if reference_map is not None:
+					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
 
 			if debug:
 				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
@@ -464,7 +479,6 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
-
 
 
 def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annotations=True, include_reference=False):
@@ -1629,6 +1643,82 @@ def get_good_reads_in_window(args, samfile, start_pos, end_pos, variant=None):
 	return good_reads, insert_dict
 
 
+def get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant=None):
+	'''Return an array of usable reads centered at the variant.
+	
+	Ignores artificial haplotype read group.
+	Relies on pysam's cigartuples structure see: http://pysam.readthedocs.io/en/latest/api.html
+	Match, M -> 0
+	Insert, I -> 1
+	Deletion, D -> 2
+	Ref Skip, N -> 3
+	Soft Clip, S -> 4
+
+	Arguments:
+		args.read_limit: maximum number of reads to return
+		samfile: the BAM (or BAMout) file
+		ref_start: the beginning of the window in reference coordinates
+		ref_end: the end of the window in reference coordinates
+		variant: (optional) if provided will sort by the base at the variant, 
+			for hets this should segregate the chromosomes
+
+	Returns:
+		good_reads: array of usable reads sorted by reference start position
+		insert_dict: a dict mapping read indices to max insertions at that point
+		pairs: Hashtable that maps read names to a list of paired reads.
+	'''		
+	good_reads = []
+	insert_dict = {}
+	pairs = defaultdict(list) 
+
+	for read in samfile.fetch(args.chrom, ref_start, ref_end):
+		if not read or not hasattr(read, 'cigarstring') or read.cigarstring is None:
+			continue
+		read_group = read.get_tag('RG')	
+		if 'artificial' in read_group.lower():
+			continue
+
+		read_already_seen = False
+		for i,p in enumerate(pairs[read.query_name]):
+			if p.flag == read.flag:
+				read_already_seen = True
+				if len(read.seq) > len(p.seq):
+					del pairs[read.query_name][i]
+					pairs[read.query_name].append(read)
+		if not read_already_seen and not read.is_supplementary:
+			pairs[read.query_name].append(read)
+
+	for p in pairs:
+		for read in pairs[p]:
+			index_dif = ref_start - read.reference_start
+			if abs(index_dif) >= args.window_size:
+				continue
+
+			if 'I' in read.cigarstring:
+				cur_idx = 0
+				for t in read.cigartuples:
+					if t[0] == 1:
+						insert_idx = cur_idx - index_dif
+						if insert_idx not in insert_dict: 
+							insert_dict[insert_idx] = t[1]
+						elif insert_dict[insert_idx] < t[1]:
+							insert_dict[insert_idx] = t[1]
+					if t[0] in [defines.cigar_code['M'], defines.cigar_code['I'], defines.cigar_code['S'], defines.cigar_code['D']]:
+						cur_idx += t[1]
+			
+			good_reads.append(read)
+
+	if len(good_reads) > args.read_limit:
+		good_reads = np.random.choice(good_reads, size=args.read_limit, replace=False).tolist()
+
+	good_reads.sort(key=lambda x: (x.reference_start + x.query_alignment_start, x.query_alignment_end))
+	if variant:
+		good_reads.sort(key=lambda read: get_base_to_sort_by(read, variant))
+
+	return good_reads, insert_dict, pairs
+
+
+
 def good_reads_to_arrays(args, good_reads, ref_start, insert_dict):
 	'''Transform reads to aligned arrays with insertions and deletions.
 
@@ -1700,7 +1790,7 @@ def good_reads_to_arrays(args, good_reads, ref_start, insert_dict):
 	return sequences, qualities, mapping_qualities, flags
 
 
-def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, sam_file):
+def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, pairs):
 	'''Create a read tensor with read pairs centered at a variant.
 
 	Assumes read pairs have the same name. 
@@ -1712,39 +1802,24 @@ def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_
 		good_reads: list of reads to make arrays from
 		ref_start: the beginning of the window in reference coordinates
 		insert_dict: a dict mapping read indices to max insertions at that point.
-		sam_file: the file containing aligned reads
+		pairs: Hash maps read names to list of reads.
 
 	Returns:
 		tensor: read tensor containing read pairs if found in each row.
 	'''	
-	pairs = defaultdict(list) # Hash maps read names to list of reads.	
 	channel_map = defines.get_tensor_channel_map_from_args(args)
 	if args.channels_last:
 		tensor = np.zeros( (args.read_limit, args.window_size, len(channel_map)) )
 	else:
 		tensor = np.zeros( (len(channel_map), args.read_limit, args.window_size) )
 
-	idx_offset, ref_start, ref_end = get_variant_window(args, variant)
-	for read in sam_file.fetch(variant.CHROM, ref_start, ref_end):
-		read_already_seen = False
-		for i,p in enumerate(pairs[read.query_name]):
-			if p.flag == read.flag:
-				read_already_seen = True
-				if len(read.seq) > len(p.seq):
-					del pairs[read.query_name][i]
-					pairs[read.query_name].append(read)
-		if not read_already_seen and not read.is_supplementary:
-			pairs[read.query_name].append(read)
-
-	for j,good_read in enumerate(good_reads):
-		
+	for j,good_read in enumerate(good_reads):	
 		if j == args.read_limit:
 			break
 		if len(pairs[good_read.query_name]) > 2:
 			print ('Got too many paired reads:',  len(pairs[good_read.query_name]) )
 			for read in pairs[good_read.query_name]:
 				print(read.query_name,' read flags:', flag_to_array(read.flag), 'seq:', read.seq)
-
 
 		for read in pairs[good_read.query_name]:
 			if not read.cigartuples: # Could be an unmapped mate
@@ -1753,8 +1828,8 @@ def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_
 			rseq, rqual = sequence_and_qualities_from_read(args, read, ref_start, insert_dict)
 			flag_start = -1
 			flag_end = 0
-			for i,b in enumerate(rseq):
-				
+			
+			for i,b in enumerate(rseq):	
 				if i == args.window_size:
 					break
 				
@@ -1785,8 +1860,7 @@ def good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_
 						tensor[:4, j, i] = defines.ambiguity_codes[b]
 				
 				else:
-					raise ValueError('Error! Unknown symbol in seq block:', b)
-					
+					raise ValueError('Error! Unknown symbol in seq block:', b)		
 
 			flags = flag_to_array(read.flag)
 			for i in range(defines.read_flags):
@@ -2119,6 +2193,10 @@ def dna_annotation_generator(args, train_paths):
 					tensor_counts[label] = 0
 				cur_example += 1
 				if cur_example == args.batch_size:
+					if args.normalize_annotations:
+						for i,a in enumerate(args.annotations):
+							annotation_data[:,i] -= defines.anno_norms_g947i[a][0]
+							annotation_data[:,i] /= defines.anno_norms_g947i[a][1]
 					break
 
 		if debug:
@@ -2526,17 +2604,6 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 		label = args.labels[label_key] 
 		tensors[label] = [os.path.join(tp, t) for t in os.listdir(tp) if os.path.splitext(t)[1] in tensor_exts]
 		tensor_counts[label] = 0
-		
-	if args.normalize_annotations:
-		means_and_stds = np.zeros((len(args.annotations),2))
-		norm_file = os.path.join(args.data_dir, 'means_and_stds.hd5')
-
-		if not os.path.exists(norm_file):
-			print('Normalization requested, but no means and stds file:', norm_file, '.  Inspecting dataset...')
-			inspect_dataset(args)
-
-		with h5py.File(norm_file, 'r') as hf:
-			means_and_stds = np.array(hf.get('means_and_stds'))
 
 	while True:
 		cur_example = 0
@@ -2548,13 +2615,6 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 					with h5py.File(tensor_path, 'r') as hf:
 						tensor[cur_example] = np.array(hf.get(args.tensor_map))
 						annotations[cur_example] = np.array(hf.get(args.annotation_set))
-					if args.normalize_annotations:
-						for i,a in enumerate(args.annotations):
-							if annotations[cur_example][i] == 0:
-								continue
-							annotations[cur_example][i] -= means_and_stds[i,0]
-							annotations[cur_example][i] /= (eps+means_and_stds[i,1])
-						#print('Annotations are:', annotations[cur_example])
 
 				except Exception as e:
 					print('Delete corrupt tensor at:', tensor_path)

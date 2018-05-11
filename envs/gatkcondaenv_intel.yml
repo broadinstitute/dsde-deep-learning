@@ -45,4 +45,4 @@ dependencies:
   - theano==0.9.0
   - tqdm==4.19.4
   - werkzeug==0.12.2
-  - vqsr_cnn==0.0.80
+  - vqsr_cnn

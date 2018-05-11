@@ -451,6 +451,7 @@ def train_reference_annotation_b(args):
 											annotation_shortcut = True,
 											fc_layers = [64, 64],
 											fc_dropout = 0.2,
+											annotation_batch_normalize = not args.normalize_annotations,
 											fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -1161,7 +1162,7 @@ def test_architectures(args):
 			models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
-		test = td.big_batch_from_minibatch_generator(args, test_generator, with_positions=True)
+		test = td.big_batch_from_minibatch_generator(args, test_generator)
 
 		positions = test[-1]
 		test_data = [test[0][args.tensor_map]]

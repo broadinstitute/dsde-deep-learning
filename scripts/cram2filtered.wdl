@@ -1,12 +1,131 @@
-# CRAM to filtered VCF WDL
-task CramToBam {
-  File reference_fasta
-  File reference_fasta_index
-  File reference_dict
-  File cram_file
-  String output_prefix
+# This workflow takes a CRAM calls variants with HaplotypeCaller and filters the calls with a Neural Net
+workflow Cram2FilteredVcf {
+    File input_cram # Aligned CRAM file
+    File reference_fasta 
+    File reference_dict
+    File reference_fasta_index
+    File architecture_json # Neural Net configuration for CNNScoreVariants  
+    File architecture_hd5  # Pre-Trained weights and architecture for CNNScoreVariants
+    Int inference_batch_size # Batch size for python in CNNScoreVariants  
+    Int transfer_batch_size  # Batch size for java in CNNScoreVariants     
+    String output_prefix # Identifying string for this run will be used to name all output files
+    String tensor_type # What kind of tensors the Neural Net expects (e.g. reference, read_tensor)
+    File? gatk4_jar_override
+    String gatk_docker    
+    File picard_jar  
+    File calling_intervals
+    Int scatter_count # Number of shards for parrallelization of HaplotypeCaller and CNNScoreVariants
+    String extra_args # Extra arguments for HaplotypeCaller
 
-  Int disk_size
+    # Runtime parameters
+    Int? mem_gb
+    Int? preemptible_attempts
+    Int? disk_space_gb
+    Int? cpu 
+
+    call CramToBam {
+        input:
+          reference_fasta = reference_fasta,
+          reference_dict = reference_dict,
+          reference_fasta_index = reference_fasta_index,
+          cram_file = input_cram,
+          output_prefix = output_prefix,
+          disk_space_gb = disk_space_gb
+    }
+
+    call SplitIntervals {
+        input:
+            picard_jar = picard_jar,
+            scatter_count = scatter_count,
+            intervals = calling_intervals
+    }
+
+    scatter (calling_interval in SplitIntervals.interval_files) {
+
+        call RunHC4 {
+            input:
+                input_bam = CramToBam.output_bam,
+                input_bam_index = CramToBam.output_bam_index,
+                reference_fasta = reference_fasta,
+                reference_dict = reference_dict,
+                reference_fasta_index = reference_fasta_index,
+                output_prefix = output_prefix,
+                interval_list = calling_interval,
+                gatk_docker = gatk_docker,
+                gatk4_jar_override = gatk4_jar_override,
+                extra_args = extra_args,
+                disk_space_gb = disk_space_gb
+        }
+
+        call CNNScoreVariants {
+            input:
+                input_vcf = RunHC4.raw_vcf,
+                input_vcf_index = RunHC4.raw_vcf_index,
+                bam_file = RunHC4.bamout,
+                bam_file_index = RunHC4.bamout_index,
+                architecture_json = architecture_json,
+                architecture_hd5 = architecture_hd5,
+                reference_fasta = reference_fasta,
+                tensor_type = tensor_type,
+                inference_batch_size = inference_batch_size,
+                transfer_batch_size = transfer_batch_size,
+                reference_dict = reference_dict,
+                reference_fasta_index = reference_fasta_index,               
+                output_prefix = output_prefix,
+                interval_list = calling_interval,
+                gatk4_jar_override = gatk4_jar_override,
+                gatk_docker = gatk_docker,
+                preemptible_attempts = preemptible_attempts,
+                mem_gb = mem_gb
+        }
+    }
+
+    call MergeVCFs as MergeVCF_HC4 {
+        input: 
+            input_vcfs = CNNScoreVariants.cnn_annotated_vcf,
+            output_prefix = output_prefix,
+            picard_jar = picard_jar
+    }
+
+    call SamtoolsMergeBAMs {
+        input:
+            input_bams = RunHC4.bamout,
+            output_prefix = output_prefix,
+            picard_jar = picard_jar
+    }
+  
+
+
+    output {
+        MergeVCF_HC4.*
+        SamtoolsMergeBAMs.*
+    }
+
+}
+
+
+task CramToBam {
+    File reference_fasta
+    File reference_fasta_index
+    File reference_dict
+    File cram_file
+    String output_prefix
+
+    # Runtime parameters
+    Int? mem_gb
+    Int? preemptible_attempts
+    Int? disk_space_gb
+    Int? cpu 
+    Boolean use_ssd = false
+
+    # You may have to change the following two parameter values depending on the task requirements
+    Int default_ram_mb = 16000
+    # WARNING: In the workflow, you should calculate the disk space as an input to this task (disk_space_gb).
+    Int default_disk_space_gb = 200
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem_gb) then mem_gb *1000 else default_ram_mb
+    Int command_mem = machine_mem - 1000
 
 command <<<
   ls -ltr ${cram_file} ${reference_fasta} &&
@@ -27,9 +146,13 @@ command <<<
   >>>
   runtime {
     docker: "broadinstitute/genomes-in-the-cloud:2.1.1"
-    memory: "3 GB"
-    disks: "local-disk " + disk_size + " HDD"
+    memory: machine_mem + " MB"
+    # Note that the space before SSD and HDD should be included.
+    disks: "local-disk " + select_first([disk_space_gb, default_disk_space_gb]) + if use_ssd then " SSD" else " HDD"
+    preemptible: select_first([preemptible_attempts, 3])
+    cpu: select_first([cpu, 1])  
   }
+
   output {
     File output_bam = "${output_prefix}.bam"
     File output_bam_index = "${output_prefix}.bai"
@@ -45,12 +168,31 @@ task RunHC4 {
     File reference_fasta_index
     String output_prefix
     File interval_list
-    File gatk_jar
     String extra_args
-    Int disk_size
+    File? gatk4_jar_override
 
-    command { 
-        java -Djava.io.tmpdir=tmp -jar ${gatk_jar} \
+    # Runtime parameters
+    Int? mem_gb
+    String gatk_docker
+    Int? preemptible_attempts
+    Int? disk_space_gb
+    Int? cpu 
+    Boolean use_ssd = false
+
+    # You may have to change the following two parameter values depending on the task requirements
+    Int default_ram_mb = 8000
+    # WARNING: In the workflow, you should calculate the disk space as an input to this task (disk_space_gb).  Please see [TODO: Link from Jose] for examples.
+    Int default_disk_space_gb = 200
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem_gb) then mem_gb *1000 else default_ram_mb
+    Int command_mem = machine_mem - 1000
+
+    command {
+        set -e
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
+
+        gatk --java-options "-Xmx${command_mem}m" \        
         HaplotypeCaller \
         -R ${reference_fasta} \
         -I ${input_bam} \
@@ -67,93 +209,83 @@ task RunHC4 {
         File raw_vcf_index = "${output_prefix}_hc4.vcf.gz.tbi"
     }
     runtime {
-        docker: "broadinstitute/genomes-in-the-cloud:2.1.1"
-        memory: "3 GB"
-        disks: "local-disk " + disk_size + " HDD"
+        #docker: gatk_docker
+        docker: "samfriedman/p3"
+        memory: machine_mem + " MB"
+        # Note that the space before SSD and HDD should be included.
+        disks: "local-disk " + select_first([disk_space_gb, default_disk_space_gb]) + if use_ssd then " SSD" else " HDD"
+        preemptible: select_first([preemptible_attempts, 3])
+        cpu: select_first([cpu, 1])  
     }
 }
 
-task WriteTensors {
-    File input_bam
-    File input_bam_index
-    File input_vcf
+task CNNScoreVariants {
+
+    String input_vcf
     File input_vcf_index
     File reference_fasta
     File reference_dict
     File reference_fasta_index
-    File truth_vcf
-    File truth_vcf_index
-    File truth_bed
+    String? bam_file
+    String? bam_file_index
+    File architecture_json
+    File architecture_hd5
+    String tensor_type
     String output_prefix
-    String tensor_dir
+    Int inference_batch_size
+    Int transfer_batch_size
     File interval_list
-    File gatk_jar
-    Int disk_size
+    File? gatk4_jar_override
 
-    command {
-        mkdir "./tensors/"
+    # Runtime parameters
+    Int? mem_gb
+    String gatk_docker
+    Int? preemptible_attempts
+    Int? disk_space_gb
+    Int? cpu 
+    Boolean use_ssd = false
 
-        java -Djava.io.tmpdir=tmp -jar ${gatk_jar} \
-        CNNVariantWriteTensors \
+    String bam_cl = if defined(bam_file) then "-I ${bam_file}" else " "
+
+    # You may have to change the following two parameter values depending on the task requirements
+    Int default_ram_mb = 16000
+    # WARNING: In the workflow, you should calculate the disk space as an input to this task (disk_space_gb).  Please see [TODO: Link from Jose] for examples.
+    Int default_disk_space_gb = 200
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem_gb) then mem_gb *1000 else default_ram_mb
+    Int command_mem = machine_mem - 1000
+
+command <<<
+        set -e
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
+
+        gatk --java-options "-Xmx${command_mem}m" \
+        CNNScoreVariants \
+        ${bam_cl} \
         -R ${reference_fasta} \
         -V ${input_vcf} \
-        -truth-vcf ${truth_vcf} \
-        -truth-bed ${truth_bed} \
-        -tensor-type read_tensor \
-        -output-tensor-dir "./tensors/" \
-        -bam-file ${input_bam}
-        
-        tar -czf "tensors.tar.gz" "./tensors/"
-    }
+        -O ${output_prefix}_cnn_annotated.vcf.gz \
+        -L ${interval_list} \
+        --tensor-type ${tensor_type} \
+        --inference-batch-size ${inference_batch_size} \
+        --transfer-batch-size ${transfer_batch_size}  \
+        --architecture ${architecture_json}
+>>>
 
-    output {
-      File tensors = "tensors.tar.gz"
-    }
-    runtime {
-        docker: "samfriedman/p3"
-        memory: "3 GB"
-        disks: "local-disk " + disk_size + " HDD"
-    }
+  runtime {
+    #docker: gatk_docker
+    docker: "samfriedman/p3"
+    memory: machine_mem + " MB"
+    # Note that the space before SSD and HDD should be included.
+    disks: "local-disk " + select_first([disk_space_gb, default_disk_space_gb]) + if use_ssd then " SSD" else " HDD"
+    preemptible: select_first([preemptible_attempts, 3])
+    cpu: select_first([cpu, 1])  
+  }
 
-}
-
-
-task TrainModel {
-    Array[File] tar_tensors
-    String output_prefix
-    File gatk_jar
-    Int disk_size
-
-    command {
-        for tensors in ${sep=' ' tar_tensors}  ; do
-            tar -xzf $tensors 
-        done
-
-        java -Djava.io.tmpdir=tmp -jar ${gatk_jar} \
-        CNNVariantTrain \
-        -input-tensor-dir "./tensors/" \
-        -model-name ${output_prefix} \
-        -tensor-type read_tensor
-    }
-
-    output {
-        File model_json = "${output_prefix}.json"
-        File model_hd5 = "${output_prefix}.hd5"
-    }
-
-    runtime {
-        docker: "samfriedman/p3"
-        memory: "16 GB"
-        disks: "local-disk " + disk_size + " HDD"
-
-#      docker: "samfriedman/gpu"
-#      gpuType: "nvidia-tesla-k80" 
-#      gpuCount: 1 
-#      zones: ["us-central1-c"]
-#      memory: "16 GB"
-#      disks: "local-disk 400 HDD"
-#      bootDiskSizeGb: "16" 
-    }
+  output {
+    File cnn_annotated_vcf = "${output_prefix}_cnn_annotated.vcf.gz"
+  }
 }
 
 
@@ -227,106 +359,4 @@ task SplitIntervals {
          cpu: "1"
          disks: "local-disk 200 HDD"
     }
-}
-
-workflow HC4Workflow {
-    File input_cram
-    File reference_fasta
-    File reference_dict
-    File reference_fasta_index
-    File truth_vcf
-    File truth_vcf_index
-    File truth_bed
-    String output_prefix
-    String tensor_dir
-    File gatk4_jar
-    File picard_jar
-    File calling_intervals
-    Int scatter_count
-    Int disk_size
-    String extra_args
-
-    call CramToBam {
-        input:
-          reference_fasta = reference_fasta,
-          reference_dict = reference_dict,
-          reference_fasta_index = reference_fasta_index,
-          cram_file = input_cram,
-          output_prefix = output_prefix,
-          disk_size = disk_size
-    }
-
-    call SplitIntervals {
-        input:
-            picard_jar = picard_jar,
-            scatter_count = scatter_count,
-            intervals = calling_intervals
-    }
-
-    scatter (calling_interval in SplitIntervals.interval_files) {
-
-        call RunHC4 {
-            input:
-                input_bam = CramToBam.output_bam,
-                input_bam_index = CramToBam.output_bam_index,
-                reference_fasta = reference_fasta,
-                reference_dict = reference_dict,
-                reference_fasta_index = reference_fasta_index,
-                output_prefix = output_prefix,
-                interval_list = calling_interval,
-                gatk_jar = gatk4_jar,
-                extra_args = extra_args,
-                disk_size = disk_size
-                
-        }
-
-        call WriteTensors {
-            input:
-                input_vcf = RunHC4.raw_vcf,
-                input_vcf_index = RunHC4.raw_vcf_index,
-                input_bam = RunHC4.bamout,
-                input_bam_index = RunHC4.bamout_index,
-                truth_vcf = truth_vcf,
-                truth_vcf_index = truth_vcf_index,
-                truth_bed = truth_bed,
-                reference_fasta = reference_fasta,
-                reference_dict = reference_dict,
-                reference_fasta_index = reference_fasta_index,               
-                output_prefix = output_prefix,
-                tensor_dir = tensor_dir,
-                interval_list = calling_interval,
-                gatk_jar = gatk4_jar,
-                disk_size = disk_size
-        }
-    }
-
-    call MergeVCFs as MergeVCF_HC4 {
-        input: 
-            input_vcfs = RunHC4.raw_vcf,
-            output_prefix = output_prefix,
-            picard_jar = picard_jar
-    }
-
-    call SamtoolsMergeBAMs {
-        input:
-            input_bams = RunHC4.bamout,
-            output_prefix = output_prefix,
-            picard_jar = picard_jar
-    }
-
-    call TrainModel {
-        input:
-            tar_tensors = WriteTensors.tensors,
-            output_prefix = output_prefix,
-            gatk_jar = gatk4_jar,
-            disk_size = disk_size
-    }    
-
-
-    output {
-        MergeVCF_HC4.*
-        SamtoolsMergeBAMs.*
-        TrainModel.*
-    }
-
 }

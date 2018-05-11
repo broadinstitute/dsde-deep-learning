@@ -26,7 +26,35 @@ from collections import Counter, defaultdict
 def run():
 	args = arguments.parse_args()
 	args.labels = defines.calling_labels
-	infer_vcf(args)
+	if args.mode == 'tensors':
+		infer_tensor(args)
+	elif args.mode == 'vcf':
+		infer_vcf(args)
+
+
+def infer_tensor(args):
+	stats = Counter()
+	model = models.load_model(args.weights_hd5, custom_objects=models.get_all_custom_objects(args.labels))
+	vcf_reader = pysam.VariantFile(args.negative_vcf, 'r')
+	vcf_writer = pysam.VariantFile(args.output_vcf, 'w', header=vcf_reader.header)
+	print('got vcfs.')
+	
+	tensor_paths = [args.data_dir+tp for tp in sorted(os.listdir(args.data_dir))]
+	print('found tensors: ', len(tensor_paths))
+	tensor_batch = np.zeros((args.batch_size,)+defines.tensor_shape_from_args(args))
+	gpos_batch = []
+
+	for tp in tensor_paths:
+		with h5py.File(tp, 'r') as hf:
+			tensor_batch[stats['cur_tensor']] = np.array(hf.get(args.tensor_map))
+			gpos_batch.append(td.position_string_from_tensor_name(tp).split('_'))
+			stats['cur_tensor'] += 1
+			if stats['cur_tensor'] == args.batch_size:
+				## Evaluate the model
+				predictions = model.predict(tensor_batch) # predictions is a numpy arra	
+				predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer)
+				stats['cur_tensor'] = 0
+				gpos_batch = []
 
 
 def infer_vcf(args):
@@ -56,12 +84,7 @@ def infer_vcf(args):
 				
 				record = contig[cur_pos: cur_pos+args.window_size]
 				print(str(record))
-				tensor_batch[stats['cur_tensor']] = td.make_calling_tensor(args, samfile, record, cur_pos, stats)
-				tensor_path = './my_tensor_'+k+'_'+str(cur_pos)+'.hd5'
-				
-				with h5py.File(tensor_path, 'w') as hf:
-					hf.create_dataset(args.tensor_map, data=tensor_batch[stats['cur_tensor']], compression='gzip')
-			
+				tensor_batch[stats['cur_tensor']] = td.make_calling_tensor(args, samfile, record, cur_pos, stats)				
 				gpos_batch.append((k, cur_pos, record))
 				stats['cur_tensor'] += 1
 
@@ -86,13 +109,13 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 			if index2labels[guess[j]] == 'HET_SNP':
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=gpos[1]+j,
-									  alleles=[gpos[2][j]],
+									  alleles=[],
 									  qual=predictions[i][j])
 				vcf_writer.write(v)
 			elif index2labels[guess[j]] == 'HOM_SNP':
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=gpos[1]+j,
-									  alleles=[gpos[2][j]],
+									  alleles=[],
 									  qual=predictions[i][j])
 				vcf_writer.write(v)
 			elif index2labels[guess[j]] == 'HET_DELETION':

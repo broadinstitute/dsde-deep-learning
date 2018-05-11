@@ -1001,7 +1001,7 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	conv_out = Activation('softmax', name='softmax_predictions')(conv_label)
 
 	model = Model(inputs=read_tensor, outputs=conv_out)
-	weights = np.array([0.5,3,2,1,1,1,1])
+	weights = np.array([0.1,3,2,1,1,1,1])
 	weighted_loss = weighted_categorical_crossentropy(weights)
 	adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 

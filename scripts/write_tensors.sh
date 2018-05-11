@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=echo
+ECHO=
 
 MODE=write_tensors
 
@@ -78,20 +78,19 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 
 # Clinical 24149 Ashkenazi Father HG003
-MODE=write_paired_read_tensors
-SAMPLE_NAME=SM-G947I
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g947i_o2d1v1_na24149_paired_reads/
-BAM_FILE=/dsde/data/deep/vqsr/bams/g947i_o2d1v1_na24149_bamout.bam 
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947i_o2d1v1_na24149_hc4_merged.vcf.gz
-SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
-
+# MODE=write_paired_read_tensors
+# SAMPLE_NAME=SM-G947I
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947i_o2d1v1_na24149_bamout.bam 
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947i_o2d1v1_na24149_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 # SAMPLE_NAME=SM-G947U
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_all_anno_channels_last/
+# MODE=write_paired_read_tensors
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947u_o1d1v2_na24149_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947u_o1d1v2_na24149_hc4_merged.vcf.gz
@@ -126,7 +125,8 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-Illsentie
 
 # Clinical 24143 Ashkenazi Mother HG004
 # SAMPLE_NAME=SM-G947K
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_all_anno/
+# MODE=write_paired_read_tensors
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947k_o2d1v1_na24143_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24143_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947k_o2d1v1_na24143_hc4_merged.vcf.gz
@@ -136,8 +136,9 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-Illsentie
 
 
 # Clinical 24143 Ashkenazi Mother HG004
+# MODE=write_paired_read_tensors
 # SAMPLE_NAME=SM-G947W
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947w_o1d2v4_na24143/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947w_o1d2v4_na24143_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24143_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947w_o1d2v4_na24143_hc4_merged.vcf.gz
@@ -311,6 +312,19 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-Illsentie
 # SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
+
+# Clinical NA12878 1ug
+MODE=write_paired_read_tensors
+SAMPLE_NAME=SM-G9481
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
+TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+BAM_FILE=/dsde/data/deep/vqsr/bams/g94781_lod_1ug_na12878_bamout.bam
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94781_lod_1ug_na12878_hc4_merged.vcf.gz
+SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
 
 
 # Project G94982 snapshot NA12878 HG38 Tensors
