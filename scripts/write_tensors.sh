@@ -317,7 +317,7 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # Clinical NA12878 1ug
 MODE=write_paired_read_tensors
 SAMPLE_NAME=SM-G9481
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g9481_na12878_paired_read2/
 TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 BAM_FILE=/dsde/data/deep/vqsr/bams/g94781_lod_1ug_na12878_bamout.bam
 NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94781_lod_1ug_na12878_hc4_merged.vcf.gz

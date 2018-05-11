@@ -961,14 +961,7 @@ def build_1d_cnn_calling_segmentation_1d(args):
 
 def build_2d_cnn_calling_segmentation_1d(args):
 	'''Build Read Tensor 2d CNN for calling variants as 1d genotyped segmentation'''
-	in_channels = defines.total_input_channels_from_args(args)
-	if args.channels_last:
-		in_shape = (args.read_limit, args.window_size, in_channels)
-		concat_axis = -1
-	else:
-		in_shape = (in_channels, args.read_limit, args.window_size)
-		concat_axis = 1
-
+	in_shape = defines.tensor_shape_from_args(args)
 	read_tensor = Input(shape=in_shape, name="read_tensor")
 
 	read_conv_width = 9
@@ -977,12 +970,15 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	pileup_filters = 64
 	padding_mode = 'same'
 	
-	
 	x = Conv2D(96, (read_conv_height, 1), padding='valid', activation="relu")(read_tensor)
 	x = Conv2D(pileup_filters, (args.read_limit-read_conv_height+1, 1), padding='valid', activation="relu")(x)
 
-	x = Reshape((pileup_filters, args.window_size))(x)
-	piled_up = Permute((2, 1))(x)
+	if args.channels_last:
+		piled_up = Reshape((args.window_size, pileup_filters))(x)
+		#piled_up = Permute((2, 1))(piled_up)
+	else:
+		piled_up = Reshape((pileup_filters, args.window_size))(x)
+		piled_up = Permute((2, 1))(piled_up)
 
 	conv1 = Conv1D(128, read_conv_width, activation="relu", padding=padding_mode)(piled_up)
 	conv1 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(conv1)
@@ -1001,7 +997,8 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	conv_out = Activation('softmax', name='softmax_predictions')(conv_label)
 
 	model = Model(inputs=read_tensor, outputs=conv_out)
-	weights = np.array([0.1,3,2,1,1,1,1])
+	weights = np.array([0.1,3,2,3,2,3,2])
+	#weights = np.array([0.1,5,5,12,7,12,6])
 	weighted_loss = weighted_categorical_crossentropy(weights)
 	adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
