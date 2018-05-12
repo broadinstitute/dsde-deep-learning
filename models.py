@@ -964,10 +964,10 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	in_shape = defines.tensor_shape_from_args(args)
 	read_tensor = Input(shape=in_shape, name="read_tensor")
 
-	read_conv_width = 3
+	read_conv_width = 7
 	read_conv_height = 15	
 
-	pileup_filters = 96
+	pileup_filters = 256
 	seq_conv_filters = 256
 	padding_mode = 'same'
 	
@@ -994,8 +994,8 @@ def build_2d_cnn_calling_segmentation_1d(args):
 
 	up10 = layers.concatenate([conv9, piled_up], axis=-1)
 	conv10 = Conv1D(seq_conv_filters, read_conv_width, activation='relu', padding=padding_mode)(up10)
-	conv10 = Conv1D(seq_conv_filters, read_conv_width, activation='relu', padding=padding_mode)(conv10)
-	conv10 = Conv1D(128, 1, activation='relu', padding=padding_mode)(conv10)
+	#conv10 = Conv1D(seq_conv_filters, read_conv_width, activation='relu', padding=padding_mode)(conv10)
+	conv10 = Conv1D(128, 3, activation='relu', padding=padding_mode)(conv10)
 	conv11 = layers.concatenate([conv10, piled_up], axis=-1)
 
 	conv_label = Conv1D(len(args.labels), 1, activation="linear", padding=padding_mode)(conv11)
