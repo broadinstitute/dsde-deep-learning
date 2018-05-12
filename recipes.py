@@ -56,11 +56,9 @@ def run(file_fxns):
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Variant Calling Models ~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 def train_calling_model(args):
 	'''Trains the variant calling as 1D segmentation CNN architecture on tensors at the supplied data directory.
 

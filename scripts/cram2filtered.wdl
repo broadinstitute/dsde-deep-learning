@@ -31,6 +31,7 @@ workflow Cram2FilteredVcf {
           cram_file = input_cram,
           output_prefix = output_prefix,
           disk_space_gb = disk_space_gb
+          #preemptible_attempts = preemptible_attempts
     }
 
     call SplitIntervals {
@@ -53,6 +54,7 @@ workflow Cram2FilteredVcf {
                 interval_list = calling_interval,
                 gatk_docker = gatk_docker,
                 gatk4_jar_override = gatk4_jar_override,
+                preemptible_attempts = preemptible_attempts,
                 extra_args = extra_args,
                 disk_space_gb = disk_space_gb
         }
@@ -192,7 +194,8 @@ task RunHC4 {
         set -e
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
 
-        gatk --java-options "-Xmx${command_mem}m" \        
+        #gatk --java-options "-Xmx${command_mem}m" \ 
+        java "-Xmx${command_mem}m" -jar ${gatk4_jar_override} \
         HaplotypeCaller \
         -R ${reference_fasta} \
         -I ${input_bam} \
@@ -260,7 +263,8 @@ command <<<
         set -e
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
 
-        gatk --java-options "-Xmx${command_mem}m" \
+        #gatk --java-options "-Xmx${command_mem}m" \
+        java "-Xmx${command_mem}m" -jar ${gatk4_jar_override} \
         CNNScoreVariants \
         ${bam_cl} \
         -R ${reference_fasta} \

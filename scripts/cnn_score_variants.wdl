@@ -1,4 +1,70 @@
 # CNNScoreVariants WDL
+workflow CNNScoreVariantsWorkflow {
+    File input_vcf
+    File input_vcf_index
+    File reference_fasta
+    File reference_dict
+    File reference_fasta_index
+    String? bam_file
+    String? bam_file_index
+    File architecture_json
+    File architecture_hd5
+    String tensor_type
+    String output_prefix
+    Int inference_batch_size
+    Int transfer_batch_size
+    File gatk4_jar_override
+    String gatk_docker
+    File picard_jar
+    File calling_intervals
+    Int scatter_count 
+    Int? preemptible_attempts
+    Int? mem_gb
+
+    call SplitIntervals {
+        input:
+            picard_jar = picard_jar,
+            scatter_count = scatter_count,
+            intervals = calling_intervals
+    }
+
+    scatter (calling_interval in SplitIntervals.interval_files) {
+
+        call CNNScoreVariants {
+            input:
+                input_vcf = input_vcf,
+                input_vcf_index = input_vcf_index,
+                reference_fasta = reference_fasta,
+                reference_dict = reference_dict,
+                reference_fasta_index = reference_fasta_index,
+                bam_file = bam_file,
+                bam_file_index = bam_file_index,
+                architecture_json = architecture_json,
+                architecture_hd5 = architecture_hd5,
+                tensor_type = tensor_type,
+                inference_batch_size = inference_batch_size,
+                transfer_batch_size = transfer_batch_size,
+                output_prefix = output_prefix,
+                interval_list = calling_interval,
+                gatk4_jar_override = gatk4_jar_override,
+                gatk_docker = gatk_docker,
+                preemptible_attempts = preemptible_attempts,
+                mem_gb = mem_gb
+        }
+    }
+
+    call MergeVCFs as MergeVCF_CNN {
+        input: 
+            input_vcfs = CNNScoreVariants.cnn_annotated_vcf,
+            output_vcf_name = output_prefix,
+            gatk4_jar_override = gatk4_jar_override,
+            gatk_docker = gatk_docker
+    }
+
+    output {
+        MergeVCF_CNN.*
+    }
+}
 
 task CNNScoreVariants {
 
@@ -130,7 +196,7 @@ command <<<
         #gatk --java-options "-Xmx${command_mem}m" \
         java -Xmx2g -Djava.io.tmpdir=tmp -jar ${gatk4_jar_override} \
             MergeVcfs -I ${sep=' -I ' input_vcfs} \
-            -O "${output_vcf_name}"
+            -O "${output_vcf_name}_cnn_scored.vcf.gz"
 >>>
   runtime {
     docker: gatk_docker
@@ -141,75 +207,8 @@ command <<<
     cpu: select_first([cpu, 1])  
   }
   output {
-    File output_vcf = "${output_vcf_name}"
-    File output_vcf_index = "${output_vcf_name}.tbi"
+    File output_vcf = "${output_vcf_name}_cnn_scored.vcf.gz"
+    File output_vcf_index = "${output_vcf_name}_cnn_scored.vcf.gz.tbi"
   }
 }
 
-workflow CNNScoreVariantsWorkflow {
-    File input_vcf
-    File input_vcf_index
-    File reference_fasta
-    File reference_dict
-    File reference_fasta_index
-    String? bam_file
-    String? bam_file_index
-    File architecture_json
-    File architecture_hd5
-    String tensor_type
-    String output_prefix
-    Int inference_batch_size
-    Int transfer_batch_size
-    File gatk4_jar_override
-    String gatk_docker
-    File picard_jar
-    File calling_intervals
-    Int scatter_count 
-    String final_output_name
-    Int? preemptible_attempts
-    Int? mem_gb
-
-    call SplitIntervals {
-        input:
-            picard_jar = picard_jar,
-            scatter_count = scatter_count,
-            intervals = calling_intervals
-    }
-
-    scatter (calling_interval in SplitIntervals.interval_files) {
-
-        call CNNScoreVariants {
-            input:
-                input_vcf = input_vcf,
-                input_vcf_index = input_vcf_index,
-                reference_fasta = reference_fasta,
-                reference_dict = reference_dict,
-                reference_fasta_index = reference_fasta_index,
-                bam_file = bam_file,
-                bam_file_index = bam_file_index,
-                architecture_json = architecture_json,
-                architecture_hd5 = architecture_hd5,
-                tensor_type = tensor_type,
-                inference_batch_size = inference_batch_size,
-                transfer_batch_size = transfer_batch_size,
-                output_prefix = output_prefix,
-                interval_list = calling_interval,
-                gatk4_jar_override = gatk4_jar_override,
-                gatk_docker = gatk_docker,
-                preemptible_attempts = preemptible_attempts,
-                mem_gb = mem_gb
-        }
-    }
-
-    call MergeVCFs as MergeVCF_CNN {
-        input: 
-            input_vcfs = CNNScoreVariants.cnn_annotated_vcf,
-            output_vcf_name = final_output_name,
-            gatk4_jar_override = gatk4_jar_override,
-            gatk_docker = gatk_docker
-    }
-
-    output {
-        MergeVCF_CNN.*
-    }
-}
