@@ -297,7 +297,9 @@ def test_caller_2d(args):
 	_, _, test_paths = td.get_train_valid_test_paths_all(args)
 	generate_test = td.calling_tensors_generator(args, test_paths)
 
-	model = models.build_2d_cnn_calling_segmentation_1d(args)
+	#model = models.build_2d_cnn_calling_segmentation_1d(args)
+	model = models.load_model(args.weights_hd5, custom_objects=models.get_all_custom_objects(args.labels))
+	model.summary()
 
 	test_tensors = np.zeros((args.iterations*args.batch_size,) + defines.tensor_shape_from_args(args))
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
