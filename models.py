@@ -958,43 +958,36 @@ def build_1d_cnn_calling_segmentation_1d(args):
 
 	return model
 
-
 def build_2d_cnn_calling_segmentation_1d(args):
 	'''Build Read Tensor 2d CNN for calling variants as 1d genotyped segmentation'''
 	in_shape = defines.tensor_shape_from_args(args)
 	read_tensor = Input(shape=in_shape, name="read_tensor")
 
-	read_conv_width = 7
-	read_conv_height = 15	
+	read_conv_width = 9
+	read_conv_height = 35	
 
-	pileup_filters = 256
-	seq_conv_filters = 256
+	pileup_filters = 64
 	padding_mode = 'same'
 	
-	x = Conv2D(128, (read_conv_height, 1), padding='valid', activation="relu")(read_tensor)
+	x = Conv2D(196, (read_conv_height, 1), padding='valid', activation="relu")(read_tensor)
 	x = Conv2D(pileup_filters, (args.read_limit-read_conv_height+1, 1), padding='valid', activation="relu")(x)
 
 	if args.channels_last:
 		piled_up = Reshape((args.window_size, pileup_filters))(x)
-		#piled_up = Permute((2, 1))(piled_up)
 	else:
 		piled_up = Reshape((pileup_filters, args.window_size))(x)
 		piled_up = Permute((2, 1))(piled_up)
 
-	conv1 = Conv1D(seq_conv_filters, read_conv_width, activation="relu", padding=padding_mode)(piled_up)
-	conv1 = Conv1D(seq_conv_filters, read_conv_width, activation='relu', padding=padding_mode)(conv1)
+	conv1 = Conv1D(128, read_conv_width, activation="relu", padding=padding_mode)(piled_up)
+	conv1 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(conv1)
 
-	up8 = layers.concatenate([conv1, piled_up], axis=-1)
-	conv8 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(up8)
-	conv8 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(conv8)
-
-	up9 = layers.concatenate([conv8, piled_up], axis=-1)
-	conv9 = Conv1D(64, read_conv_width, activation='relu', padding=padding_mode)(up9)
-	conv9 = Conv1D(64, read_conv_width, activation='relu', padding=padding_mode)(conv9)
+	up9 = layers.concatenate([conv1, piled_up], axis=-1)
+	conv9 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(up9)
+	conv9 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(conv9)
 
 	up10 = layers.concatenate([conv9, piled_up], axis=-1)
-	conv10 = Conv1D(seq_conv_filters, read_conv_width, activation='relu', padding=padding_mode)(up10)
-	#conv10 = Conv1D(seq_conv_filters, read_conv_width, activation='relu', padding=padding_mode)(conv10)
+	conv10 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(up10)
+	conv10 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(conv10)
 	conv10 = Conv1D(128, 3, activation='relu', padding=padding_mode)(conv10)
 	conv11 = layers.concatenate([conv10, piled_up], axis=-1)
 
