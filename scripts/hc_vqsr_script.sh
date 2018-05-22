@@ -64,12 +64,12 @@ SCATTER=20
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
-# Clinical project g947m NA12878 HG38
-# BAM=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878.bam
-# BAMOUT=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878_bamout.bam
-# VCF=/dsde/data/deep/vqsr/vcfs/g947m_o1d1v1_na12878.vcf.gz
-# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-# INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+# Clinical project g947x NA12878 HG38
+BAM=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878.bam
+BAMOUT=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878_bamout.bam
+VCF=/dsde/data/deep/vqsr/vcfs/g947x_o2d1v1_na12878_cnn_scored.vcf.gz
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
 # NA12877 CEPH CEU Utah husband Solexa 269364
 # BAM=/seq/picard_aggregation/LCSET-6205/Solexa-269364,_PCR-Free_pool/v1/Solexa-269364,_PCR-Free_pool.bam
@@ -168,10 +168,10 @@ SCATTER=20
 # BAMOUT=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_392292.bam
 # VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_392292_all_calls.vcf.gz
 
-BAM=/seq/picard_aggregation/D5227/NexPond-720405/current/NexPond-720405.bam
-BAMOUT=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_720405_bamout.bam
-VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_720405.vcf.gz
-INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
+# BAM=/seq/picard_aggregation/D5227/NexPond-720405/current/NexPond-720405.bam
+# BAMOUT=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_720405_bamout.bam
+# VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_720405.vcf.gz
+# INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
 
 # HG38 Project G94982, NA12878
 # BAM=/dsde/data/deep/vqsr/bams/g94982_hg38.bam

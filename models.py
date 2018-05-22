@@ -1557,7 +1557,7 @@ def build_bqsr_annotation_model(args):
 	Returns
 		The keras model
 	'''	
-	read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name='read_tensor')
+	read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name=args.tensor_map)
 	x = Conv1D(filters=320, kernel_size=3, activation="relu", kernel_initializer='glorot_normal')(read_tensor)
 	x = Dropout(0.2)(x)
 	x = Conv1D(filters=256, kernel_size=3, activation="relu", kernel_initializer='glorot_normal')(x)
@@ -1569,7 +1569,7 @@ def build_bqsr_annotation_model(args):
 	x = Dense(units=40, activation="relu", kernel_initializer='glorot_normal')(x)
 	
 	# Mix the read annotations in
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	alt_input_mlp = Dense(units=32, kernel_initializer='glorot_normal', activation='relu')(annotations)
 	x = layers.concatenate([x, alt_input_mlp], axis=1)
 

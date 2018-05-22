@@ -185,7 +185,7 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 			read_tensor = good_reads_to_tensor(args, good_reads, ref_start, insert_dict)
 			reference_sequence_into_tensor(args, reference_seq, read_tensor)
 
-			tensor_path = get_path_to_train_valid_or_test(args.data_dir)
+			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
 			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 			stats[cur_label_key] += 1
@@ -294,7 +294,7 @@ def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 
 
 			read_tensor = good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, pairs)
 			reference_sequence_into_tensor(args, reference_seq, read_tensor)
-			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
+			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
 			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 			stats[cur_label_key] += 1
@@ -446,7 +446,7 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 		read_tensor = good_reads_to_tensor(args, good_reads, cur_pos, insert_dict)
 		reference_sequence_into_tensor(args, reference_seq, read_tensor)
 
-		tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
+		tensor_path = get_path_to_train_valid_or_test(args.data_dir, variant.CHROM)	
 		tensor_prefix = 'calling_tensor_' + plain_name(args.bam_file) +'_'+ plain_name(args.train_vcf) 
 		tensor_path += tensor_prefix + '-' + args.chrom + '_' + str(cur_pos) + '_' +str(cur_pos+args.window_size) + '.hd5'
 
@@ -603,7 +603,7 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 				add_flags_to_read_tensor(args, read_tensor, tensor_channel_map, flags)
 				add_mq_to_read_tensor(args, read_tensor, tensor_channel_map, mapping_qualities)
 
-		tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
+		tensor_path = get_path_to_train_valid_or_test(args.data_dir, variant.CHROM)	
 		tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
 		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 		stats[cur_label_key] += 1
@@ -738,7 +738,7 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 					add_flags_to_read_tensor(args, read_tensor, tensor_channel_map, flags)
 					add_mq_to_read_tensor(args, read_tensor, tensor_channel_map, mapping_qualities)
 
-			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
+			tensor_path = get_path_to_train_valid_or_test(args.data_dir, variant.CHROM)	
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) +'_allele_'+ str(allele_index) + '-' + cur_label_key 
 			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 			stats[cur_label_key] += 1
@@ -837,7 +837,7 @@ def tensors_from_tensor_map_2channel(args, include_annotations=True):
 					read_tensor[:6,:,:] = reads_to_2bit_tensor(args, sequences, qualities, reference_seq)
 				add_flags_to_read_tensor(args, read_tensor, tensor_channel_map, flags)
 				add_mq_to_read_tensor(args, read_tensor, tensor_channel_map, mapping_qualities)
-				tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
+				tensor_path = get_path_to_train_valid_or_test(args.data_dir, variant.CHROM)	
 				tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) +'_allele_'+ str(allele_index) +'-'+ cur_label_key 
 				tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 				stats[cur_label_key] += 1
@@ -895,12 +895,7 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 
 	tensor_channel_map = defines.bqsr_tensor_channel_map() 
 
-	if args.chrom:
-		reads  = samfile.fetch(args.chrom, args.start_pos, args.end_pos)
-	else:
-		reads = samfile
-
-	for read in reads:
+	for read in samfile.fetch(args.chrom, args.start_pos, args.end_pos):
 		if read.is_reverse:
 			continue
 		read_group = read.get_tag('RG')	
@@ -960,9 +955,9 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 					elif a == 'mapping_quality':
 						annotation_data[i] = float(read.mapping_quality) / max_mq
 					elif a == 'read_position':
-						annotation_data[i] = float(read_idx)/ max_read_pos	
+						annotation_data[i] = float(read_idx) / max_read_pos	
 
-			tensor_path = get_path_to_train_valid_or_test(args.data_dir)	
+			tensor_path = get_path_to_train_valid_or_test(args, args.chrom)	
 			tensor_prefix = plain_name(args.bam_file) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
 			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + args.chrom + '_' + str(ref_pos) + '.hd5'
 			if not os.path.exists(os.path.dirname(tensor_path)):
@@ -972,7 +967,7 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 				if include_annotations:
 					hf.create_dataset(args.annotation_set, data=annotation_data)
 		
-			stats['count'] +=1
+			stats['count'] += 1
 			if stats['count']%400 == 0:
 				print('Wrote', stats['count'], 'tensors out of', args.samples)
 			if stats['count'] >= args.samples:
@@ -3077,19 +3072,19 @@ def split_and_symlink_images(args, valid_ratio=0.1):
 				print('symlinked:', count)
 
 
-def get_path_to_train_valid_or_test(path, 
-									valid_ratio=0.1, 
-									test_ratio=0.2, 
-									valid_contigs=['-18_', '-19_', '-chr18_', '-chr19_'], 
-									test_contigs=['-20_','-21_', '-chr20_', '-chr21_']):
-	dice = np.random.rand()
+def get_path_to_train_valid_or_test(args, contig):
+	if any(x == contig for x in args.valid_contigs):
+		return os.path.join(args.data_dir, 'valid/')
+	if any(x == contig for x in args.test_contigs):
+		return os.path.join(args.data_dir, 'test/')
 
-	if dice < valid_ratio or any(map(lambda x: x in path, valid_contigs)):
-		return os.path.join(path, 'valid/')
-	elif dice < valid_ratio+test_ratio or any(map(lambda x: x in path, test_contigs)):	
-		return os.path.join(path, 'test/')
+	dice = np.random.rand()
+	if dice < args.valid_ratio:
+		return os.path.join(args.data_dir, 'valid/')
+	elif dice < (args.valid_ratio+args.test_ratio):	
+		return os.path.join(args.data_dir, 'test/')
 	else:	
-		return os.path.join(path, 'train/')
+		return os.path.join(args.data_dir, 'train/')
 
 
 def get_train_valid_test_paths(args):

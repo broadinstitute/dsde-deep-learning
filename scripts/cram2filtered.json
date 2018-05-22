@@ -7,7 +7,7 @@
 	"Cram2FilteredVcf.architecture_json":"gs://broad-dsde-methods/cnn-variant-score/architectures/small_2d_tf_model.json",	
 	"Cram2FilteredVcf.architecture_hd5":"gs://broad-dsde-methods/cnn-variant-score/architectures/small_2d_tf_model.hd5",
 	"Cram2FilteredVcf.tensor_type":"read_tensor",
-	"Cram2FilteredVcf.gatk4_jar_override": "gs://broad-dsde-methods/sam/jars/gatk.jar",
+	"Cram2FilteredVcf.gatk_override": "gs://broad-dsde-methods/sam/jars/gatk.jar",
 	"Cram2FilteredVcf.picard_jar": "gs://broad-dsde-methods/skwalker/picard_2.12.1.jar",
 	"Cram2FilteredVcf.calling_intervals": "gs://broad-references/hg38/v0/wgs_calling_regions.hg38.interval_list",
 	"Cram2FilteredVcf.gatk_docker": "samfriedman/p3",

@@ -1,21 +1,21 @@
-# This workflow takes a CRAM calls variants with HaplotypeCaller and filters the calls with a Neural Net
+# This workflow takes an input CRAM to call variants with HaplotypeCaller and filter the calls with a neural net
 workflow Cram2FilteredVcf {
-    File input_cram # Aligned CRAM file
+    File input_cram                 # Aligned CRAM file
     File reference_fasta 
     File reference_dict
     File reference_fasta_index
-    File architecture_json # Neural Net configuration for CNNScoreVariants  
-    File architecture_hd5  # Pre-Trained weights and architecture for CNNScoreVariants
-    Int inference_batch_size # Batch size for python in CNNScoreVariants  
-    Int transfer_batch_size  # Batch size for java in CNNScoreVariants     
-    String output_prefix # Identifying string for this run will be used to name all output files
-    String tensor_type # What kind of tensors the Neural Net expects (e.g. reference, read_tensor)
-    File? gatk4_jar_override
+    File architecture_json          # Neural Net configuration for CNNScoreVariants  
+    File architecture_hd5           # Pre-Trained weights and architecture for CNNScoreVariants
+    Int inference_batch_size        # Batch size for python in CNNScoreVariants  
+    Int transfer_batch_size         # Batch size for python in CNNScoreVariants
+    String output_prefix            # Identifying string for this run will be used to name all output files
+    String tensor_type              # What kind of tensors the Neural Net expects (e.g. reference, read_tensor)
+    File? gatk_override
     String gatk_docker    
     File picard_jar  
     File calling_intervals
-    Int scatter_count # Number of shards for parrallelization of HaplotypeCaller and CNNScoreVariants
-    String extra_args # Extra arguments for HaplotypeCaller
+    Int scatter_count               # Number of shards for parallelization of HaplotypeCaller and CNNScoreVariants
+    String extra_args               # Extra arguments for HaplotypeCaller
 
     # Runtime parameters
     Int? mem_gb
@@ -36,9 +36,13 @@ workflow Cram2FilteredVcf {
 
     call SplitIntervals {
         input:
-            picard_jar = picard_jar,
+            gatk_override = gatk_override,
             scatter_count = scatter_count,
-            intervals = calling_intervals
+            intervals = calling_intervals,
+            ref_fasta = reference_fasta,
+            ref_dict = reference_dict,
+            ref_fai = reference_fasta_index,
+            gatk_docker = gatk_docker
     }
 
     scatter (calling_interval in SplitIntervals.interval_files) {
@@ -53,7 +57,7 @@ workflow Cram2FilteredVcf {
                 output_prefix = output_prefix,
                 interval_list = calling_interval,
                 gatk_docker = gatk_docker,
-                gatk4_jar_override = gatk4_jar_override,
+                gatk_override = gatk_override,
                 preemptible_attempts = preemptible_attempts,
                 extra_args = extra_args,
                 disk_space_gb = disk_space_gb
@@ -75,7 +79,7 @@ workflow Cram2FilteredVcf {
                 reference_fasta_index = reference_fasta_index,               
                 output_prefix = output_prefix,
                 interval_list = calling_interval,
-                gatk4_jar_override = gatk4_jar_override,
+                gatk_override = gatk_override,
                 gatk_docker = gatk_docker,
                 preemptible_attempts = preemptible_attempts,
                 mem_gb = mem_gb
@@ -86,21 +90,27 @@ workflow Cram2FilteredVcf {
         input: 
             input_vcfs = CNNScoreVariants.cnn_annotated_vcf,
             output_prefix = output_prefix,
-            picard_jar = picard_jar
+            gatk_override = gatk_override,
+            preemptible_attempts = preemptible_attempts,
+            gatk_docker = gatk_docker
     }
-
-    call SamtoolsMergeBAMs {
+ 
+    call MergeBamOuts {
         input:
-            input_bams = RunHC4.bamout,
+            bam_outs = RunHC4.bamout,
             output_prefix = output_prefix,
-            picard_jar = picard_jar
+            ref_fasta = reference_fasta,
+            ref_dict = reference_dict,
+            ref_fai = reference_fasta_index,            
+            gatk_override = gatk_override,
+            preemptible_attempts = preemptible_attempts,
+            gatk_docker = gatk_docker                  
     }
-  
 
 
     output {
         MergeVCF_HC4.*
-        SamtoolsMergeBAMs.*
+        MergeBamOuts.*
     }
 
 }
@@ -118,7 +128,7 @@ task CramToBam {
     Int? preemptible_attempts
     Int? disk_space_gb
     Int? cpu 
-    Boolean use_ssd = false
+    Boolean use_ssd = true
 
     # You may have to change the following two parameter values depending on the task requirements
     Int default_ram_mb = 16000
@@ -171,7 +181,7 @@ task RunHC4 {
     String output_prefix
     File interval_list
     String extra_args
-    File? gatk4_jar_override
+    File? gatk_override
 
     # Runtime parameters
     Int? mem_gb
@@ -179,11 +189,11 @@ task RunHC4 {
     Int? preemptible_attempts
     Int? disk_space_gb
     Int? cpu 
-    Boolean use_ssd = false
+    Boolean use_ssd = true
 
     # You may have to change the following two parameter values depending on the task requirements
     Int default_ram_mb = 8000
-    # WARNING: In the workflow, you should calculate the disk space as an input to this task (disk_space_gb).  Please see [TODO: Link from Jose] for examples.
+    # WARNING: In the workflow, you should calculate the disk space as an input to this task (disk_space_gb).
     Int default_disk_space_gb = 200
 
     # Mem is in units of GB but our command and memory runtime values are in MB
@@ -192,10 +202,10 @@ task RunHC4 {
 
     command {
         set -e
-        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
 
         #gatk --java-options "-Xmx${command_mem}m" \ 
-        java "-Xmx${command_mem}m" -jar ${gatk4_jar_override} \
+        java "-Xmx${command_mem}m" -jar ${gatk_override} \
         HaplotypeCaller \
         -R ${reference_fasta} \
         -I ${input_bam} \
@@ -212,8 +222,7 @@ task RunHC4 {
         File raw_vcf_index = "${output_prefix}_hc4.vcf.gz.tbi"
     }
     runtime {
-        #docker: gatk_docker
-        docker: "samfriedman/p3"
+        docker: gatk_docker
         memory: machine_mem + " MB"
         # Note that the space before SSD and HDD should be included.
         disks: "local-disk " + select_first([disk_space_gb, default_disk_space_gb]) + if use_ssd then " SSD" else " HDD"
@@ -223,7 +232,6 @@ task RunHC4 {
 }
 
 task CNNScoreVariants {
-
     String input_vcf
     File input_vcf_index
     File reference_fasta
@@ -238,7 +246,7 @@ task CNNScoreVariants {
     Int inference_batch_size
     Int transfer_batch_size
     File interval_list
-    File? gatk4_jar_override
+    File? gatk_override
 
     # Runtime parameters
     Int? mem_gb
@@ -246,7 +254,7 @@ task CNNScoreVariants {
     Int? preemptible_attempts
     Int? disk_space_gb
     Int? cpu 
-    Boolean use_ssd = false
+    Boolean use_ssd = true
 
     String bam_cl = if defined(bam_file) then "-I ${bam_file}" else " "
 
@@ -261,10 +269,10 @@ task CNNScoreVariants {
 
 command <<<
         set -e
-        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
 
         #gatk --java-options "-Xmx${command_mem}m" \
-        java "-Xmx${command_mem}m" -jar ${gatk4_jar_override} \
+        java "-Xmx${command_mem}m" -jar ${gatk_override} \
         CNNScoreVariants \
         ${bam_cl} \
         -R ${reference_fasta} \
@@ -278,8 +286,7 @@ command <<<
 >>>
 
   runtime {
-    #docker: gatk_docker
-    docker: "samfriedman/p3"
+    docker: gatk_docker
     memory: machine_mem + " MB"
     # Note that the space before SSD and HDD should be included.
     disks: "local-disk " + select_first([disk_space_gb, default_disk_space_gb]) + if use_ssd then " SSD" else " HDD"
@@ -292,28 +299,100 @@ command <<<
   }
 }
 
+task SplitIntervals {
+    # inputs
+    File? intervals
+    File ref_fasta
+    File ref_fai
+    File ref_dict
+    Int scatter_count
+    String? split_intervals_extra_args
 
-task MergeVCFs {
-    Array[File] input_vcfs
-    String output_prefix
-    File picard_jar
+    File? gatk_override
+
+    # runtime
+    String gatk_docker
+    Int? mem
+    Int? preemptible_attempts
+    Int? disk_space
+    Int? cpu
+    Boolean use_ssd = true
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem) then mem * 1000 else 3500
+    Int command_mem = machine_mem - 500
+
     command {
-        java -jar ${picard_jar} \
-        MergeVcfs \
-        INPUT=${sep=' INPUT=' input_vcfs} \
-        OUTPUT=${output_prefix}_hc4_merged.vcf.gz
-    }
+        set -e
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
 
-    output {
-        File output_vcf = "${output_prefix}_hc4_merged.vcf.gz"
+        mkdir interval-files
+        #gatk --java-options "-Xmx${command_mem}m" SplitIntervals \
+        java "-Xmx${command_mem}m" -jar ${gatk_override} SplitIntervals \
+            -R ${ref_fasta} \
+            ${"-L " + intervals} \
+            -scatter ${scatter_count} \
+            -O interval-files \
+            ${split_intervals_extra_args}
+        cp interval-files/*.intervals .
     }
 
     runtime {
-        docker: "broadinstitute/genomes-in-the-cloud:2.1.1"
-        memory: "16 GB"
-        disks: "local-disk 400 HDD"
-    } 
+        docker: gatk_docker
+        memory: machine_mem + " MB"
+        disks: "local-disk " + select_first([disk_space, 100]) + if use_ssd then " SSD" else " HDD"
+        preemptible: select_first([preemptible_attempts, 10])
+        cpu: select_first([cpu, 1])
+    }
+
+    output {
+        Array[File] interval_files = glob("*.intervals")
+    }
 }
+
+task MergeVCFs {
+    # inputs
+    Array[File] input_vcfs
+    String output_prefix
+
+    File? gatk_override
+
+    # runtime
+    String gatk_docker
+    Int? mem
+    Int? preemptible_attempts
+    Int? disk_space
+    Int? cpu
+    Boolean use_ssd = true
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem) then mem * 1000 else 3500
+    Int command_mem = machine_mem - 1000
+
+    # using MergeVcfs instead of GatherVcfs so we can create indices
+    # WARNING 2015-10-28 15:01:48 GatherVcfs  Index creation not currently supported when gathering block compressed VCFs.
+    command {
+        set -e
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
+        #gatk --java-options "-Xmx${command_mem}m" MergeVcfs \
+        java "-Xmx${command_mem}m" -jar ${gatk_override} MergeVcfs \
+        -I ${sep=' -I ' input_vcfs} -O "${output_prefix}_cnn_scored.vcf.gz"
+    }
+
+    runtime {
+        docker: gatk_docker
+        memory: machine_mem + " MB"
+        disks: "local-disk " + select_first([disk_space, 100]) + if use_ssd then " SSD" else " HDD"
+        preemptible: select_first([preemptible_attempts, 10])
+        cpu: select_first([cpu, 1])
+    }
+
+    output {
+        File merged_vcf = "${output_prefix}_cnn_scored.vcf.gz"
+        File merged_vcf_index = "${output_prefix}_cnn_scored.vcf.gz.tbi"
+    }
+}
+
 
 task SamtoolsMergeBAMs {
     Array[File] input_bams
@@ -325,6 +404,7 @@ task SamtoolsMergeBAMs {
 
     output {
         File bamout = "${output_prefix}_bamout.bam"
+        File bamout_index = "${output_prefix}_bamout.bai"
     }
 
   runtime {
@@ -334,33 +414,60 @@ task SamtoolsMergeBAMs {
   }    
 }
 
-task SplitIntervals {
-    File picard_jar
-    Int scatter_count
-    File intervals
 
-    command {
+task MergeBamOuts {
+    # inputs
+    File ref_fasta
+    File ref_fai
+    File ref_dict
+    Array[File]+ bam_outs
+    String output_prefix
+
+    File? gatk_override
+
+    # runtime
+    String gatk_docker
+    Int? mem
+    Int? preemptible_attempts
+    Int? disk_space
+    Int? cpu
+    Boolean use_ssd = true
+
+    # Mem is in units of GB but our command and memory runtime values are in MB
+    Int machine_mem = if defined(mem) then mem * 1000 else 7000
+    Int command_mem = machine_mem - 1000
+
+    command <<<
+        # This command block assumes that there is at least one file in bam_outs.
+        #  Do not call this task if len(bam_outs) == 0
         set -e
-        Picard_Jar=${picard_jar}
-        mkdir interval-files
-        java -Xmx6g -jar $Picard_Jar IntervalListTools I=${intervals} O=interval-files SCATTER_COUNT=${scatter_count}
-        find ./interval-files -iname scattered.interval_list | sort > interval-files.txt
-        i=1
-        while read file; 
-        do
-            mv $file $i.interval_list
-            ((i++))
-        done < interval-files.txt
-    }
-    
-    output {
-        Array[File] interval_files = glob("*.interval_list")
-    }
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk_override}
+        #gatk --java-options "-Xmx${command_mem}m" GatherBamFiles \
+        java "-Xmx${command_mem}m" -jar ${gatk_override} GatherBamFiles \
+            -I ${sep=" -I " bam_outs} -O unsorted.out.bam -R ${ref_fasta}
+
+        # We must sort because adjacent scatters may have overlapping (padded) assembly regions, hence
+        # overlapping bamouts
+
+        #gatk --java-options "-Xmx${command_mem}m" SortSam -I unsorted.out.bam \
+        java "-Xmx${command_mem}m" -jar ${gatk_override} SortSam -I unsorted.out.bam \
+            -O "${output_prefix}_bamout.bam" \
+            --SORT_ORDER coordinate
+        #gatk --java-options "-Xmx${command_mem}m" BuildBamIndex -I "${output_prefix}_bamout.bam"
+        java "-Xmx${command_mem}m" -jar ${gatk_override} BuildBamIndex -I "${output_prefix}_bamout.bam"
+    >>>
 
     runtime {
-         docker: "samfriedman/p3"
-         memory: "3 GB"
-         cpu: "1"
-         disks: "local-disk 200 HDD"
+        docker: gatk_docker
+        memory: machine_mem + " MB"
+        disks: "local-disk " + select_first([disk_space, 100]) + if use_ssd then " SSD" else " HDD"
+        preemptible: select_first([preemptible_attempts, 10])
+        cpu: select_first([cpu, 1])
+    }
+
+    output {
+        File bamout = "${output_prefix}_bamout.bam"
+        File bamout_index = "${output_prefix}_bamout.bai"
     }
 }
+

@@ -111,6 +111,14 @@ def parse_args():
 		help='Whether to skip positive examples when writing tensors.')
 	parser.add_argument('--use_lowercase_dna', default=False, action='store_true',
 		help='Whether to include tensors covering lower case bases when writing tensors.')
+	parser.add_argument('--valid_ratio', default=0.1, type=float,
+		help='Rate of training tensors to save for validation must be in [0.0, 1.0].')	
+	parser.add_argument('--test_ratio', default=0.2, type=float,
+		help='Rate of training tensors to save for testing [0.0, 1.0].')	
+	parser.add_argument('--valid_contigs', nargs='+', default=['18', '19', 'chr18', 'chr19'],
+		help='Contigs to reserve for validation data in addition to those reserved by valid_ratio.')	
+	parser.add_argument('--test_contigs', nargs='+', default=['20', '21', 'chr20', 'chr21'],
+		help='Contigs to reserve for testing data in addition to those reserved by test_ratio.')	
 	parser.add_argument('--chrom', help='Chromosome to load for parallel tensor writing.')
 
 

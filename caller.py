@@ -106,17 +106,21 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 		print('Guess:', guess)
 		print('gpos:', gpos)
 		for j in range(guess.shape[0]):
+			gpos_int = int(gpos[1])
+			ref_snp = reference_snp_allele_from_tensor(args, cur_tensor, j)
+			alt_snps = alt_snp_allele_from_tensor(args, cur_tensor, j)
+			alt = alt_snps[0] if alt_snps[1] == ref_snp else alt_snps[1]
 			if index2labels[guess[j]] == 'HET_SNP':
 				v = vcf_writer.new_record(contig=gpos[0], 
-									  start=gpos[1]+j,
-									  alleles=[],
-									  qual=predictions[i][j])
+									  start=gpos_int+j,
+									  alleles=[ref_snp, alt],
+									  qual=predictions[i][j][guess[j]])
 				vcf_writer.write(v)
 			elif index2labels[guess[j]] == 'HOM_SNP':
 				v = vcf_writer.new_record(contig=gpos[0], 
-									  start=gpos[1]+j,
-									  alleles=[],
-									  qual=predictions[i][j])
+									  start=gpos_int+j,
+									  alleles=[ref_snp, alt],
+									  qual=predictions[i][j][guess[j]])
 				vcf_writer.write(v)
 			elif index2labels[guess[j]] == 'HET_DELETION':
 				pass	
@@ -126,6 +130,31 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				pass	
 			elif index2labels[guess[j]] == 'HET_INSERTION':
 				pass
+
+
+def reference_snp_allele_from_tensor(args, tensor, gpos):
+	channels = defines.get_tensor_channel_map_from_args(args)
+	for c in channels:
+		if 'reference' in c:
+			if args.channels_last and tensor[ 0, gpos, channels[c]] > 0:
+				return c[-1].upper() # reference channels are strings like reference_A or reference_C
+				# Here we want just the nucleic acid. 
+			elif tensor[channels[c], 0, gpos] > 0:
+				return c[-1].upper()
+
+
+def alt_snp_allele_from_tensor(args, tensor, gpos):
+	channels = defines.get_tensor_channel_map_from_args(args)
+	counts = {}
+	for c in channels:
+		if 'read' in c:
+			if args.channels_last:
+				counts[c[-1].upper()] = np.sum(tensor[:, gpos, channels[c]])
+			else:
+				counts[c[-1].upper()] = np.sum(tensor[channels[c], :, gpos])
+	
+	counts = sorted(counts.items(), key=operator.itemgetter(1))
+	return counts[-1][0], counts[-2][0]
 
 
 

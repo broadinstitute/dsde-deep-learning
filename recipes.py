@@ -57,7 +57,7 @@ def run(file_fxns):
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~ Variant Calling Models ~~~~~~~~~~~
+# ~~~~~~~ Variant Calling Recipes ~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 def train_calling_model(args):
 	'''Trains the variant calling as 1D segmentation CNN architecture on tensors at the supplied data directory.
@@ -1136,6 +1136,11 @@ def depristo_inception(args):
 		
 	test = td.load_images_from_class_dirs(args, test_paths, shape=image_shape, per_class_max=args.samples)
 	plots.plot_roc_per_class(model, test[0], test[1], args.labels, args.id)
+
+
+def test_score_consistency():
+	model = models.load_model(args.weights_hd5, custom_objects=models.get_all_custom_objects(args.labels))
+	model.summary()	
 
 
 
