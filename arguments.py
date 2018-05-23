@@ -207,7 +207,7 @@ def weight_path_from_args(args):
 	Arguments:
 		args: puts arguments into the file name skips args in the ignore array
 	'''		
-	save_weight_hd5 =  args.output_dir + args.id + '.hd5'
+	save_weight_hd5 = args.output_dir + args.id + '.hd5'
 	print('save weight path:' , save_weight_hd5)
 	return save_weight_hd5
 

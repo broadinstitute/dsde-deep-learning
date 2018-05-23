@@ -64,7 +64,7 @@ SCATTER=200
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
-# Clinical project g947x NA12878 HG38
+# Clinical project illumina NA12878 HG38
 BAM=/dsde/data/deep/vqsr/bams/NA12878_S1.bam
 BAMOUT=/dsde/data/deep/vqsr/bams/illumina_na12878_s1_bamout.bam
 VCF=/dsde/data/deep/vqsr/vcfs/illumina_na12878_s1.vcf.gz
