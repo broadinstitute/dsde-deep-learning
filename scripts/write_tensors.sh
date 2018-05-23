@@ -352,7 +352,6 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
-
 # Clinical NA12878 g947z
 # SAMPLE_NAME=SM-G947Z
 # DOWNSAMPLE_SNPS=0.003
@@ -367,6 +366,22 @@ BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC
 # SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
+# Illumina Made NA12878 S1
+# SAMPLE_NAME=SM-G947Z
+# DOWNSAMPLE_SNPS=0.003
+# DOWNSAMPLE_INDELS=0.025
+# DOWNSAMPLE_NOT_SNPS=0.5
+# CHANNEL_ORDER=channels_last
+# MODE=write_paired_read_tensors
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_balanced_paired_read_channels_last/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947z_intrarun3_na12878_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947z_intrarun3_na12878_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
 
 # Project G94982 snapshot NA12878 HG38 Tensors
 # DOWNSAMPLE_SNPS=0.0075

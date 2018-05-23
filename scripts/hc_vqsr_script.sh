@@ -15,7 +15,7 @@ REFERENCE=/seq/references/Homo_sapiens_assembly19/v1/Homo_sapiens_assembly19.fas
 TMPDIR=/broad/hptmp/`whoami`
 INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/wgs_calling_regions.v1.interval_list
 PICARD=/seq/software/picard/current/bin/picard.jar
-SCATTER=20
+SCATTER=200
 
 
 # HG002 BAM from NIST NA24385 Ashkenazi son
@@ -65,9 +65,9 @@ SCATTER=20
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
 # Clinical project g947x NA12878 HG38
-BAM=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878.bam
-BAMOUT=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878_bamout.bam
-VCF=/dsde/data/deep/vqsr/vcfs/g947x_o2d1v1_na12878_cnn_scored.vcf.gz
+BAM=/dsde/data/deep/vqsr/bams/NA12878_S1.bam
+BAMOUT=/dsde/data/deep/vqsr/bams/illumina_na12878_s1_bamout.bam
+VCF=/dsde/data/deep/vqsr/vcfs/illumina_na12878_s1.vcf.gz
 REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
@@ -220,6 +220,7 @@ $ECHO java -Djava.io.tmpdir=$TMPDIR -Dsamjdk.use_asysnc_io=true \
    -an ReadPosRankSum \
    -oe _recalibrated.vcf.gz \
    -ie .vcf.gz \
+   -snpMaxGaussians 6 \
    -indelMaxGaussians 5 \
    -qsub -jobQueue gsa
 
