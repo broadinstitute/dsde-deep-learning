@@ -1,0 +1,21 @@
+{
+	"Cram2FilteredVcf.input_cram": "gs://broad-dsde-methods/palantir/ClinicalGenomeTruthSets/NA12878_NA12878_O2D1_SM-G947X_v1.cram",
+	"Cram2FilteredVcf.reference_fasta": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.fasta",
+	"Cram2FilteredVcf.reference_dict": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.dict",
+	"Cram2FilteredVcf.reference_fasta_index": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai",
+	"Cram2FilteredVcf.output_prefix": "g947x_o2d1v1_na12878",
+	"Cram2FilteredVcf.architecture_json":"gs://broad-dsde-methods/cnn-variant-score/architectures/small_2d_tf_model.json",	
+	"Cram2FilteredVcf.architecture_hd5":"gs://broad-dsde-methods/cnn-variant-score/architectures/small_2d_tf_model.hd5",
+	"Cram2FilteredVcf.tensor_type":"read_tensor",
+	"Cram2FilteredVcf.gatk_override": "gs://broad-dsde-methods/sam/jars/gatk.jar",
+	"Cram2FilteredVcf.picard_jar": "gs://broad-dsde-methods/skwalker/picard_2.12.1.jar",
+	"Cram2FilteredVcf.calling_intervals": "gs://broad-references/hg38/v0/wgs_calling_regions.hg38.interval_list",
+	"Cram2FilteredVcf.gatk_docker": "samfriedman/p3",
+	"Cram2FilteredVcf.preemptible_attempts": 0,
+	"Cram2FilteredVcf.inference_batch_size": 1,
+	"Cram2FilteredVcf.transfer_batch_size": 1,
+	"Cram2FilteredVcf.mem_gb": 7,
+	"Cram2FilteredVcf.extra_args": "--dont-trim-active-regions -stand-call-conf 0 -A Coverage -A ChromosomeCounts -A BaseQuality -A FragmentLength -A MappingQuality -A ReadPosition ",
+	"Cram2FilteredVcf.scatter_count": 100,
+	"Cram2FilteredVcf.disk_size": 300
+}

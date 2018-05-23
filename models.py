@@ -49,91 +49,6 @@ ResidualLayer = namedtuple("ResidualLayer", "identity filters strides")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Models ~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-def build_sequential_model(args):
-	""" Create sequential 1d Convolutional model with 3 layers for classifying variants.
-
-	Three layers of convolution followed by two dense layers.
-	Prints out model summary.
-
-	Arguments
-		args.window_size: Length in base-pairs of sequence centered at the variant to use as input
-		args.input_symbols: Dict mapping input symbols to the index of each typically DNA (e.g. {'A':0, 'C':1, ...})
-		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
-
-	Returns
-		The keras model
-	"""	
-	in_shape = (args.window_size, len(args.input_symbols))
-	model = Sequential()
-	model.add(Convolution1D(input_shape=in_shape, input_length=args.window_size, nb_filter=320, filter_length=16, activation="relu"))
-	model.add(Dropout(0.2))
-	model.add(Convolution1D(nb_filter=256, filter_length=16, activation="relu"))
-	model.add(Dropout(0.2))
-	model.add(Convolution1D(nb_filter=160, filter_length=16, activation="relu"))
-	model.add(Dropout(0.2))	
-	model.add(Flatten())
-
-	model.add(Dense(output_dim=40, init='normal'))
-	model.add(Activation('relu'))
-	
-	model.add( Dense(output_dim=len(args.labels), init='normal') )
-	model.add( Activation('softmax'))
-	
-	sgd = SGD(lr=0.001, decay=1e-5, momentum=0.9, nesterov=True)
-	model.compile(loss='binary_crossentropy', 
-		optimizer=sgd, 
-		metrics=get_metrics())
-
-	model.summary()
-
-	return model
-
-
-def build_sequential_snp_indel_model(args):
-	""" Build sequential 1d Convolutional model with 3 layers for classifying variants.
-
-	Three layers of convolution followed by two dense layers.
-	Prints out model summary.
-
-	Arguments
-		args.window_size: Length in base-pairs of sequence centered at the variant to use as input
-		args.input_symbols: Dict mapping input symbols to the index of each typically DNA (e.g. {'A':0, 'C':1, ...})
-		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
-
-	Returns
-		The keras model
-	"""	
-	model = Sequential()
-	model.add(Convolution1D(input_shape=(args.window_size, len(args.input_symbols)), 
-		input_length=args.window_size, 
-		nb_filter=320,
-		filter_length=16, 
-		activation="relu",
-		init='normal'))
-
-	model.add(Dropout(0.2))
-	model.add(Convolution1D(nb_filter=256, filter_length=16, activation="relu", init='normal'))
-	model.add(Dropout(0.2))
-	model.add(Convolution1D(nb_filter=160, filter_length=16, activation="relu", init='normal'))
-	model.add(Dropout(0.2))	
-	model.add(Flatten())
-
-	model.add(Dense(output_dim=40, init='normal'))
-	model.add(Activation('relu'))
-	
-	model.add( Dense(output_dim=len(args.labels), init='normal') )
-	model.add( Activation('softmax'))
-
-	sgd = SGD(lr=0.001, decay=1e-6, momentum=0.9, nesterov=True, clipnorm=0.5)
-	adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
-
-	model.compile(loss='mse', optimizer=adamo, metrics=get_metrics(args.labels))
-	model.summary()
-
-	return model
-
-
 def build_reference_model(args):
 	'''Build 1d Convolutional model with 3 layers for classifying variants.
 
@@ -236,43 +151,6 @@ def annotation_multilayer_perceptron_from_args(args,
 	return model
 
 
-def build_annotation_multilayer_perceptron(args):
-	'''Build Multilayer perceptron for classifying variants.
-
-	Four layers of dense connection, uses the functional API.
-	Prints out model summary.
-
-	Arguments
-		args.annotations: The variant annotations, perhaps from a HaplotypeCaller VCF.
-		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
-
-	Returns
-		The keras model
-	'''
-	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
-	annotations_bn = BatchNormalization(axis=1)(annotations)
-	
-	x = Dense(units=216, kernel_initializer='glorot_normal', activation='relu')(annotations_bn)
-	x = Dropout(0.3)(x)	
-	x = Dense(units=160, kernel_initializer='glorot_normal', activation='relu')(x)
-	x = Dropout(0.3)(x)	
-	x = Dense(units=128, kernel_initializer='glorot_normal', activation='relu')(x)
-	x = Dropout(0.3)(x)
-	prob_output = Dense(units=len(args.labels), kernel_initializer='glorot_normal', activation='softmax')(x)
-	
-	model = Model(inputs=[annotations], outputs=[prob_output])
-	
-	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)	
-	model.compile(optimizer=adamo, loss='categorical_crossentropy', metrics=get_metrics(args.labels))
-	model.summary()
-
-	if os.path.exists(args.weights_hd5):
-		model.load_weights(args.weights_hd5, by_name=True)
-		print('Loaded model weights from:', args.weights_hd5)
-
-	return model	
-
-
 def build_reference_1d_1layer_model(args):
 	'''Build Reference plus bed tracks 1d CNN model for classifying variants.
 
@@ -293,17 +171,10 @@ def build_reference_1d_1layer_model(args):
 	
 	x = Conv1D(filters=256, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(reference)
 	x = SpatialDropout1D(0.5)(x)
-
-	#x = Conv1D(filters=128, kernel_size=9, activation="relu", kernel_initializer='glorot_normal')(x)
-	#x = SpatialDropout1D(0.4)(x)	
-	#x = MaxPooling1D(3)(x)
 	x = Flatten()(x)
 
 	x = Dense(units=48, activation='relu')(x)
 	x = Dropout(0.1)(x)
-	#x = Dense(units=48, activation='relu')(x)
-	#x = Dropout(0.2)(x)
-
 	prob_output = Dense(units=len(args.labels), name='softmax_predictions', activation='softmax')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
@@ -608,7 +479,8 @@ def read_tensor_2d_model_from_args(args,
 									fc_dropout = 0.0,
 									fc_batch_normalize = False,
 									fc_initializer='glorot_normal',
-									kernel_initializer='glorot_normal'
+									kernel_initializer='glorot_normal',
+									kernel_single_channel=True,
 									):
 	'''Builds Read Tensor 2d CNN model for classifying variants.
 
@@ -642,10 +514,12 @@ def read_tensor_2d_model_from_args(args,
 	# Add convolutional layers
 	max_pool_diff = len(conv_layers)-len(max_pools)
 	for i,f in enumerate(conv_layers):
-		if i%2 == 0:
+		if kernel_single_channel and i%2 == 0:
 			cur_kernel = (conv_width, 1)
-		else:
+		elif kernel_single_channel:
 			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
 
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
@@ -699,7 +573,6 @@ def read_tensor_2d_annotation_model_from_args(args,
 											conv_dropout = 0.0,
 											conv_batch_normalize = False,
 											spatial_dropout = True,
-											residual_layers = [],
 											max_pools = [(3,1), (3,3)],
 											padding='valid',
 											annotation_units = 16,
@@ -765,34 +638,6 @@ def read_tensor_2d_annotation_model_from_args(args,
 
 		if i >= max_pool_diff:
 			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
-
-	for i,r in enumerate(residual_layers):
-		if kernel_single_channel and i%2 == 0:
-			cur_kernel = (conv_width, 1)
-		elif kernel_single_channel:
-			cur_kernel = (1, conv_height)
-		else:
-			cur_kernel = (conv_width, conv_height)
-
-		y = Conv2D(r.filters[0], (1, 1), strides=r.strides)(x)
-		y = BatchNormalization(axis=concat_axis)(y)
-		y = Activation('relu')(y)
-
-		y = Conv2D(r.filters[1], cur_kernel, padding='same')(y)
-		y = BatchNormalization(axis=concat_axis)(y)
-		y = Activation('relu')(y)
-
-		y = Conv2D(r.filters[2], (1, 1))(y)
-		y = BatchNormalization(axis=concat_axis)(y)
-
-		if r.identity:
-			x = layers.add([y, x])
-		else:
-			shortcut = Conv2D(r.filters[2], (1, 1), strides=r.strides)(x)
-			shortcut = BatchNormalization(axis=concat_axis)(shortcut)
-			x = layers.add([y, shortcut])
-		
-		x = Activation('relu')(x)
 
 	x = Flatten()(x)
 
@@ -865,12 +710,9 @@ def build_read_tensor_2d_model(args):
 	fc_dropout = 0.3
 
 	x = Conv2D(216, (read_conv_width, 1), padding='valid', activation="relu", kernel_initializer="he_normal")(read_tensor)
-	#x = MaxPooling2D((2,1))(x)
 	x = Conv2D(160, (1, read_conv_width), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
-	#x = Dropout(conv_dropout)(x)
 	x = Conv2D(128, (read_conv_width, 1), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
 	x = MaxPooling2D((2,1))(x)
-	#x = Dropout(conv_dropout)(x)
 	x = Conv2D(96, (1, read_conv_width), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
 	x = Dropout(conv_dropout)(x)
 	x = MaxPooling2D((2,1))(x)
@@ -1039,12 +881,9 @@ def build_read_tensor_2d_dilated_model(args):
 
 	x = Conv2D(180, (read_conv_width, 1), padding='valid', activation="relu", kernel_initializer="he_normal")(read_tensor)
 	x = Conv2D(128, (1, read_conv_width), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
-	#x = Dropout(conv_dropout)(x)
 	x = MaxPooling2D((2,1))(x)
 	x = Conv2D(128, (1, read_conv_width), dilation_rate=(1,2), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
-	#x = Dropout(conv_dropout)(x)
 	x = Conv2D(96, (1, read_conv_width),  dilation_rate=(1,4), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
-	#x = Dropout(conv_dropout)(x)
 	x = MaxPooling2D((2,1))(x)						
 	x = Conv2D(64, (1, read_conv_width),  dilation_rate=(1,8), padding='valid', activation="relu", kernel_initializer="he_normal")(x)
 	x = MaxPooling2D((2,1))(x)						
@@ -1052,7 +891,6 @@ def build_read_tensor_2d_dilated_model(args):
 
 	x = Flatten()(x)
 	x = Dense(units=32, kernel_initializer='glorot_normal', activation='relu')(x)
-	#x = Dropout(fc_dropout)(x)
 	prob_output = Dense(units=len(args.labels), kernel_initializer='glorot_normal', activation='softmax')(x)
 	
 	model = Model(inputs=[read_tensor], outputs=[prob_output])
@@ -1111,7 +949,6 @@ def build_1d_cnn_calling_segmentation_1d(args):
 	weighted_loss = weighted_categorical_crossentropy(weights)
 
 	model.compile(optimizer=Adam(lr=1e-4), loss=weighted_loss, metrics=get_metrics(args.labels, dim=3))
-	#model.compile(optimizer=Adam(lr=1e-4), loss='categorical_crossentropy', metrics=get_metrics(args.labels, dim=3))
 
 	model.summary()
 
@@ -1121,17 +958,9 @@ def build_1d_cnn_calling_segmentation_1d(args):
 
 	return model
 
-
 def build_2d_cnn_calling_segmentation_1d(args):
 	'''Build Read Tensor 2d CNN for calling variants as 1d genotyped segmentation'''
-	in_channels = defines.total_input_channels_from_args(args)
-	if args.channels_last:
-		in_shape = (args.read_limit, args.window_size, in_channels)
-		concat_axis = -1
-	else:
-		in_shape = (in_channels, args.read_limit, args.window_size)
-		concat_axis = 1
-
+	in_shape = defines.tensor_shape_from_args(args)
 	read_tensor = Input(shape=in_shape, name="read_tensor")
 
 	read_conv_width = 9
@@ -1140,12 +969,14 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	pileup_filters = 64
 	padding_mode = 'same'
 	
-	
-	x = Conv2D(96, (read_conv_height, 1), padding='valid', activation="relu")(read_tensor)
+	x = Conv2D(196, (read_conv_height, 1), padding='valid', activation="relu")(read_tensor)
 	x = Conv2D(pileup_filters, (args.read_limit-read_conv_height+1, 1), padding='valid', activation="relu")(x)
 
-	x = Reshape((pileup_filters, args.window_size))(x)
-	piled_up = Permute((2, 1))(x)
+	if args.channels_last:
+		piled_up = Reshape((args.window_size, pileup_filters))(x)
+	else:
+		piled_up = Reshape((pileup_filters, args.window_size))(x)
+		piled_up = Permute((2, 1))(piled_up)
 
 	conv1 = Conv1D(128, read_conv_width, activation="relu", padding=padding_mode)(piled_up)
 	conv1 = Conv1D(128, read_conv_width, activation='relu', padding=padding_mode)(conv1)
@@ -1164,7 +995,8 @@ def build_2d_cnn_calling_segmentation_1d(args):
 	conv_out = Activation('softmax', name='softmax_predictions')(conv_label)
 
 	model = Model(inputs=read_tensor, outputs=conv_out)
-	weights = np.array([0.5,3,2,1,1,1,1])
+	weights = np.array([0.1,3,2,3,2,3,2])
+	#weights = np.array([0.1,5,5,12,7,12,6])
 	weighted_loss = weighted_categorical_crossentropy(weights)
 	adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
 
@@ -1195,7 +1027,6 @@ def build_2d_cnn_calling_segmentation_full_2d(args):
 
 	conv3 = Conv2D(96, (1, conv_width), activation='relu', padding='same')(read_tensor)
 	conv3 = Conv2D(96, (conv_height, 1), activation='relu', padding='same')(conv3)
-	#conv3 = Conv2D(128, (1, conv_width), activation='relu', padding='same')(conv3)
 	pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
 
 	conv5 = Conv2D(64, (1, conv_width), activation='relu', padding='same')(pool3)
@@ -1229,7 +1060,6 @@ def build_2d_cnn_calling_segmentation_full_2d(args):
 		print('Loaded model weights from:', args.weights_hd5, '\nLoss weights are:', weights)
 
 	return model
-
 
 
 def get_unet():
@@ -1272,8 +1102,6 @@ def get_unet():
 
 	conv10 = Conv2D(1, (1, 1), activation='sigmoid')(conv9)
 	conv_label = Conv1D(len(args.labels), 1, activation='relu',border_mode='same')(conv10)
-
-
 
 	conv_out = core.Activation('softmax')(conv_label)
 
@@ -1358,87 +1186,6 @@ def build_read_tensor_2d_annotations_exome_model(args):
 	return model
 
 
-
-
-def identity_block(input_tensor, kernel_size, filters, stage, block):
-	"""The identity block is the block that has no conv layer at shortcut.
-	# Arguments
-		input_tensor: input tensor
-		kernel_size: defualt 3, the kernel size of middle conv layer at main path
-		filters: list of integers, the filterss of 3 conv layer at main path
-		stage: integer, current stage label, used for generating layer names
-		block: 'a','b'..., current block label, used for generating layer names
-	# Returns
-		Output tensor for the block.
-	"""
-	filters1, filters2, filters3 = filters
-	if K.image_data_format() == 'channels_last':
-		bn_axis = 3
-	else:
-		bn_axis = 1
-	conv_name_base = 'res' + str(stage) + block + '_branch'
-	bn_name_base = 'bn' + str(stage) + block + '_branch'
-
-	x = Conv2D(filters1, (1, 1), name=conv_name_base + '2a')(input_tensor)
-	x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
-	x = Activation('relu')(x)
-
-	x = Conv2D(filters2, kernel_size,
-			   padding='same', name=conv_name_base + '2b')(x)
-	x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
-	x = Activation('relu')(x)
-
-	x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
-	x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
-
-	x = layers.add([x, input_tensor])
-	x = Activation('relu')(x)
-	return x
-
-
-def conv_block(input_tensor, kernel_size, filters, stage, block, strides=(2, 2)):
-	"""conv_block is the block that has a conv layer at shortcut
-	# Arguments
-		input_tensor: input tensor
-		kernel_size: defualt 3, the kernel size of middle conv layer at main path
-		filters: list of integers, the filterss of 3 conv layer at main path
-		stage: integer, current stage label, used for generating layer names
-		block: 'a','b'..., current block label, used for generating layer names
-	# Returns
-		Output tensor for the block.
-	Note that from stage 3, the first conv layer at main path is with strides=(2,2)
-	And the shortcut should have strides=(2,2) as well
-	"""
-	filters1, filters2, filters3 = filters
-	if K.image_data_format() == 'channels_last':
-		bn_axis = 3
-	else:
-		bn_axis = 1
-	conv_name_base = 'res' + str(stage) + block + '_branch'
-	bn_name_base = 'bn' + str(stage) + block + '_branch'
-
-	x = Conv2D(filters1, (1, 1), strides=strides,
-			   name=conv_name_base + '2a')(input_tensor)
-	x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2a')(x)
-	x = Activation('relu')(x)
-
-	x = Conv2D(filters2, kernel_size, padding='same',
-			   name=conv_name_base + '2b')(x)
-	x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2b')(x)
-	x = Activation('relu')(x)
-
-	x = Conv2D(filters3, (1, 1), name=conv_name_base + '2c')(x)
-	x = BatchNormalization(axis=bn_axis, name=bn_name_base + '2c')(x)
-
-	shortcut = Conv2D(filters3, (1, 1), strides=strides,
-					  name=conv_name_base + '1')(input_tensor)
-	shortcut = BatchNormalization(axis=bn_axis, name=bn_name_base + '1')(shortcut)
-
-	x = layers.add([x, shortcut])
-	x = Activation('relu')(x)
-	return x
-
-
 def conv2d_bn(x,
 			  filters,
 			  num_row,
@@ -1482,6 +1229,13 @@ def conv2d_bn(x,
 
 
 def build_read_tensor_keras_resnet(args):
+	"""Build a residual network to process tensors with the keras_resnet package
+	# Arguments
+		args.tensor_map: keyword indicates what kind of input tensors
+
+	# Returns
+		The keras model
+	"""	
 	in_channels = defines.total_input_channels_from_args(args)
 	if args.channels_last:
 		in_shape = (args.read_limit, args.window_size, in_channels)
@@ -1546,79 +1300,6 @@ def build_ref_read_anno_keras_resnet(args):
 
 	return model
 
-
-def build_read_tensor_2d_residual_model(args):
-	"""Build Read Tensor 2d Residual Network model for classifying variants.
-
-	Repeated 2d Convolutions followed by addition of the input, followed by dense connection.
-	See: https://arxiv.org/abs/1512.03385
-	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
-	Uses the functional API. Supports theano or tensorflow channel ordering.
-	Prints out model summary.
-
-	Arguments
-		args.window_size: Length in base-pairs of sequence centered at the variant to use as input.	
-		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
-		args.channels_last: Theano->False or Tensorflow->True channel ordering flag
-
-	Returns
-		The keras model
-	"""			
-	in_channels = defines.total_input_channels_from_args(args)
-	if args.channels_last:
-		in_shape = (args.read_limit, args.window_size, in_channels)
-		channel_axis = 3
-	else:
-		in_shape = (in_channels, args.read_limit, args.window_size)
-		channel_axis = 1
-
-	read_tensor = Input(shape=in_shape, name="read_tensor")
-	read_conv_width = 12
-	conv_dropout = 0.0
-	num_filters = 128
-
-	x = Conv2D(316, (read_conv_width, 1), padding='valid', kernel_initializer="he_normal")(read_tensor)
-	x = BatchNormalization(axis=channel_axis, name='bn_conv1')(x)
-	x = Dropout(conv_dropout)(x)
-	x = Activation('relu')(x)
-	x = Conv2D(160, (1, read_conv_width), padding='valid', kernel_initializer="he_normal")(x)
-	x = BatchNormalization(axis=channel_axis, name='bn_conv2')(x)
-	x = Dropout(conv_dropout)(x)
-	x = Activation('relu')(x)
-
-	x = conv_block(x, 3, [64, 64, 256], stage=2, block='a', strides=(1, 1))
-	x = identity_block(x, 3, [64, 64, 256], stage=2, block='b')
-	x = identity_block(x, 3, [64, 64, 256], stage=2, block='c')
-
-	x = conv_block(x, 3, [128, 128, 512], stage=3, block='a')
-	x = identity_block(x, 3, [128, 128, 512], stage=3, block='b')
-	x = identity_block(x, 3, [128, 128, 512], stage=3, block='c')
-	x = identity_block(x, 3, [128, 128, 512], stage=3, block='d')
-
-	x = conv_block(x, 3, [256, 256, 512], stage=4, block='a')
-	x = identity_block(x, 3, [256, 256, 512], stage=4, block='b')
-	x = identity_block(x, 3, [256, 256, 512], stage=4, block='c')
-	x = identity_block(x, 3, [256, 256, 512], stage=4, block='d')
-	x = identity_block(x, 3, [256, 256, 512], stage=4, block='e')
-	x = identity_block(x, 3, [256, 256, 512], stage=4, block='f')
-
-	x = AveragePooling2D((2, 2), name='avg_pool')(x)
-
-	x = Flatten()(x)
-	x = Dense(units=len(args.labels), activation='softmax', name='fully_connected')(x)
-
-	model = Model(read_tensor, x, name='resnet50')
-
-	adamo = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08)#, clipnorm=1.)
-	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
-	
-	model.summary()
-	
-	if os.path.exists(args.weights_hd5):
-		model.load_weights(args.weights_hd5, by_name=True)
-		print('Loaded model weights from:', args.weights_hd5)
-
-	return model
 
 
 def build_read_tensor_2d_inception_model(args):
@@ -1796,31 +1477,6 @@ def build_read_tensor_2d_inception_model(args):
 	x = layers.concatenate(
 		[branch3x3, branch7x7x3, branch_pool], axis=channel_axis, name='mixed8')
 
-	# mixed 9: 8 x 8 x 2048
-	# for i in range(2):
-	#     branch1x1 = conv2d_bn(x, 320, 1, 1)
-
-	#     branch3x3 = conv2d_bn(x, 384, 1, 1)
-	#     branch3x3_1 = conv2d_bn(branch3x3, 384, 1, 3)
-	#     branch3x3_2 = conv2d_bn(branch3x3, 384, 3, 1)
-	#     branch3x3 = layers.concatenate(
-	#         [branch3x3_1, branch3x3_2], axis=channel_axis, name='mixed9_' + str(i))
-
-	#     branch3x3dbl = conv2d_bn(x, 448, 1, 1)
-	#     branch3x3dbl = conv2d_bn(branch3x3dbl, 384, 3, 3)
-	#     branch3x3dbl_1 = conv2d_bn(branch3x3dbl, 384, 1, 3)
-	#     branch3x3dbl_2 = conv2d_bn(branch3x3dbl, 384, 3, 1)
-	#     branch3x3dbl = layers.concatenate(
-	#         [branch3x3dbl_1, branch3x3dbl_2], axis=channel_axis)
-
-	#     branch_pool = AveragePooling2D(
-	#         (3, 3), strides=(1, 1), padding='same')(x)
-	#     branch_pool = conv2d_bn(branch_pool, 192, 1, 1)
-	#     x = layers.concatenate(
-	#         [branch1x1, branch3x3, branch3x3dbl, branch_pool],
-	#         axis=channel_axis,
-	#		name='mixed' + str(9 + i))
-
 	# Classification block
 	x = GlobalAveragePooling2D(name='avg_pool')(x)
 	x = Dense(len(args.labels), activation='softmax', name='predictions')(x)
@@ -1838,30 +1494,6 @@ def build_read_tensor_2d_inception_model(args):
 
 	return model
 
-
-def inception_node(x, filters, channel_axis):
-	""" Build an inception node.
-
-	Parallel 1x1 convolution (channel-wise) followed by 2d Convolutions (spatial) followed by concatenation.
-	See: https://arxiv.org/abs/1409.4842
-
-	Arguments
-		x: The input.	
-		filters: The number of filters to use (the width of the inception node).
-		channel_axis: The tensor axis for the channels (1 for theano, 3 for tensorflow) 
-	Returns
-		The output activations
-	"""		
-	tower_1 = Convolution2D(filters, 1, 1, border_mode='same', activation='relu')(x)
-	tower_1 = Convolution2D(filters, 3, 3, border_mode='same', activation='relu')(tower_1)
-
-	tower_2 = Convolution2D(filters, 1, 1, border_mode='same', activation='relu')(x)
-	tower_2 = Convolution2D(filters, 5, 5, border_mode='same', activation='relu')(tower_2)
-
-	tower_3 = MaxPooling2D((3, 3), strides=(1, 1), border_mode='same')(x)
-	tower_3 = Convolution2D(filters, 1, 1, border_mode='same', activation='relu')(tower_3)
-
-	return merge([tower_1, tower_2, tower_3], mode='concat', concat_axis=channel_axis)
 
 
 def build_bqsr_model(args):
@@ -1925,7 +1557,7 @@ def build_bqsr_annotation_model(args):
 	Returns
 		The keras model
 	'''	
-	read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name='read_tensor')
+	read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name=args.tensor_map)
 	x = Conv1D(filters=320, kernel_size=3, activation="relu", kernel_initializer='glorot_normal')(read_tensor)
 	x = Dropout(0.2)(x)
 	x = Conv1D(filters=256, kernel_size=3, activation="relu", kernel_initializer='glorot_normal')(x)
@@ -1937,7 +1569,7 @@ def build_bqsr_annotation_model(args):
 	x = Dense(units=40, activation="relu", kernel_initializer='glorot_normal')(x)
 	
 	# Mix the read annotations in
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	alt_input_mlp = Dense(units=32, kernel_initializer='glorot_normal', activation='relu')(annotations)
 	x = layers.concatenate([x, alt_input_mlp], axis=1)
 
@@ -1955,9 +1587,14 @@ def build_bqsr_annotation_model(args):
 
 
 def build_bqsr_lstm_model(args):
+	'''Build a model to predict Base Quality.
+
+	Arguments
+		args.tensor_map: what kind of input tensors are input
+	'''
 	model = Sequential()
-	model.add(LSTM(128, name="read_tensor", input_shape=(args.window_size, len(args.input_symbols))))
-	model.add(LSTM(128, name="read_tensor", input_shape=(args.window_size, len(args.input_symbols))))
+	model.add(LSTM(128, name=args.tensor_map, input_shape=(args.window_size, len(args.input_symbols))))
+	model.add(LSTM(128, name=args.tensor_map, input_shape=(args.window_size, len(args.input_symbols))))
 	model.add(Dense(len(args.labels), activation='softmax'))
 
 	optimizer = RMSprop(lr=0.01)
@@ -1966,240 +1603,9 @@ def build_bqsr_lstm_model(args):
 	return model
 
 
-def conv2d_bn_old(x, nb_filter, nb_row, nb_col,
-			  border_mode='same', subsample=(1, 1),
-			  name=None):
-	'''Utility function to apply conv + BN.
-	'''
-	if name is not None:
-		bn_name = name + '_bn'
-		conv_name = name + '_conv'
-	else:
-		bn_name = None
-		conv_name = None
-	if K.image_dim_ordering() == 'th':
-		bn_axis = 1
-	else:
-		bn_axis = 3
-	x = Convolution2D(nb_filter, nb_row, nb_col,
-					  subsample=subsample,
-					  activation='relu',
-					  border_mode=border_mode,
-					  name=conv_name)(x)
-	x = BatchNormalization(axis=bn_axis, name=bn_name)(x)
-	return x
-
-
-def inception_v3_max(args, input_tensor=None, architecture=''):
-	'''Instantiate the Inception v3 architecture,
-	optionally loading weights pre-trained
-	on ImageNet. Note that when using TensorFlow,
-	for best performance you should set
-	`image_dim_ordering="tf"` in your Keras config
-	at ~/.keras/keras.json.
-
-	The model and the weights are compatible with both
-	TensorFlow and Theano. The dimension ordering
-	convention used by the model is the one
-	specified in your Keras config file.
-
-	Note that the default input image size for this model is 299x299.
-
-	# Arguments
-		args.labels: classes at the top of the network.
-		input_tensor: optional Keras tensor (i.e. output of `layers.Input()`)
-			to use as image input for the model.
-
-	# Returns
-		A Keras model instance.
-	'''
-
-	# Determine proper input shape
-	size = 299 
-	if K.image_dim_ordering() == 'th':
-		input_shape = (3, size, size)
-
-	else:
-		input_shape = (size, size, 3)
-
-	if input_tensor is None:
-		img_input = Input(shape=input_shape)
-	else:
-		if not K.is_keras_tensor(input_tensor):
-			img_input = Input(tensor=input_tensor)
-		else:
-			img_input = input_tensor
-
-	if K.image_dim_ordering() == 'th':
-		channel_axis = 1
-	else:
-		channel_axis = 3
-
-	x = conv2d_bn_old(img_input, 32, 3, 3, subsample=(2, 2), border_mode='valid')
-	x = conv2d_bn_old(x, 32, 3, 3, border_mode='valid')
-	x = conv2d_bn_old(x, 64, 3, 3)
-	x = MaxPooling2D((3, 3), strides=(2, 2))(x)
-
-	x = conv2d_bn_old(x, 80, 1, 1, border_mode='valid')
-	x = conv2d_bn_old(x, 192, 3, 3, border_mode='valid')
-	x = MaxPooling2D((3, 3), strides=(2, 2))(x)
-
-	# mixed 0, 1, 2: 35 x 35 x 256
-	for i in range(3):
-		branch1x1 = conv2d_bn_old(x, 64, 1, 1)
-
-		branch5x5 = conv2d_bn_old(x, 48, 1, 1)
-		branch5x5 = conv2d_bn_old(branch5x5, 64, 5, 5)
-
-		branch3x3dbl = conv2d_bn_old(x, 64, 1, 1)
-		branch3x3dbl = conv2d_bn_old(branch3x3dbl, 96, 3, 3)
-		branch3x3dbl = conv2d_bn_old(branch3x3dbl, 96, 3, 3)
-
-		branch_pool = MaxPooling2D(
-			(3, 3), strides=(1, 1), border_mode='same')(x)
-		branch_pool = conv2d_bn_old(branch_pool, 32, 1, 1)
-		x = merge([branch1x1, branch5x5, branch3x3dbl, branch_pool],
-				  mode='concat', concat_axis=channel_axis,
-				  name='mixed' + str(i))
-
-	# mixed 3: 17 x 17 x 768
-	branch3x3 = conv2d_bn_old(x, 384, 3, 3, subsample=(2, 2), border_mode='valid')
-
-	branch3x3dbl = conv2d_bn_old(x, 64, 1, 1)
-	branch3x3dbl = conv2d_bn_old(branch3x3dbl, 96, 3, 3)
-	branch3x3dbl = conv2d_bn_old(branch3x3dbl, 96, 3, 3,
-							 subsample=(2, 2), border_mode='valid')
-
-	branch_pool = MaxPooling2D((3, 3), strides=(2, 2))(x)
-	x = merge([branch3x3, branch3x3dbl, branch_pool],
-			  mode='concat', concat_axis=channel_axis,
-			  name='mixed3')
-
-	# mixed 4: 17 x 17 x 768
-	branch1x1 = conv2d_bn_old(x, 192, 1, 1)
-
-	branch7x7 = conv2d_bn_old(x, 128, 1, 1)
-	branch7x7 = conv2d_bn_old(branch7x7, 128, 1, 7)
-	branch7x7 = conv2d_bn_old(branch7x7, 192, 7, 1)
-
-	branch7x7dbl = conv2d_bn_old(x, 128, 1, 1)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 128, 7, 1)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 128, 1, 7)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 128, 7, 1)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 192, 1, 7)
-
-	branch_pool = MaxPooling2D((3, 3), strides=(1, 1), border_mode='same')(x)
-	branch_pool = conv2d_bn_old(branch_pool, 192, 1, 1)
-	x = merge([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-			  mode='concat', concat_axis=channel_axis,
-			  name='mixed4')
-
-	# mixed 5, 6: 17 x 17 x 768
-	for i in range(2):
-		branch1x1 = conv2d_bn_old(x, 192, 1, 1)
-
-		branch7x7 = conv2d_bn_old(x, 160, 1, 1)
-		branch7x7 = conv2d_bn_old(branch7x7, 160, 1, 7)
-		branch7x7 = conv2d_bn_old(branch7x7, 192, 7, 1)
-
-		branch7x7dbl = conv2d_bn_old(x, 160, 1, 1)
-		branch7x7dbl = conv2d_bn_old(branch7x7dbl, 160, 7, 1)
-		branch7x7dbl = conv2d_bn_old(branch7x7dbl, 160, 1, 7)
-		branch7x7dbl = conv2d_bn_old(branch7x7dbl, 160, 7, 1)
-		branch7x7dbl = conv2d_bn_old(branch7x7dbl, 192, 1, 7)
-
-		branch_pool = MaxPooling2D(
-			(3, 3), strides=(1, 1), border_mode='same')(x)
-		branch_pool = conv2d_bn_old(branch_pool, 192, 1, 1)
-		x = merge([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-				  mode='concat', concat_axis=channel_axis,
-				  name='mixed' + str(5 + i))
-
-	# mixed 7: 17 x 17 x 768
-	branch1x1 = conv2d_bn_old(x, 192, 1, 1)
-
-	branch7x7 = conv2d_bn_old(x, 192, 1, 1)
-	branch7x7 = conv2d_bn_old(branch7x7, 192, 1, 7)
-	branch7x7 = conv2d_bn_old(branch7x7, 192, 7, 1)
-
-	branch7x7dbl = conv2d_bn_old(x, 160, 1, 1)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 192, 7, 1)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 192, 1, 7)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 192, 7, 1)
-	branch7x7dbl = conv2d_bn_old(branch7x7dbl, 192, 1, 7)
-
-	branch_pool = MaxPooling2D((3, 3), strides=(1, 1), border_mode='same')(x)
-	branch_pool = conv2d_bn_old(branch_pool, 192, 1, 1)
-	x = merge([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-			  mode='concat', concat_axis=channel_axis,
-			  name='mixed7')
-
-	# mixed 8: 8 x 8 x 1280
-	branch3x3 = conv2d_bn_old(x, 192, 1, 1)
-	branch3x3 = conv2d_bn_old(branch3x3, 320, 3, 3,
-						  subsample=(2, 2), border_mode='valid')
-
-	branch7x7x3 = conv2d_bn_old(x, 192, 1, 1)
-	branch7x7x3 = conv2d_bn_old(branch7x7x3, 192, 1, 7)
-	branch7x7x3 = conv2d_bn_old(branch7x7x3, 192, 7, 1)
-	branch7x7x3 = conv2d_bn_old(branch7x7x3, 192, 3, 3,
-							subsample=(2, 2), border_mode='valid')
-
-	branch_pool = MaxPooling2D((3, 3), strides=(2, 2))(x)
-	x = merge([branch3x3, branch7x7x3, branch_pool],
-			  mode='concat', concat_axis=channel_axis,
-			  name='mixed8')
-
-	# mixed 9: 8 x 8 x 2048
-	for i in range(2):
-		branch1x1 = conv2d_bn_old(x, 320, 1, 1)
-
-		branch3x3 = conv2d_bn_old(x, 384, 1, 1)
-		branch3x3_1 = conv2d_bn_old(branch3x3, 384, 1, 3)
-		branch3x3_2 = conv2d_bn_old(branch3x3, 384, 3, 1)
-		branch3x3 = merge([branch3x3_1, branch3x3_2],
-						  mode='concat', concat_axis=channel_axis,
-						  name='mixed9_' + str(i))
-
-		branch3x3dbl = conv2d_bn_old(x, 448, 1, 1)
-		branch3x3dbl = conv2d_bn_old(branch3x3dbl, 384, 3, 3)
-		branch3x3dbl_1 = conv2d_bn_old(branch3x3dbl, 384, 1, 3)
-		branch3x3dbl_2 = conv2d_bn_old(branch3x3dbl, 384, 3, 1)
-		branch3x3dbl = merge([branch3x3dbl_1, branch3x3dbl_2],
-							 mode='concat', concat_axis=channel_axis)
-
-		branch_pool = MaxPooling2D(
-			(3, 3), strides=(1, 1), border_mode='same')(x)
-		branch_pool = conv2d_bn_old(branch_pool, 192, 1, 1)
-		x = merge([branch1x1, branch3x3, branch3x3dbl, branch_pool],
-				  mode='concat', concat_axis=channel_axis,
-				  name='mixed' + str(9 + i))
-
-
-	# Classification block
-	# pool stride was 8
-	x = MaxPooling2D((3, 3), strides=(3, 3), name='avg_pool')(x)
-	x = Flatten(name='flatten')(x)
-	x = Dense(len(args.labels), activation='softmax', name='predictions')(x)
-
-	# Create model
-	model = Model(img_input, x)
-	adamo = Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
-	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
-
-	model.summary()
-
-	if os.path.exists(architecture):
-		model.load_weights(architecture, by_name=True)
-		print('Loaded model weights from:', architecture)
-
-	return model
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Serialization ~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 def serialize_model_semantics(args, architecture_hd5):
 	'''Save a json file specifying model semantics, I/O contract.
 
@@ -2286,7 +1692,6 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	model = load_model(weight_path_hd5, custom_objects=get_metric_dict(args.labels))
 	model.summary()
 	return model
-
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2682,6 +2087,14 @@ def get_metric_dict(labels):
 		metrics[label_key+'_precision'] = precision_fxns[i]
 		metrics[label_key+'_recall'] = recall_fxns[i]
 	return metrics
+
+
+def get_all_custom_objects(labels):
+	objs = get_metric_dict(labels)
+	weights = np.array([0.5,3,2,1,1,1,1])
+	objs['loss'] = weighted_categorical_crossentropy(weights)
+	return objs
+
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Evaluation ~~~~~~~~~~~~~~

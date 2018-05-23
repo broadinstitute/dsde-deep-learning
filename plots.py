@@ -29,7 +29,7 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score, precision_recall_curv
 image_ext = '.png'
 
 color_array = ['red', 'indigo', 'cyan', 'pink', 'purple', 'cyan', 'chartreuse', 'yellow', 'darkseagreen',
-				'aquamarine', 'gold', 'coral',  'tomato', 'grey', 'black', 'maroon', 'hotpink' 'steelblue',
+				'aquamarine', 'gold', 'coral',  'tomato', 'grey', 'black', 'maroon', 'hotpink', 'steelblue',
 				'goldenrod', 'deepskyblue',  'darkolivegreen', 'peachpuff', 'firebrick', 'plum', 'seagreen' ]
 
 key_colors = {
@@ -225,6 +225,11 @@ def get_auc(model, test_data, test_truth, labels):
 		mean += roc_auc[labels[key]]
 
 	return mean / len(labels)
+
+
+def get_per_class_auc(model, test_data, test_truth, labels):
+	fpr, tpr, roc_auc = get_fpr_tpr_roc(model, test_data, test_truth, labels)
+	return roc_auc
 
 
 def plot_roc_per_class(model, test_data, test_truth, labels, title, batch_size=32, prefix='./figures/', melt=False):

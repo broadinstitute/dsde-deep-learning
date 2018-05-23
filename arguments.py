@@ -19,12 +19,12 @@ import argparse
 import numpy as np
 
 print('uname is:', os.uname())
-# def is_broad_cluster():
-# 	machine = os.uname()[1]
-#  	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
+def is_broad_cluster():
+	machine = os.uname()[1]
+	return machine.endswith('broadinstitute.org') and not 'gsa5' in machine
 
-# if not is_broad_cluster():
-# 	import keras.backend as K
+if not is_broad_cluster():
+	import keras.backend as K
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -109,6 +109,16 @@ def parse_args():
 		help='Genomic position end for parallel tensor writing.')
 	parser.add_argument('--skip_positive_class', default=False, action='store_true',
 		help='Whether to skip positive examples when writing tensors.')
+	parser.add_argument('--use_lowercase_dna', default=False, action='store_true',
+		help='Whether to include tensors covering lower case bases when writing tensors.')
+	parser.add_argument('--valid_ratio', default=0.1, type=float,
+		help='Rate of training tensors to save for validation must be in [0.0, 1.0].')	
+	parser.add_argument('--test_ratio', default=0.2, type=float,
+		help='Rate of training tensors to save for testing [0.0, 1.0].')	
+	parser.add_argument('--valid_contigs', nargs='+', default=['18', '19', 'chr18', 'chr19'],
+		help='Contigs to reserve for validation data in addition to those reserved by valid_ratio.')	
+	parser.add_argument('--test_contigs', nargs='+', default=['20', '21', 'chr20', 'chr21'],
+		help='Contigs to reserve for testing data in addition to those reserved by test_ratio.')	
 	parser.add_argument('--chrom', help='Chromosome to load for parallel tensor writing.')
 
 
@@ -148,7 +158,7 @@ def parse_args():
 
 	# Evaluation related arguments
 	parser.add_argument('--multiallelics', default='include', choices=['include', 'only', 'ignore'],
-		help='How to handle multiallelic sites: can be include, only, or ignore. Only used in gnomad evaluation.')
+		help='How to handle multiallelic sites: can be include, only, or ignore.')
 	parser.add_argument('--random_forest_training_sites', default='ignore', choices=['include', 'only', 'ignore'],
 		help='How to handle Random Forest Training sites: can be include, only, or ignore. Only used in gnomad evaluation.')
 	parser.add_argument('--emit_interesting_sites', default=False, action='store_true',
@@ -180,11 +190,11 @@ def parse_args():
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
 
-	# if not is_broad_cluster():
-	# 	if args.channels_last:
-	# 		K.set_image_data_format('channels_last')
-	# 	else:
-	# 		K.set_image_data_format('channels_first')
+	if not is_broad_cluster():
+		if args.channels_last:
+			K.set_image_data_format('channels_last')
+		else:
+			K.set_image_data_format('channels_first')
 
 	print('Arguments are', args)
 	

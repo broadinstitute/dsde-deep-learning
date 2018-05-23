@@ -83,6 +83,7 @@ class VQSRScript extends QScript {
   @Argument(shortName = "oe", required = false, doc = "output file extension") var output_extension = ".recalibrated.vcf"
   @Argument(shortName = "ie", required = false, doc = "input file extension") var input_extension = ".vcf"
   @Argument(shortName = "indelMaxGaussians", required = false, doc = "Indel max gaussians") var indelMaxGaussians: Int = 5
+  @Argument(shortName = "snpMaxGaussians", required = false, doc = "Indel max gaussians") var snpMaxGaussians: Int = 8
 
   // Script arguments
   @Argument(shortName = "sc", required = false, doc = "Scatter count") var jobs: Int = 1
@@ -109,8 +110,8 @@ class VQSRScript extends QScript {
     vr_snp.tranches_file = "results/" + snp_tranches_file
     vr_snp.recal_file = "results/" + snp_recal_file
     vr_snp.use_annotation ++= List("FS", "MQ", "QD", "DP", "SOR", "ReadPosRankSum", "MQRankSum")
-    //vr_snp.use_annotation ++= List("FS", "QD", "SOR", "ReadPosRankSum", "MQRankSum")
     vr_snp.mode = org.broadinstitute.gatk.tools.walkers.variantrecalibration.VariantRecalibratorArgumentCollection.Mode.SNP
+    vr_snp.maxGaussians = snpMaxGaussians
 
     // Script arguments
     vr_snp.memoryLimit = memoryLimit

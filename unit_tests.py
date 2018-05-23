@@ -23,6 +23,7 @@ import plots
 import pickle
 import models
 import defines
+import recipes
 import unittest
 import arguments
 import numpy as np
@@ -33,6 +34,8 @@ from collections import Counter
 
 
 def run_tests():
+	suite = unittest.TestLoader().loadTestsFromTestCase(TestRecipes)
+	unittest.TextTestRunner(verbosity=2).run(suite)		
 	suite = unittest.TestLoader().loadTestsFromTestCase(TestModels)
 	unittest.TextTestRunner(verbosity=2).run(suite)	
 	suite = unittest.TestLoader().loadTestsFromTestCase(TestVariants)
@@ -84,7 +87,6 @@ class TestVariants(unittest.TestCase):
 			if count > max_samples:
 				break
 
-
 class TestModels(unittest.TestCase):
 	
 	def setUp(self):
@@ -99,6 +101,23 @@ class TestModels(unittest.TestCase):
 		self.assertEquals(m.output_shape[1], len(args.labels))
 		self.assertEquals(m.input_shape[0][1:], self.tensor_shape)
 		self.assertEquals(m.input_shape[1][1], len(args.annotations))
+
+
+class TestRecipes(unittest.TestCase):
+
+	def test_rra_b(self):
+		idx2labels = {v:k for k,v in args.labels.items()}
+		delta = 5e-2
+		args.data_dir = '/dsde/data/deep/vqsr/tensors/g94982_na12878_ref_read_anno_channels_first/'
+		args.epochs = 0
+		expected = {'NOT_SNP': 0.9678009259259259, 
+					'NOT_INDEL': 0.9766435185185185, 
+					'SNP': 0.9880324074074074, 
+					'INDEL': 0.9899074074074075
+					}
+		aucs = recipes.train_ref_read_anno_b(args)
+		for k in aucs:
+			self.assertAlmostEqual(aucs[k], expected[idx2labels[k]], delta=delta)
 
 
 # Back to the top!

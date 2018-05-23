@@ -15,7 +15,7 @@ REFERENCE=/seq/references/Homo_sapiens_assembly19/v1/Homo_sapiens_assembly19.fas
 TMPDIR=/broad/hptmp/`whoami`
 INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/wgs_calling_regions.v1.interval_list
 PICARD=/seq/software/picard/current/bin/picard.jar
-SCATTER=210
+SCATTER=200
 
 
 # HG002 BAM from NIST NA24385 Ashkenazi son
@@ -40,6 +40,13 @@ SCATTER=210
 # BAMOUT=/dsde/working/sam/cnn/chmi_chmi3_wgs4_g94794_bamout_all_calls.bam
 # VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794_all_calls.vcf.gz
 
+# The synthetic diploid wgs1 HG38
+# BAM=/dsde/data/deep/vqsr/bams/g94794_wgs1_hg38.bam
+# BAMOUT=/dsde/data/deep/vqsr/bams/g94794_wgs1_hg38_bamout.bam
+# VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+
 # Good ole NA12878 CEPH CEU Utah wife
 # BAM=/dsde/data/deep/vqsr/bams/NA12878_10X.bam
 # BAMOUT=/dsde/data/deep/vqsr/bams/na12878_10x_bamout.bam
@@ -57,13 +64,12 @@ SCATTER=210
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
-# Clinical project g47m NA12878 HG38
-# BAM=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878.bam
-# BAMOUT=/dsde/data/deep/vqsr/bams/g947m_o1d1v1_na12878_bamout.bam
-# VCF=/dsde/data/deep/vqsr/vcfs/g947m_o1d1v1_na12878.vcf.gz
-# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-# INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
-
+# Clinical project g947x NA12878 HG38
+BAM=/dsde/data/deep/vqsr/bams/NA12878_S1.bam
+BAMOUT=/dsde/data/deep/vqsr/bams/illumina_na12878_s1_bamout.bam
+VCF=/dsde/data/deep/vqsr/vcfs/illumina_na12878_s1.vcf.gz
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
 # NA12877 CEPH CEU Utah husband Solexa 269364
 # BAM=/seq/picard_aggregation/LCSET-6205/Solexa-269364,_PCR-Free_pool/v1/Solexa-269364,_PCR-Free_pool.bam
@@ -162,6 +168,11 @@ SCATTER=210
 # BAMOUT=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_392292.bam
 # VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_392292_all_calls.vcf.gz
 
+# BAM=/seq/picard_aggregation/D5227/NexPond-720405/current/NexPond-720405.bam
+# BAMOUT=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_720405_bamout.bam
+# VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_720405.vcf.gz
+# INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
+
 # HG38 Project G94982, NA12878
 # BAM=/dsde/data/deep/vqsr/bams/g94982_hg38.bam
 # BAMOUT=/dsde/data/deep/vqsr/bams/g94982_hg38_na12878_bamout.bam
@@ -187,7 +198,8 @@ $ECHO java -Djava.io.tmpdir=$TMPDIR -Dsamjdk.use_asysnc_io=true \
    -sc $SCATTER \
    -memLimit 7 \
    -jobResReq virtual_free=8G \
-   -mem 6
+   -mem 6 \
+   -run
 
 
 #Run VQSR and AssessNA12878
@@ -208,6 +220,7 @@ $ECHO java -Djava.io.tmpdir=$TMPDIR -Dsamjdk.use_asysnc_io=true \
    -an ReadPosRankSum \
    -oe _recalibrated.vcf.gz \
    -ie .vcf.gz \
+   -snpMaxGaussians 6 \
    -indelMaxGaussians 5 \
    -qsub -jobQueue gsa
 
