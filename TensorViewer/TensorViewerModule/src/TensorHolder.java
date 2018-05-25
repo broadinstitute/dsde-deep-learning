@@ -84,15 +84,11 @@ public class TensorHolder {
                         HDF5Constants.H5S_ALL, HDF5Constants.H5S_ALL,
                         HDF5Constants.H5P_DEFAULT, read_tensor);
                 System.out.println("Tensor loaded. Shape:" + Arrays.toString(tensor_shape));
-
-
             }
-
         }
         catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
     public void load_label_tensor(Path tensor_file, String tensor_name, int window_size){
@@ -111,7 +107,6 @@ public class TensorHolder {
         try {
             if (file_id >= 0) {
                 data_id = H5.H5Dopen(file_id, tensor_name, HDF5Constants.H5P_DEFAULT);
-
             }
         }
         catch (Exception e) {
