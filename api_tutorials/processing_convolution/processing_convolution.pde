@@ -63,7 +63,7 @@ void setup() {
   size(2200, 900);
   textSize(30);
   frameRate(30);
-  img = loadImage("basenji.jpg");
+  img = loadImage("palantir.png");
   matrix = block_avg;
 }
 
