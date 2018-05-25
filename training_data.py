@@ -506,7 +506,7 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 	stats = Counter()
 	debug = False
 
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	bed_dict = bed_file_to_dict(args.bed_file)
@@ -655,7 +655,7 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 	stats = Counter()
 	debug = False
 
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	bed_dict = bed_file_to_dict(args.bed_file)
@@ -4084,7 +4084,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	'''
 	stats = Counter()
 
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 	bed_dict = bed_file_to_dict(args.bed_file)
 	
 	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
@@ -4103,7 +4103,8 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	indel_scores = {key:[] for key in score_keys}
 	indel_truth = []
 
-	for variant in vcf_reader:	
+	for variant in vcf_reader:
+
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):
 			stats['In ignore vcf'] += 1
 			continue	
@@ -4125,11 +4126,12 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 			stats['gnomAD missing chrom:'+variant.CHROM] += 1
 			continue
 
-		variants = gnomads[variant.CHROM].fetch(variant.CHROM, variant.POS-1, variant.POS+1)
+		variants = gnomads[variant.CHROM].fetch(variant.CHROM.replace('chr', ''), variant.POS-1, variant.POS+1)
 		gnomad_variant = None
 		for v in variants:
-			if v.POS == variant.POS and v.CHROM == variant.CHROM:
+			if v.POS == variant.POS and any([a1 == a2 for a1 in v.ALT for a2 in variant.ALT]):
 				gnomad_variant = v
+		
 		if not gnomad_variant:
 			stats['Variant not in gnomAD'] += 1
 			continue
@@ -4173,7 +4175,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 		else:
 			stats['Not SNP or INDEL'] += 1
 
-		if len(snp_truth)%200 == 0:
+		if len(snp_truth)%1000 == 0:
 			for k in stats.keys():
 				print(k, 'has:', stats[k])			
 			print('last variant was:', str(variant))
@@ -4313,17 +4315,21 @@ def scores_from_gnomad_like_vcf(args, score_keys=['VQSLOD']):
 
 
 
-def gnomads_to_dict():
-	"""Open and load gnomAD autosomal vcfs into a dict.
+def gnomads_to_dict(args):
+	"""Open and load gnomAD vcfs into a dict.
 
 	Returns:
 		A dicts of vcf readers for each contig vcf from the gnomAD callset.
 	"""		
 	gnomads = {}
 
+	contig_prefix = 'chr' if '38' in args.reference_fasta else ''
+	prefix = defines.gnomad_prefix_hg38 if '38' in args.reference_fasta else defines.gnomad_prefix
+	postfix = '.liftover.b38.vcf.gz' if '38' in args.reference_fasta else '.vcf.gz'
+	
 	for i in range(1,23):
-		gnomads[str(i)] = vcf.Reader(open(defines.gnomad_prefix+str(i)+'.vcf.gz', 'r'))
-	gnomads['X'] = vcf.Reader(open(defines.gnomad_prefix+'X.vcf.gz', 'r'))
+		gnomads[contig_prefix+str(i)] = vcf.Reader(open(prefix+str(i)+postfix, 'r'))
+	gnomads[contig_prefix+'X'] = vcf.Reader(open(prefix+'X'+postfix, 'r'))
 	
 	return gnomads
 
@@ -4424,7 +4430,7 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 		And a similar dict for INDELs.
 	"""	
 	stats = Counter()
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 	bed_dict = bed_file_to_dict(args.bed_file)
 	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
 	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
@@ -4449,11 +4455,11 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 			allele_idx = int(p_split[2])
 
 		variant = None
-		variants = gnomads[chrom].fetch(chrom, pos-1, pos)
+		variants = gnomads[chrom].fetch(chrom.replace('chr', ''), pos-1, pos)
 		for v in variants:
-			if v.POS == pos and v.CHROM == chrom:
+			if v.POS == pos:
 				variant = v
-				v_negative = variant_in_vcf(variant, vcf_negative)
+				v_negative = variant_in_vcf(variant, vcf_negative, 'chr')
 
 		if not variant:
 			stats['Not in gnomad'] += 1
@@ -4483,7 +4489,7 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 			if score is None:
 				continue
 
-		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
+		in_bed = in_bed_file(bed_dict, 'chr'+variant.CHROM, variant.POS)
 		if not in_bed:
 			stats['Not in high confidence region'] += 1
 			continue
@@ -4497,7 +4503,7 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 				truth = 1
 			else:
 				truth = 0
-		elif not allele_idx and variant_in_vcf(variant, vcf_nist):
+		elif not allele_idx and variant_in_vcf(variant, vcf_nist, 'chr'):
 			truth = 1			
 		else:
 			truth = 0
@@ -4668,7 +4674,7 @@ def write_tranches(args):
 
 def inspect_gnomad_low_ac(args):
 	stats = Counter()
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 	for variant in gnomads['1']:
 		for i,a in enumerate(variant.ALT):
 			if int(variant.INFO['AC'][i]) < 2:
@@ -4823,7 +4829,7 @@ def intersect_vcfs(vcf1, vcf2):
 	return shared_variants
 
 
-def variant_in_vcf(variant, vcf_ram):
+def variant_in_vcf(variant, vcf_ram, contig_prefix=''):
 	''' Check if variant is in a VCF file.
 
 	Arguments
@@ -4836,11 +4842,11 @@ def variant_in_vcf(variant, vcf_ram):
 	start = variant.POS-1
 	end = variant.POS
 
-	variants = vcf_ram.fetch(variant.CHROM, start, end)
+	variants = vcf_ram.fetch(contig_prefix+variant.CHROM, start, end)
 	
 	for v in variants:
 		same_allele = any([a1 == a2 for a1 in v.ALT for a2 in variant.ALT]) 
-		if v.CHROM == variant.CHROM and v.POS == variant.POS and same_allele:
+		if v.POS == variant.POS and same_allele:
 			return v
 	
 	return None 

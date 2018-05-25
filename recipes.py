@@ -1182,7 +1182,7 @@ def test_architectures(args):
 	if 'SNP' in args.labels:
 		snp_key_sets = [set(compare_snp[k].keys()) for k in compare_snp]
 		shared_snp_keys = set.intersection(*snp_key_sets)
-		snp_truth = [compare_snp[compare_snp.keys()[0]][p][1] for p in shared_snp_keys]
+		snp_truth = [compare_snp[list(compare_snp)[0]][p][1] for p in shared_snp_keys]
 		snp_scores = score_dict_from_shared_positions(args, 'SNP', shared_snp_keys, cnn_snp_dicts, compare_snp)
 		title_suffix = args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
 		plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
@@ -1191,7 +1191,7 @@ def test_architectures(args):
 	if 'INDEL' in args.labels:
 		indel_key_sets = [set(compare_indel[k].keys()) for k in compare_indel]
 		shared_indel_keys = set.intersection(*indel_key_sets)
-		indel_truth = [compare_indel[compare_indel.keys()[0]][p][1] for p in shared_indel_keys]
+		indel_truth = [compare_indel[list(compare_indel)[0]][p][1] for p in shared_indel_keys]
 		indel_scores = score_dict_from_shared_positions(args, 'INDEL', shared_indel_keys, cnn_indel_dicts, compare_indel)
 		title_suffix = args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
 		plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
