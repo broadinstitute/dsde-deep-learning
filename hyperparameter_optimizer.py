@@ -268,7 +268,8 @@ class HyperparameterOptimizer(object):
 		trials = hyperopt.Trials()
 		best = fmin(hp_loss_from_params_2d, space=space, algo=tpe.suggest, max_evals=args.iterations, trials=trials)
 		print('best is:', best)
-		print(trials)
+		print('trial dicts', trials.trials)
+		print('trials.losses', trials.losses())
 
 		# optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d, # Objective function       
   #                                            domain=bounds,          				# Box-constraints of the problem
