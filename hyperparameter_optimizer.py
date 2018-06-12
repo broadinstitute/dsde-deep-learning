@@ -83,7 +83,8 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.max_pool_sets_2d = [ 
-									[], [(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
+									#[], 
+									[(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
 									[(1,2),(1,2)], [(2,1),(2,1)], [(3,1),(3,1)], [(1,3), (1,3)],
 								  	[(2,1),(6,1)],[(4,1),(4,1)], [(4,1),(8,1)], 
 								  	[(3,3), (3,3)], [(4,4), (4,4)], [(4,8), (4,8)],
@@ -271,7 +272,7 @@ class HyperparameterOptimizer(object):
 		print('trial dicts', trials.trials)
 		print('trials.losses', trials.losses())
 		print('best is:', best)
-		print('best str is:', string_from_best_trials(self, best, trials.trials))
+		print('best str is:', self.string_from_best_trials(best, trials.trials))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
