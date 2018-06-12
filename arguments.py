@@ -60,7 +60,7 @@ def parse_args():
 	parser.add_argument('--label_sites', default=True, dest='label_sites', action='store_true',
 		help='Truth labels are for variant sites (i.e. not allele specific).')				
 	parser.add_argument('--label_alleles', dest='label_sites', action='store_false',
-		help='Truth labels are for allele specific, so one site may have both true and false variants.')
+		help='If True then truth labels are allele specific, so one site may have both true and false variants.')
 	
 
 	# Annotation arguments
