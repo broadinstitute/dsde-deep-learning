@@ -28,6 +28,8 @@ from collections import Counter
 # Bayesian optimization imports
 import GPy
 import GPyOpt
+import hyperopt
+from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
 # Keras imports
 import keras.backend as K
@@ -94,8 +96,8 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.fc_layer_sets = [
-									[24], [32], 
-									[32, 16], [16, 32], [32, 32], [48, 32], [32, 32]
+									[16], [24], [32], 
+									[32, 16], [16, 32], [32, 32]
 							 ]
 
 		self.mlp_layer_sets = [
@@ -105,35 +107,7 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.residual_layers_sets = [
-										[],
-										# [ 	
-										# 	models.ResidualLayer(False, [64, 64, 256], [1,1]), 
-										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]), 
-										# 	models.ResidualLayer(True, [64, 64, 256], [1,1])
-										# ],										
-										# [ 	
-										# 	models.ResidualLayer(False, [64, 64, 256], [1,1]), 
-										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]), 
-										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]),
-										# 	models.ResidualLayer(False, [128, 128, 512], [2,2]),
-										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
-										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
-										# 	models.ResidualLayer(True, [128, 128, 512], [1,1])
-										# ],
-										# [ 	
-										# 	models.ResidualLayer(False, [64, 64, 256], [1,1]), 
-										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]), 
-										# 	models.ResidualLayer(True, [64, 64, 256], [1,1]),
-										# 	models.ResidualLayer(False, [128, 128, 512], [2,2]),
-										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
-										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
-										# 	models.ResidualLayer(True, [128, 128, 512], [1,1]),
-										# 	models.ResidualLayer(False, [256, 256, 512], [2,2]),
-										# 	models.ResidualLayer(True, [256, 256, 512], [1,1]),
-										# 	models.ResidualLayer(True, [256, 256, 512], [1,1]),
-										# 	models.ResidualLayer(True, [256, 256, 512], [1,1]),
-										# 	models.ResidualLayer(True, [256, 256, 512], [1,1])
-										# ]
+										[]
 									]
 
 
@@ -244,21 +218,29 @@ class HyperparameterOptimizer(object):
 			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))}
 		]
 
-		param_keys = { d['name']:i for i,d in enumerate(bounds)}
-
-		def loss_from_params_2d(x):
-			p = x[0]
-			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
-			max_pools = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
-			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
+		space = {
+			'conv_width' : hp.quniform('conv_width', 3, 19, 2),
+			'conv_height' : hp.quniform('conv_height', 3, 19, 2),
+			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'kernel_single_channel' : hp.choice('kernel_single_channel', [0, 1]),
+			'fc' : hp.choice('fc',self.fc_layer_sets),
+			'valid_padding' : hp.choice('valid_padding', [0, 1]),
+			'max_pools_2d' : hp.choice('max_pools_2d', self.max_pool_sets_2d),
+		}
+		
+		def hp_loss_from_params_2d(x):
+			#print('my x is:', x)
+			#conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
+			#max_pools = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
+			#fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
-										conv_width = int(p[param_keys['conv_width']]),
-										conv_height = int(p[param_keys['conv_height']]),
-										conv_layers = conv_layers,
-										max_pools = max_pools,
-										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-										fc_layers = fc_layers
+										conv_width = int(x['conv_width']),
+										conv_height = int(x['conv_height']),
+										conv_layers = x['conv_layers'],
+										max_pools = x['max_pools_2d'],
+										padding = 'valid' if bool(x['valid_padding']) else 'same',
+										fc_layers = x['fc']
 										)
 
 				if model.count_params() > args.max_parameters:
@@ -268,36 +250,42 @@ class HyperparameterOptimizer(object):
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
-				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
-				print('best_architecture:', self.str_from_params_and_keys(p, param_keys))
+				#print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				#print('best_architecture:', self.str_from_params_and_keys(p, param_keys))
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
-				limit_mem()
+				#limit_mem()
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
 				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2)]
+		print(samples)
+		trials = hyperopt.Trials()
+		best = fmin(hp_loss_from_params_2d, space=space, algo=tpe.suggest, max_evals=args.iterations, trials=trials)
+		print('best is:', best)
+		print(trials)
 
-		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d, # Objective function       
-                                             domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-                                             model_type='GP',
-                                             acquisition_type='EI',        			# Expected Improvement
-                                             acquisition_optimizer='DIRECT',
-                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True,							# Talk to me!
-                                             normalize_Y = False
-                                             )         
+		# optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d, # Objective function       
+  #                                            domain=bounds,          				# Box-constraints of the problem
+  #                                            initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
+  #                                            model_type='GP',
+  #                                            acquisition_type='EI',        			# Expected Improvement
+  #                                            acquisition_optimizer='DIRECT',
+  #                                            exact_feval=True,						# Is loss exact or noisy? Noisy!
+  #                                            verbosity=True,							# Talk to me!
+  #                                            normalize_Y = False
+  #                                            )         
 
-		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
-		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
-		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
+		# optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
+		# print('Best parameter set:', optimizer.x_opt)
+		# print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
+		# with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
+		# 	f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
