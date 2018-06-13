@@ -259,13 +259,14 @@ class HyperparameterOptimizer(object):
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
 				#limit_mem()
+				print('Current architecture: ', self.string_from_arch_dict(x))
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
 				return max_loss
 
-		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2)]
+		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2) ]
 		print(samples)
 		trials = hyperopt.Trials()
 		best = fmin(hp_loss_from_params_2d, space=space, algo=tpe.suggest, max_evals=args.iterations, trials=trials)
@@ -656,7 +657,6 @@ class HyperparameterOptimizer(object):
 				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
 		s = ''
 
-
 		best_trial_idx = np.argmin(best)
 		x = trials[best_trial_idx]['misc']['vals']
 
@@ -683,6 +683,34 @@ class HyperparameterOptimizer(object):
 				s += str(v)
 
 		return s
+
+
+	def string_from_arch_dict(self, x):
+		for k in x:
+			
+			s += '\n' + k + ' = '
+			v = x[k]
+
+			if k == 'fc':
+				s += str(self.fc_layer_sets[int(v)])
+			elif k == 'mlp_fc':
+				s += str(self.mlp_layer_sets[int(v)])	
+			elif k == 'conv_layers':
+				s += str(self.conv_layers_sets[int(v)])
+			elif k == 'max_pools_1d':
+				s += str(self.max_pool_sets_1d[int(v)])
+			elif k == 'max_pools_2d':
+				s += str(self.max_pool_sets_2d[int(v)])
+			elif k == 'residual_layers':
+				s += str(self.residual_layers_sets[int(v)])					
+			elif k in bools:
+				s += str(bool(v))
+			else:
+				s += str(v)
+
+		return s
+
+
 
 	def ab_test_2d(self, args, params_a, params_b):
 		'''A/B Test between two different architectures.
