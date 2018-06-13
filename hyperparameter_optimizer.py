@@ -655,27 +655,28 @@ class HyperparameterOptimizer(object):
 		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
 				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
 		s = ''
-
-
 		best_trial_idx = np.argmin(best)
-		for k in trials[best_trial_idx]:
+		x = trials[best_trial_idx]['vals']
+
+		for k in x:
+			
 			s += '\n' + k + ' = '
 			if k == 'fc':
-				s += str(self.fc_layer_sets[int(trials[best_trial_idx][k])])
+				s += str(self.fc_layer_sets[int(x[k])])
 			elif k == 'mlp_fc':
-				s += str(self.mlp_layer_sets[int(trials[best_trial_idx][k])])	
+				s += str(self.mlp_layer_sets[int(x[k])])	
 			elif k == 'conv_layers':
-				s += str(self.conv_layers_sets[int(trials[best_trial_idx][k])])
+				s += str(self.conv_layers_sets[int(x[k])])
 			elif k == 'max_pools_1d':
-				s += str(self.max_pool_sets_1d[int(trials[best_trial_idx][k])])
+				s += str(self.max_pool_sets_1d[int(x[k])])
 			elif k == 'max_pools_2d':
-				s += str(self.max_pool_sets_2d[int(trials[best_trial_idx][k])])
+				s += str(self.max_pool_sets_2d[int(x[k])])
 			elif k == 'residual_layers':
-				s += str(self.residual_layers_sets[int(trials[best_trial_idx][k])])					
+				s += str(self.residual_layers_sets[int(x[k])])					
 			elif k in bools:
-				s += str(bool(trials[best_trial_idx][k]))
+				s += str(bool(x[k]))
 			else:
-				s += str(trials[best_trial_idx][k])
+				s += str(x[k])
 
 		return s
 
