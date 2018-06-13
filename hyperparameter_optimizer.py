@@ -655,8 +655,10 @@ class HyperparameterOptimizer(object):
 		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
 				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
 		s = ''
+
+
 		best_trial_idx = np.argmin(best)
-		x = trials[best_trial_idx]['vals']
+		x = trials[best_trial_idx]
 
 		for k in x:
 			
