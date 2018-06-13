@@ -262,6 +262,7 @@ class HyperparameterOptimizer(object):
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
 				#limit_mem()
+				print('x is', x)
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				return loss_and_metrics[0]
 			
@@ -691,21 +692,9 @@ class HyperparameterOptimizer(object):
 		for k in x:
 			
 			s += '\n' + k + ' = '
-			v = x[k][0]
+			v = x[k]
 
-			if k == 'fc':
-				s += str(self.fc_layer_sets[int(v)])
-			elif k == 'mlp_fc':
-				s += str(self.mlp_layer_sets[int(v)])	
-			elif k == 'conv_layers':
-				s += str(self.conv_layers_sets[int(v)])
-			elif k == 'max_pools_1d':
-				s += str(self.max_pool_sets_1d[int(v)])
-			elif k == 'max_pools_2d':
-				s += str(self.max_pool_sets_2d[int(v)])
-			elif k == 'residual_layers':
-				s += str(self.residual_layers_sets[int(v)])					
-			elif k in bools:
+			if k in bools:
 				s += str(bool(v))
 			else:
 				s += str(v)
