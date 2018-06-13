@@ -686,6 +686,7 @@ class HyperparameterOptimizer(object):
 
 
 	def string_from_arch_dict(self, x):
+		s = ''
 		for k in x:
 			
 			s += '\n' + k + ' = '
