@@ -658,27 +658,29 @@ class HyperparameterOptimizer(object):
 
 
 		best_trial_idx = np.argmin(best)
-		x = trials[best_trial_idx]
+		x = trials[best_trial_idx]['misc']['vals']
 
 		for k in x:
 			
 			s += '\n' + k + ' = '
+			v = x[k][0]
+
 			if k == 'fc':
-				s += str(self.fc_layer_sets[int(x[k])])
+				s += str(self.fc_layer_sets[int(v)])
 			elif k == 'mlp_fc':
-				s += str(self.mlp_layer_sets[int(x[k])])	
+				s += str(self.mlp_layer_sets[int(v)])	
 			elif k == 'conv_layers':
-				s += str(self.conv_layers_sets[int(x[k])])
+				s += str(self.conv_layers_sets[int(v)])
 			elif k == 'max_pools_1d':
-				s += str(self.max_pool_sets_1d[int(x[k])])
+				s += str(self.max_pool_sets_1d[int(v)])
 			elif k == 'max_pools_2d':
-				s += str(self.max_pool_sets_2d[int(x[k])])
+				s += str(self.max_pool_sets_2d[int(v)])
 			elif k == 'residual_layers':
-				s += str(self.residual_layers_sets[int(x[k])])					
+				s += str(self.residual_layers_sets[int(v)])					
 			elif k in bools:
-				s += str(bool(x[k]))
+				s += str(bool(v))
 			else:
-				s += str(x[k])
+				s += str(v)
 
 		return s
 
