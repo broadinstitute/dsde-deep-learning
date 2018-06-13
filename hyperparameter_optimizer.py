@@ -34,6 +34,9 @@ from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 # Keras imports
 import keras.backend as K
 
+bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
+				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
+
 def run():
 	args = arguments.parse_args()	
 	if '2d' == args.mode:
@@ -626,8 +629,7 @@ class HyperparameterOptimizer(object):
 
 
 	def str_from_params_and_keys(self, x, param_keys):
-		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
-				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
+
 		s = ''
 		for k in param_keys:
 			s += '\n' + k + ' = '
@@ -653,8 +655,7 @@ class HyperparameterOptimizer(object):
 
 
 	def string_from_best_trials(self, best, trials):
-		bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'valid_padding', 'annotation_shortcut',
-				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
+		
 		s = ''
 
 		best_trial_idx = np.argmin(best)
