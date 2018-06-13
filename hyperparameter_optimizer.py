@@ -691,7 +691,7 @@ class HyperparameterOptimizer(object):
 		for k in x:
 			
 			s += '\n' + k + ' = '
-			v = x[k]
+			v = x[k][0]
 
 			if k == 'fc':
 				s += str(self.fc_layer_sets[int(v)])
