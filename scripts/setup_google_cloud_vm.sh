@@ -1,6 +1,9 @@
 #!/bin/bash
 ECHO=echo
 
+# Get root
+$ECHO sudo passwd
+
 # Check for CUDA and try to install.
 if ! dpkg-query -W cuda-9-0; then
   # The 16.04 installer works with 16.10.
@@ -10,21 +13,22 @@ if ! dpkg-query -W cuda-9-0; then
   $ECHO apt-get update
   $ECHO apt-get install cuda-9-0 -y
 fi
+
 # Enable persistence mode
-$ECHO sudo passwd
 $ECHO nvidia-smi -pm 1
 
+# Get Anaconda
 $ECHO wget http://repo.continuum.io/archive/Anaconda3-4.0.0-Linux-x86_64.sh
 $ECHO bash Anaconda3-4.0.0-Linux-x86_64.sh
-
 $ECHO source ~/.profile
 
-$ECHO git clone https://github.com/broadinstitute/dsde-deep-learning.git
-$ECHO cd dsde-deep-learning/
+# Create the conda environment for GATK Deep Learning with GPU
 $ECHO conda env create -n gatk -f ./envs/gatkcondaenv_gpu.yml
 
+#Activate environment
 $ECHO source activate gatk
 
+# Run something
 $ECHO cd api_tutorials/
 $ECHO python api_tutorials/keras_example.py
 
