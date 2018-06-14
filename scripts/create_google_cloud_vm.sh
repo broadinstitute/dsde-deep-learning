@@ -1,7 +1,7 @@
 #!/bin/bash
 ECHO=echo
 
-VM_NAME="dsde-deep-learner-$USER"
+VM_NAME="dddddddddsde-deep-learner-$USER"
 $ECHO echo "Try to create vm named ${VM_NAME}"
 $ECHO gcloud compute instances create "${VM_NAME}" \
 	--scopes "compute-rw,storage-full,cloud-platform" \
@@ -18,7 +18,7 @@ $ECHO gcloud compute ssh "${VM_NAME}" --zone us-east1-d
 $ECHO "echo In a terminal on the instance clone this repo:"
 $ECHO "echo git clone https://github.com/broadinstitute/dsde-deep-learning.git "
 $ECHO "echo Then run the setup script with: "
-$ECHO "./dsde-deep-learning/ "
+$ECHO "echo ./dsde-deep-learning/scripts/setup_google_cloud_vm.sh "
 
 $ECHO "echo To copy things from the VM to a local machine use gcloud compute scp "
 $ECHO "echo For example the templates templates learned and plotted by keras_example.py can be copied locally with:"

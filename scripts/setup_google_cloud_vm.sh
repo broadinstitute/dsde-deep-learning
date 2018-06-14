@@ -29,7 +29,7 @@ $ECHO conda env create -n gatk -f ./envs/gatkcondaenv_gpu.yml
 $ECHO source activate gatk
 
 # Run something
-$ECHO cd api_tutorials/
+$ECHO cd $HOME/dsde-deep-learning/
 $ECHO python api_tutorials/keras_example.py
 
 $ECHO "echo To copy things from the VM to a local machine use gcloud compute scp "
