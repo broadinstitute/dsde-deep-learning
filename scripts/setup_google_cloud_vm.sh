@@ -23,14 +23,13 @@ $ECHO bash Anaconda3-4.0.0-Linux-x86_64.sh
 $ECHO source ~/.profile
 
 # Create the conda environment for GATK Deep Learning with GPU
-$ECHO conda env create -n gatk -f ./envs/gatkcondaenv_gpu.yml
+$ECHO conda env create -n gatk -f $HOME/dsde-deep-learning/envs/gatkcondaenv_gpu.yml
 
 #Activate environment
 $ECHO source activate gatk
 
 # Run something
-$ECHO cd $HOME/dsde-deep-learning/
-$ECHO python api_tutorials/keras_example.py
+$ECHO python $HOME/dsde-deep-learning/api_tutorials/keras_example.py
 
 $ECHO "echo To copy things from the VM to a local machine use gcloud compute scp "
 $ECHO "echo For example the templates templates learned by keras_example.py can be copied and looked at locally with:"
