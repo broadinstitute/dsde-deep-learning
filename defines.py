@@ -29,6 +29,7 @@ dbsnp_vcf = '/dsde/working/sam/dbsnp_comparisons/dbsnp_150_hg19_All_20170403.vcf
 # BED and BAM and other files
 bam_file = data_path + 'bams/na12878_g94982_bamout_no_trim.bam'
 gnomad_prefix = '/web/macarthurlab-distribution/gnomAD/release-170228/genomes/vcf/gnomad.genomes.r2.0.1.sites.'
+gnomad_prefix_hg38 = '/humgen/atgu1/fs03/shared_resources/gnomAD/GRCh38/v2.0.2/genomes/gnomad.genomes.r2.0.2.sites.chr'
 nist_bed_file = data_path + 'beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed'
 exon_bed_file = data_path + 'beds/gencode_exons_v24.bed'
 repeat_bed_file = data_path + 'beds/repeat_masker_hg19.bed'

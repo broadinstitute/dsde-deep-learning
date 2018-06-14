@@ -1,11 +1,9 @@
 #!/usr/bin/python
 # keras_example.py
 
-
 # Basic example for learning small keras model's on simulated data and MNIST
 # sam@broadinstitute.org
 # December 2016
-
 
 # Try to be Python 2 / 3 Compatible
 from __future__ import print_function
@@ -17,16 +15,22 @@ import gzip
 import pickle
 import random
 import numpy as np
+
+# Matplotlib shenanigans
+import matplotlib
+matplotlib.use('Agg') # Need this to write images from the GSA servers.  Order matters:
+import matplotlib.pyplot as plt # First import matplotlib, then use Agg, then import plt
+
+# Keras imports
 from keras import metrics
-import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers.core import Dense
 
 
 def run():
-	#linear_regression()
+	linear_regression()
 	logistic_regression()
-	#multilayer_perceptron()
+	multilayer_perceptron()
 
 
 def linear_regression():
@@ -39,20 +43,26 @@ def linear_regression():
 	linear_model = Sequential()
 	linear_model.add(Dense(1, input_dim=1))
 	linear_model.compile(loss='mse', optimizer='sgd')
+	linear_model.summary()
 	linear_model.fit(x, y, batch_size=1, epochs=10)
 
 	learned_slope = linear_model.get_weights()[0][0][0]
 	learned_bias = linear_model.get_weights()[1][0]
 	print('Learned slope:',  learned_slope, 'real slope:', real_weight, 'learned bias:', learned_bias, 'real bias:', real_bias)
+	
 	plt.plot(x, y)
 	plt.plot([-1,1], [-learned_slope+learned_bias, learned_slope+learned_bias], 'r')
-	plt.show()
+	plot_name = "./regression_example/linear_regression.png"
+	if not os.path.exists(os.path.dirname(plot_name)):
+		os.makedirs(os.path.dirname(plot_name))	
+	plt.savefig(plot_name)
+	print('Linear Regression complete! Saved plot at:', plot_name)
 
 
 def logistic_regression():
 	train, test, valid = load_data('mnist.pkl.gz')
 
-	epochs = 3200
+	epochs = 1000
 	num_labels = 10
 	train_y = make_one_hot(train[1], num_labels)
 	valid_y = make_one_hot(valid[1], num_labels)
@@ -71,10 +81,9 @@ def logistic_regression():
 		x_batch = train[0][trainidx,:]
 		y_batch = train_y[trainidx]
 		logistic_model.train_on_batch(x_batch, y_batch)
-		if e % 5 == 0:
+		if e % 100 == 0:
 			plot_templates(logistic_model.layers[0].get_weights()[0], e)
-
-	print('Test set loss and accuracy:', logistic_model.evaluate(test[0], test_y))
+			print('Logistic Model test set loss and accuracy:', logistic_model.evaluate(test[0], test_y), 'at epoch', e)
 
 
 def plot_templates(templates, epoch):
@@ -88,7 +97,7 @@ def plot_templates(templates, epoch):
 		ax.get_xaxis().set_visible(False)
 		ax.get_yaxis().set_visible(False)
 
-	plot_name = "./frames/mnist/regression/templates_"+str(epoch)+".png"
+	plot_name = "./regression_example/mnist_templates_"+str(epoch)+".png"
 	if not os.path.exists(os.path.dirname(plot_name)):
 		os.makedirs(os.path.dirname(plot_name))		
 	plt.savefig(plot_name)
@@ -106,8 +115,9 @@ def multilayer_perceptron():
 	mlp_model.add(Dense(300, activation='relu', input_dim=784))
 	mlp_model.add(Dense(10, activation='softmax'))
 	mlp_model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
+	mlp_model.summary()
 	mlp_model.fit(train[0], train_y, validation_data=(valid[0],valid_y), batch_size=32, epochs=10)
-	print('Test set loss and accuracy:', mlp_model.evaluate(test[0], test_y))
+	print('Multilayer Perceptron trained. Test set loss and accuracy:', mlp_model.evaluate(test[0], test_y))
 
 
 def make_one_hot(y, num_labels):
@@ -140,12 +150,14 @@ def load_data(dataset):
 			dataset = new_path
 
 	if (not os.path.isfile(dataset)) and data_file == 'mnist.pkl.gz':
-		import urllib
+		from urllib.request import urlretrieve
 		origin = (
 			'http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz'
 		)
 		print('Downloading data from %s' % origin)
-		urllib.urlretrieve(origin, dataset)
+		if not os.path.exists(os.path.dirname(dataset)):
+			os.makedirs(os.path.dirname(dataset))	
+		urlretrieve(origin, dataset)
 
 	print('loading data...')
 

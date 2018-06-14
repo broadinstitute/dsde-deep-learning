@@ -37,12 +37,14 @@ def run():
 def annotate_vcf_with_inference(args):
 	cnns = {}
 	stats = Counter()
-	vcf_reader = pysam.VariantFile(args.negative_vcf, "r")
+	vcf_reader = pysam.VariantFile(args.negative_vcf, 'r')
+	pyvcf_vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
 	input_tensors = {}
 
 	for a in args.architectures:	
-		print('Annotating with architecture:', a)		
 		cnns[a] = models.set_args_and_get_model_from_semantics(args, a)
+		print('Annotating with architecture:', a, 'sample name is', args.sample_name)		
+
 		if not score_key_from_json(a) in vcf_reader.header.info:
 			vcf_reader.header.info.add(score_key_from_json(a), '1', 'Float', 'Site-level score from Convolutional Neural Net named '+a+'.')
 		if defines.annotations_from_args(args) is not None:
@@ -73,13 +75,13 @@ def annotate_vcf_with_inference(args):
 		print('iterate over vcf')
 		variants = vcf_reader
 
+	start_time = time.time()
 	for variant in variants:
 		idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 
 		contig = reference[variant.contig]	
 		record = contig[ ref_start : ref_end ]
-		v = pysam_variant_to_pyvcf(variant)
-		
+		v = pysam_variant_in_pyvcf(variant, pyvcf_vcf_reader)
 		for tm in batch:
 			batch_key = tm+'_in_batch'
 
@@ -119,7 +121,9 @@ def annotate_vcf_with_inference(args):
 
 			stats['batches processed'] += 1
 			if stats['batches processed'] % 10 == 0:
-				print('Processed:', stats['batches processed'], 'batches.  Last variant:', variant)
+				elapsed = time.time()-start_time
+				v_per_minute = stats['batches processed']*args.batch_size / (elapsed/60)
+				print('Variants per minute:', v_per_minute, 'Batches:', stats['batches processed'], 'batches.  Last variant:', variant)
 
 		if stats['batches processed']*args.batch_size > args.samples:
 			break
@@ -134,6 +138,28 @@ def annotate_vcf_with_inference(args):
 def pysam_variant_to_pyvcf(v):
 	alts = [vcf.model._Substitution(a) for a in v.alts]
 	return vcf.model._Record(v.contig, v.pos, v.id, v.ref, alts, v.qual, v.filter, v.info, [], None)
+
+def pysam_variant_in_pyvcf(variant, vcf_ram, contig_prefix=''):
+	''' Check if variant is in a VCF file.
+
+	Arguments
+		variant: the variant we are looking for
+		vcf_ram: the VCF we look in, must have an index (tbi, or idx)
+
+	Returns
+		variant if it is found otherwise None
+	'''	
+	start = variant.pos-1
+	end = variant.pos
+
+	variants = vcf_ram.fetch(contig_prefix+variant.chrom, start, end)
+	
+	for v in variants:
+		same_allele = any([a1 == a2 for a1 in v.ALT for a2 in variant.alts]) 
+		if v.POS == variant.pos and same_allele:
+			return v
+	
+	return None 
 
 def score_key_from_json(json_file):
 	return td.plain_name(json_file).upper() 
@@ -167,8 +193,6 @@ def apply_cnns_to_batch(args, cnns, batch, positions, variant_batch, vcf_writer,
 				stats['Not SNP or INDEL'] += 1
 				v_out.info[score_key_from_json(a)] = float(max(snp_dicts[a][position],indel_dicts[a][position]))
 
-		print('predictions:', predictions)
-		print('Writing v_out:', v_out)
 		vcf_writer.write(v_out)
 		stats['variants_written'] += 1
 

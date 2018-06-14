@@ -37,6 +37,14 @@ from collections import Counter, defaultdict
 
 tensor_exts = ['.h5', '.hd5']
 
+p_lut = np.zeros((256,))
+not_p_lut = np.zeros((256,))
+
+for i in range(256):
+    exponent = float(-i) / 10.0
+    p_lut[i] = 1.0 - (10.0**exponent)
+    not_p_lut[i] = (1.0 - p_lut[i]) / 3.0
+
 
 def run_training_data():
 	'''Dispatch on args.mode command-line supplied recipe'''
@@ -157,7 +165,11 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 				stats['Skipped lowercase DNA'] += 1
 				continue
 
-			cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
+			if args.label_sites:
+				cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
+			else:
+				cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
+			
 			if not cur_label_key or downsample(args, cur_label_key, stats, variant):
 				continue
 
@@ -262,7 +274,11 @@ def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 
 			contig = record_dict[variant.CHROM]	
 			record = contig[ ref_start : ref_end ]
 
-			cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
+			if args.label_sites:
+				cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
+			else:
+				cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
+
 			if not cur_label_key or downsample(args, cur_label_key, stats):
 				continue
 
@@ -506,7 +522,7 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 	stats = Counter()
 	debug = False
 
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	bed_dict = bed_file_to_dict(args.bed_file)
@@ -655,7 +671,7 @@ def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, in
 	stats = Counter()
 	debug = False
 
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	bed_dict = bed_file_to_dict(args.bed_file)
@@ -1262,49 +1278,51 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 		annos = args.annotations
 
 	annotation_data = np.zeros(( len(annos), ))
-	
-	try:
-		for i,a in enumerate(annos):
-			if a == 'QUAL':
-				annotation_data[i] = annotation_variant.QUAL
-			elif a == 'AF':
-				annotation_data[i] = annotation_variant.INFO[a][0]
-			elif a in annotation_variant.INFO and not math.isnan(annotation_variant.INFO[a]):
-				annotation_data[i] = annotation_variant.INFO[a]
-			elif len(annotation_variant.samples) > 0:
-				call = annotation_variant.genotype(args.sample_name)
-				if a == 'MBQ' and hasattr(call.data, a):
-					if len(annotation_variant.ALT) > 1:
-						annotation_data[i] = call.data.MBQ[allele_index]
-					else:
-						annotation_data[i] = call.data.MBQ
-				elif a == 'MPOS' and hasattr(call.data, a):
-					if len(annotation_variant.ALT) > 1:
-						annotation_data[i] = call.data.MPOS[allele_index]
-					else:
-						annotation_data[i] = call.data.MPOS
-				elif a == 'MMQ' and hasattr(call.data, a):
-					if len(annotation_variant.ALT) > 1:
-						annotation_data[i] = call.data.MMQ[allele_index]
-					else:
-						annotation_data[i] = call.data.MMQ		
-				elif a == 'MFRL_0' and hasattr(call.data, 'MFRL'):
-					annotation_data[i] = call.data.MFRL[0] 
-				elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
-					annotation_data[i] = call.data.MFRL[allele_index+1] 
-				elif a == 'AD_0' and hasattr(call.data, 'AD'):
-					annotation_data[i] = call.data.AD[0] 
-				elif a == 'AD_1' and hasattr(call.data, 'AD'):
-					annotation_data[i] = call.data.AD[allele_index+1]
-				else:
-					stats['Could not handle genotyped annotation:'+a] += 1
-			else:
-				stats['Could not handle annotation:'+a] += 1
 
-	except ValueError as e:
-		print(str(e) + '\nERROR! at variant:', annotation_variant, '\n format stuff:', annotation_variant.genotype(args.sample_name))
-	
+	for i,a in enumerate(annos):
+		if a == 'QUAL':
+			annotation_data[i] = annotation_variant.QUAL
+		elif a == 'AF':
+			annotation_data[i] = annotation_variant.INFO[a][0]
+		elif a in annotation_variant.INFO and not math.isnan(annotation_variant.INFO[a]):
+			annotation_data[i] = annotation_variant.INFO[a]
+		elif len(annotation_variant.samples) > 0:
+			call = annotation_variant.genotype(args.sample_name)
+			if a == 'MBQ' and hasattr(call.data, a):
+				if len(annotation_variant.ALT) > 1:
+					annotation_data[i] = call.data.MBQ[allele_index]
+				else:
+					annotation_data[i] = call.data.MBQ
+			elif a == 'MBQ' and hasattr(call.data, a):
+				if len(annotation_variant.ALT) > 1:
+					annotation_data[i] = call.data.MPOS[allele_index]
+				else:
+					annotation_data[i] = call.data.MPOS
+			elif a == 'MMQ' and hasattr(call.data, a):
+				if len(annotation_variant.ALT) > 1:
+					annotation_data[i] = call.data.MMQ[allele_index]
+				else:
+					annotation_data[i] = call.data.MMQ		
+			elif a == 'MFRL_0' and hasattr(call.data, 'MFRL'):
+				annotation_data[i] = call.data.MFRL[0] 
+			elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
+				annotation_data[i] = call.data.MFRL[allele_index+1] 
+			elif a == 'AD_0' and hasattr(call.data, 'AD'):
+				annotation_data[i] = call.data.AD[0] 
+			elif a == 'AD_1' and hasattr(call.data, 'AD'):
+				annotation_data[i] = call.data.AD[allele_index+1]
+			else:
+				stats['Could not handle genotyped annotation:'+a] += 1
+		elif len(annotation_variant.samples) == 0 and genotype_annotation(a):
+			raise ValueError('Genotype level annotations requested but variant has no sample (format) data.')
+		else:
+			stats['Could not handle annotation:'+a] += 1
+
 	return annotation_data
+
+
+def genotype_annotation(a):
+	return a in ['MBQ', 'MBQ', 'MMQ', 'MFRL_0', 'MFRL_1', 'AD_0', 'AD_1']
 
 
 def get_true_site_label(variant, bed_dict, truth_vcf, stats):
@@ -1448,7 +1466,6 @@ def make_reference_tensor(args, reference_seq):
 
 def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, reference_start, stats):
 	good_reads, insert_dict = get_good_reads(args, samfile, variant)
-	print('Got reads:', len(good_reads))
 	if len(good_reads) >= args.read_limit:
 		stats['More reads than read_limit'] += 1
 	if len(good_reads) == 0:
@@ -2691,6 +2708,11 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 						for key in batch.keys():
 							hf_tensor = hf.get(key)
 							if hf_tensor:
+								#REMOVE THISSSSSSSSS
+								#if key == args.tensor_map:
+								#	batch[key][cur_example] = np.rollaxis(np.array(hf_tensor), 0, 3	)
+								#else:
+								#	batch[key][cur_example] = np.array(hf_tensor)
 								batch[key][cur_example] = np.array(hf_tensor)
 							else:
 								raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
@@ -2718,6 +2740,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		if debug:
 			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 			print('batch keys:', batch.keys())
+
 
 		if with_positions:
 			yield (batch, label_matrix, positions)
@@ -3187,7 +3210,7 @@ def base_quality_to_phred_array(base_quality, base, base_dict):
 	return phred
 
 
-def base_quality_to_p_hot_array(base_quality, base, base_dict):
+def base_quality_to_p_hot_array_old(base_quality, base, base_dict):
 	phot = np.zeros((4,))
 	exponent = float(-base_quality) / 10.0
 	p = 1.0-(10.0**exponent)
@@ -3202,6 +3225,13 @@ def base_quality_to_p_hot_array(base_quality, base, base_dict):
 			phot[base_dict[b]] = not_p
 
 	return phot
+
+def base_quality_to_p_hot_array(base_quality, base, base_dict):
+    not_p = not_p_lut[base_quality]
+    phot = [not_p, not_p, not_p, not_p]
+    phot[base_dict[base]] = p_lut[base_quality]
+
+    return phot
 
 
 def quality_from_mode(args, base_quality, base, base_dict):
@@ -4084,7 +4114,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	'''
 	stats = Counter()
 
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 	bed_dict = bed_file_to_dict(args.bed_file)
 	
 	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
@@ -4103,7 +4133,8 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	indel_scores = {key:[] for key in score_keys}
 	indel_truth = []
 
-	for variant in vcf_reader:	
+	for variant in vcf_reader:
+
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):
 			stats['In ignore vcf'] += 1
 			continue	
@@ -4125,11 +4156,12 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 			stats['gnomAD missing chrom:'+variant.CHROM] += 1
 			continue
 
-		variants = gnomads[variant.CHROM].fetch(variant.CHROM, variant.POS-1, variant.POS+1)
+		variants = gnomads[variant.CHROM].fetch(variant.CHROM.replace('chr', ''), variant.POS-1, variant.POS+1)
 		gnomad_variant = None
 		for v in variants:
-			if v.POS == variant.POS and v.CHROM == variant.CHROM:
+			if v.POS == variant.POS and any([a1 == a2 for a1 in v.ALT for a2 in variant.ALT]):
 				gnomad_variant = v
+		
 		if not gnomad_variant:
 			stats['Variant not in gnomAD'] += 1
 			continue
@@ -4173,7 +4205,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 		else:
 			stats['Not SNP or INDEL'] += 1
 
-		if len(snp_truth)%200 == 0:
+		if len(snp_truth)%1000 == 0:
 			for k in stats.keys():
 				print(k, 'has:', stats[k])			
 			print('last variant was:', str(variant))
@@ -4313,17 +4345,21 @@ def scores_from_gnomad_like_vcf(args, score_keys=['VQSLOD']):
 
 
 
-def gnomads_to_dict():
-	"""Open and load gnomAD autosomal vcfs into a dict.
+def gnomads_to_dict(args):
+	"""Open and load gnomAD vcfs into a dict.
 
 	Returns:
 		A dicts of vcf readers for each contig vcf from the gnomAD callset.
 	"""		
 	gnomads = {}
 
+	contig_prefix = 'chr' if '38' in args.reference_fasta else ''
+	prefix = defines.gnomad_prefix_hg38 if '38' in args.reference_fasta else defines.gnomad_prefix
+	postfix = '.liftover.b38.vcf.gz' if '38' in args.reference_fasta else '.vcf.gz'
+	
 	for i in range(1,23):
-		gnomads[str(i)] = vcf.Reader(open(defines.gnomad_prefix+str(i)+'.vcf.gz', 'r'))
-	gnomads['X'] = vcf.Reader(open(defines.gnomad_prefix+'X.vcf.gz', 'r'))
+		gnomads[contig_prefix+str(i)] = vcf.Reader(open(prefix+str(i)+postfix, 'r'))
+	gnomads[contig_prefix+'X'] = vcf.Reader(open(prefix+'X'+postfix, 'r'))
 	
 	return gnomads
 
@@ -4424,13 +4460,15 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 		And a similar dict for INDELs.
 	"""	
 	stats = Counter()
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 	bed_dict = bed_file_to_dict(args.bed_file)
 	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
 	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
 	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 	
 	vcf_negative = vcf.Reader(open(args.negative_vcf, 'r'))
 	
+	contig_prefix = 'chr' if '38' in args.reference_fasta else ''
+
 	if args.ignore_vcf:
 		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'r'))
 	if args.include_vcf:
@@ -4449,11 +4487,11 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 			allele_idx = int(p_split[2])
 
 		variant = None
-		variants = gnomads[chrom].fetch(chrom, pos-1, pos)
+		variants = gnomads[chrom].fetch(chrom.replace('chr', ''), pos-1, pos)
 		for v in variants:
-			if v.POS == pos and v.CHROM == chrom:
+			if v.POS == pos:
 				variant = v
-				v_negative = variant_in_vcf(variant, vcf_negative)
+				v_negative = variant_in_vcf(variant, vcf_negative, contig_prefix)
 
 		if not variant:
 			stats['Not in gnomad'] += 1
@@ -4483,7 +4521,7 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 			if score is None:
 				continue
 
-		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
+		in_bed = in_bed_file(bed_dict, contig_prefix+variant.CHROM, variant.POS)
 		if not in_bed:
 			stats['Not in high confidence region'] += 1
 			continue
@@ -4497,7 +4535,7 @@ def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):
 				truth = 1
 			else:
 				truth = 0
-		elif not allele_idx and variant_in_vcf(variant, vcf_nist):
+		elif not allele_idx and variant_in_vcf(variant, vcf_nist, contig_prefix):
 			truth = 1			
 		else:
 			truth = 0
@@ -4668,7 +4706,7 @@ def write_tranches(args):
 
 def inspect_gnomad_low_ac(args):
 	stats = Counter()
-	gnomads = gnomads_to_dict()
+	gnomads = gnomads_to_dict(args)
 	for variant in gnomads['1']:
 		for i,a in enumerate(variant.ALT):
 			if int(variant.INFO['AC'][i]) < 2:
@@ -4823,7 +4861,7 @@ def intersect_vcfs(vcf1, vcf2):
 	return shared_variants
 
 
-def variant_in_vcf(variant, vcf_ram):
+def variant_in_vcf(variant, vcf_ram, contig_prefix=''):
 	''' Check if variant is in a VCF file.
 
 	Arguments
@@ -4836,11 +4874,11 @@ def variant_in_vcf(variant, vcf_ram):
 	start = variant.POS-1
 	end = variant.POS
 
-	variants = vcf_ram.fetch(variant.CHROM, start, end)
+	variants = vcf_ram.fetch(contig_prefix+variant.CHROM, start, end)
 	
 	for v in variants:
 		same_allele = any([a1 == a2 for a1 in v.ALT for a2 in variant.ALT]) 
-		if v.CHROM == variant.CHROM and v.POS == variant.POS and same_allele:
+		if v.POS == variant.POS and same_allele:
 			return v
 	
 	return None 

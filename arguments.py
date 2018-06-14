@@ -33,18 +33,11 @@ def parse_args():
 	parser.add_argument('mode', help='High level recipe: write tensors, train, test or evaluate models.')
 	
 
-	# Tensor defining dictionaries
+	# Tensor defining arguments
 	parser.add_argument('--tensor_map', default='read_tensor',
 		help='Key which looks up the map from tensor channels to their meaning.')
 	parser.add_argument('--input_symbols', default=defines.inputs_indel,
 		help='Dict mapping input symbols to their index within input tensors.')
-	parser.add_argument('--labels', default=defines.snp_indel_labels,
-		help='Dict mapping label names to their index within label tensors.')
-	
-
-	# Tensor defining arguments
-	parser.add_argument('--label_smoothing', default=0.0, type=float,
-		help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
 	parser.add_argument('--batch_size', default=32, type=int,
 		help='Mini batch size for stochastic gradient descent algorithms.')
 	parser.add_argument('--read_limit', default=128, type=int,
@@ -58,6 +51,17 @@ def parse_args():
 	parser.add_argument('--base_quality_mode', default='phot', choices=['phot', 'phred', '1hot'],
 		help='How to treat base qualities, must be in [phot, phred, 1hot]')
 
+
+	# Label defining arguments
+	parser.add_argument('--labels', default=defines.snp_indel_labels,
+		help='Dict mapping label names to their index within label tensors.')
+	parser.add_argument('--label_smoothing', default=0.0, type=float,
+		help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
+	parser.add_argument('--label_sites', default=True, dest='label_sites', action='store_true',
+		help='Truth labels are for variant sites (i.e. not allele specific).')				
+	parser.add_argument('--label_alleles', dest='label_sites', action='store_false',
+		help='If True then truth labels are allele specific, so one site may have both true and false variants.')
+	
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
@@ -159,7 +163,7 @@ def parse_args():
 	# Evaluation related arguments
 	parser.add_argument('--multiallelics', default='include', choices=['include', 'only', 'ignore'],
 		help='How to handle multiallelic sites: can be include, only, or ignore.')
-	parser.add_argument('--random_forest_training_sites', default='ignore', choices=['include', 'only', 'ignore'],
+	parser.add_argument('--random_forest_training_sites', default='include', choices=['include', 'only', 'ignore'],
 		help='How to handle Random Forest Training sites: can be include, only, or ignore. Only used in gnomad evaluation.')
 	parser.add_argument('--emit_interesting_sites', default=False, action='store_true',
 		help='Emit sites where classification algorithms disagree or of extreme CNN scores. Only used in gnomad evaluation.')
@@ -189,6 +193,7 @@ def parse_args():
 	args = parser.parse_args()
 	args.annotations = defines.annotations_from_args(args)
 	np.random.seed(args.random_seed)
+	args.batch_size = min(args.samples, args.batch_size)
 
 	if not is_broad_cluster():
 		if args.channels_last:
