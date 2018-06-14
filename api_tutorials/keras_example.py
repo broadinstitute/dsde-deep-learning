@@ -47,12 +47,15 @@ def linear_regression():
 
 	learned_slope = linear_model.get_weights()[0][0][0]
 	learned_bias = linear_model.get_weights()[1][0]
+	print('Learned slope:',  learned_slope, 'real slope:', real_weight, 'learned bias:', learned_bias, 'real bias:', real_bias)
+	
 	plt.plot(x, y)
 	plt.plot([-1,1], [-learned_slope+learned_bias, learned_slope+learned_bias], 'r')
-	plot_name = "./regression_example/linear_regression.png"	
+	plot_name = "./regression_example/linear_regression.png"
+	if not os.path.exists(os.path.dirname(plot_name)):
+		os.makedirs(os.path.dirname(plot_name))	
 	plt.savefig(plot_name)
 	print('Linear Regression complete! Saved plot at:', plot_name)
-	print('Learned slope:',  learned_slope, 'real slope:', real_weight, 'learned bias:', learned_bias, 'real bias:', real_bias)
 
 
 def logistic_regression():
