@@ -43,6 +43,7 @@ def linear_regression():
 	linear_model = Sequential()
 	linear_model.add(Dense(1, input_dim=1))
 	linear_model.compile(loss='mse', optimizer='sgd')
+	linear_model.summary()
 	linear_model.fit(x, y, batch_size=1, epochs=10)
 
 	learned_slope = linear_model.get_weights()[0][0][0]
@@ -114,6 +115,7 @@ def multilayer_perceptron():
 	mlp_model.add(Dense(300, activation='relu', input_dim=784))
 	mlp_model.add(Dense(10, activation='softmax'))
 	mlp_model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
+	mlp_model.summary()
 	mlp_model.fit(train[0], train_y, validation_data=(valid[0],valid_y), batch_size=32, epochs=10)
 	print('Multilayer Perceptron trained. Test set loss and accuracy:', mlp_model.evaluate(test[0], test_y))
 
