@@ -17,8 +17,14 @@ import gzip
 import pickle
 import random
 import numpy as np
+
+# Matplotlib shenanigans
+import matplotlib
+matplotlib.use('Agg') # Need this to write images from the GSA servers.  Order matters:
+import matplotlib.pyplot as plt # First import matplotlib, then use Agg, then import plt
+
+# Keras imports
 from keras import metrics
-import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers.core import Dense
 
