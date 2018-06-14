@@ -1,7 +1,7 @@
 #!/bin/bash
 ECHO=echo
 
-VM_NAME="dddddddddsde-deep-learner-$USER"
+VM_NAME="dsde-deep-learner-$USER"
 $ECHO echo "Try to create vm named ${VM_NAME}"
 $ECHO gcloud compute instances create "${VM_NAME}" \
 	--scopes "compute-rw,storage-full,cloud-platform" \
