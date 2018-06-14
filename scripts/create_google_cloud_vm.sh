@@ -1,5 +1,6 @@
 #!/bin/bash
 ECHO=echo
+
 VM_NAME="dsde-deep-learner-$USER"
 $ECHO echo "Try to create vm named ${VM_NAME}"
 $ECHO gcloud compute instances create "${VM_NAME}" \
