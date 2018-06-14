@@ -151,6 +151,8 @@ def load_data(dataset):
 			'http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz'
 		)
 		print('Downloading data from %s' % origin)
+		if not os.path.exists(os.path.dirname(dataset)):
+			os.makedirs(os.path.dirname(dataset))	
 		urlretrieve(origin, dataset)
 
 	print('loading data...')
