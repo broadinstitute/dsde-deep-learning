@@ -36,6 +36,7 @@ if ! dpkg-query -W cuda-9-0; then
   $ECHO apt-get install cuda-9-0 -y
 fi
 # Enable persistence mode
+$ECHO sudo passwd
 $ECHO nvidia-smi -pm 1
 
 $ECHO wget http://repo.continuum.io/archive/Anaconda3-4.0.0-Linux-x86_64.sh

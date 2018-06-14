@@ -40,8 +40,8 @@ dependencies:
   - scikit-learn==0.19.1
   - scipy==1.0.0
   - six==1.11.0
-  - tensorflow==1.4.0
-  - tensorflow-tensorboard==0.4.0rc3
+  - tensorflow==1.8.0
+  - tensorflow-tensorboard
   - theano==0.9.0
   - tqdm==4.19.4
   - werkzeug==0.12.2

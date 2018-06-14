@@ -24,9 +24,9 @@ from keras.layers.core import Dense
 
 
 def run():
-	#linear_regression()
+	linear_regression()
 	logistic_regression()
-	#multilayer_perceptron()
+	multilayer_perceptron()
 
 
 def linear_regression():
@@ -140,12 +140,12 @@ def load_data(dataset):
 			dataset = new_path
 
 	if (not os.path.isfile(dataset)) and data_file == 'mnist.pkl.gz':
-		import urllib
+		from urllib.request import urlretrieve
 		origin = (
 			'http://www.iro.umontreal.ca/~lisa/deep/data/mnist/mnist.pkl.gz'
 		)
 		print('Downloading data from %s' % origin)
-		urllib.urlretrieve(origin, dataset)
+		urlretrieve(origin, dataset)
 
 	print('loading data...')
 
