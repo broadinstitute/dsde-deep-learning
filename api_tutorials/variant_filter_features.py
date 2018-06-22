@@ -14,12 +14,14 @@ import json
 import h5py
 import time
 import scipy
+import tempfile
 import argparse
 import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
 
 from keras import metrics
+from keras import activations
 from keras import backend as K
 from keras.applications import inception_v3
 from keras.models import Sequential, load_model
@@ -66,8 +68,8 @@ def run():
 		write_filters(args, model)
 	elif 'excite_neuron' == args.mode:
 		excite_neuron(args, model)
-	elif 'excite_layer' == args.mode:
-		excite_layer(args, model)
+	elif 'excite_mlp' == args.mode:
+		excite_mlp(args, model)
 	elif 'excite_softmax' == args.mode:
 		excite_softmax(args, model)			
 	elif 'deep_dream' == args.mode:
@@ -78,8 +80,8 @@ def run():
 		draw_loop(args, model)
 	elif 'journey' == args.mode:
 		image_journey(args, model)	
-	elif 'write_video' == args.mode:
-		write_dream_video(args, model)		
+	elif 'saliency' == args.mode:
+		write_saliency(args, model)		
 	else:
 		raise ValueError('unknown variant visualize mode:', args.mode)
 
@@ -87,7 +89,6 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--maxfun', default=9, type=int)
 	parser.add_argument('--fps', default=1, type=int)
 	parser.add_argument('--learning_rate', default=0.01, type=float)
 	parser.add_argument('--jitter', default=0.0, type=float)
@@ -96,6 +97,7 @@ def parse_args():
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=0.00001, type=float)
 	parser.add_argument('--neuron', default=58, type=int)
+	parser.add_argument('--undo_softmax', default=False, action='store_true', help='Replace softmax activation with linear.')
 
 
 	# Tensor defining arguments
@@ -110,7 +112,7 @@ def parse_args():
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
-	parser.add_argument('--annotation_set', default='gatk', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
+	parser.add_argument('--annotation_set', default='best_practices', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
 
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
@@ -184,6 +186,11 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	weight_path_hd5 = os.path.join(os.path.dirname(semantics_json), semantics['architecture'])
 	print('Loading keras weight file from:', weight_path_hd5)
 	model = load_model(weight_path_hd5, custom_objects=get_metric_dict(args.labels))
+
+	if args.undo_softmax:
+		model.layers[-1].activation = activations.linear
+		apply_modifications(model, custom_objects=get_metric_dict(args.labels))
+
 	model.summary()
 	return model
 
@@ -193,9 +200,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 ################################################
 
 def write_filters(args, model):
-	#
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	exclude = [args.annotation_set, 'dropout', 'flatten', 'activation', 'batch_normalization', 'concatenate']
 
 	for layer in model.layers:
 		if not any([l in layer.name for l in args.layers]):
@@ -223,21 +228,54 @@ def write_filters(args, model):
 			# run gradient ascent
 			for i in range(args.iterations):
 				#print("predictions:", model.predict([read_tensor, annos])[0])
+				print("Annotations are:", annos)
 				random_jitter = args.jitter * (np.random.random(expand_dim_shape) - 0.5)
 				read_tensor += random_jitter
-				loss_value, grads_value = iterate([read_tensor, annos])
+				loss_value, grads_value, anno_grads = iterate([read_tensor, annos])
 				read_tensor -= random_jitter
 
 				read_tensor += args.learning_rate*grads_value
+				annos += args.learning_rate*anno_grads
+
 				if i % (max(args.iterations,4)//4) == 0:
 					print("After iteration:", i, "of:", args.iterations, "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index)
-			
 			if not os.path.exists(os.path.dirname(out_file)):
 				os.makedirs(os.path.dirname(out_file))
 			with h5py.File(out_file, 'w') as hf:
 				hf.create_dataset(args.tensor_name, data=read_tensor[0], compression='gzip')
 			print('Wrote tensor to:', out_file)
 
+
+#def write_saliency(args, model):
+			
+def excite_mlp(args, model):
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+	for layer in model.layers:
+		if not any([l in layer.name for l in args.layers]):
+			continue
+		
+		for filter_index in range(0, num_layer_channels(layer), args.fps):
+			print("Layer name:", layer.name, "filter index:", filter_index)
+			objective_fxn = excite_dense(args, model, layer_dict, layer.name, filter_index)
+			annos = np.random.random((1, len(args.annotations)))
+			
+			if os.path.exists(args.tensor_example):
+				with h5py.File(args.tensor_example, 'r') as hf:
+					annos[0] = np.array(hf.get(args.annotation_set))
+				out_file = args.output_dir + '%s/%s/write_%s_filter_%d.hd5' % (plain_name(args.semantics_json), plain_name(args.tensor_example), layer.name, filter_index)
+			else:
+				out_file = args.output_dir + '%s/random/write_filters/%s_filter_%d.hd5' % (plain_name(args.semantics_json), layer.name, filter_index)
+			
+			print("Starting annotations:", zip(args.annotations, annos[0])) 
+			# run gradient ascent
+			for i in range(args.iterations):
+				loss_value, anno_grads = objective_fxn([annos])
+				annos += args.learning_rate*anno_grads
+
+				if i % (max(args.iterations,4)//4) == 0:
+					print(" After iteration:", i, "of:", args.iterations, "loss is:", loss_value)
+			print("filter index:", filter_index, zip(args.annotations, annos[0]))
+			print("Model prediction:", model.predict(annos))
 
 def excite_neuron(args, model):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
@@ -393,12 +431,34 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(objective, input_tensor)[0]
+	anno_grads = K.gradients(objective, annos)[0]
+
+	# normalization trick: we normalize the gradient
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
+	# normalization trick: we normalize the gradient
+	anno_grads /= (K.sqrt(K.mean(K.square(anno_grads))) + 1e-6)
+
+	# this function returns the loss and grads given the input picture
+	iterate = K.function([input_tensor, annos], [objective, grads, anno_grads])
+	return iterate
+
+def excite_dense(args, model, layer_dict, layer_name, neuron):
+	annos = model.input
+
+	x = layer_dict[layer_name].output[:, neuron]
+
+	objective = K.variable(0.)
+
+	objective += args.activity_weight*K.sum(K.square(x)) 
+
+	# compute the gradient of the input picture wrt this loss
+	grads = K.gradients(objective, annos)[0]
 
 	# normalization trick: we normalize the gradient
 	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
-	iterate = K.function([input_tensor, annos], [objective, grads])
+	iterate = K.function([annos], [objective, grads])
 	return iterate
 
 
@@ -801,116 +861,136 @@ def get_reference_and_read_channels(args):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def precision(y_true, y_pred):
-    '''Calculates the precision, a metric for multi-label classification of
-    how many selected items are relevant.
-    '''
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
-    precision = true_positives / (predicted_positives + K.epsilon())
-    return precision
+	'''Calculates the precision, a metric for multi-label classification of
+	how many selected items are relevant.
+	'''
+	true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+	predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+	precision = true_positives / (predicted_positives + K.epsilon())
+	return precision
 
 
 def recall(y_true, y_pred):
-    '''Calculates the recall, a metric for multi-label classification of
-    how many relevant items are selected.
-    '''
-    true_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-    recall = true_positives / (possible_positives + K.epsilon())
-    return recall
+	'''Calculates the recall, a metric for multi-label classification of
+	how many relevant items are selected.
+	'''
+	true_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)))
+	possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+	recall = true_positives / (possible_positives + K.epsilon())
+	return recall
 
 
 def per_class_recall(labels):
-    recall_fxns = []
+	recall_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
-        string_fxn += '\tpossible_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
+		string_fxn += '\tpossible_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        recall_fxn = eval(label_key + '_recall')
-        recall_fxns.append(recall_fxn)
+		exec(string_fxn)
+		recall_fxn = eval(label_key + '_recall')
+		recall_fxns.append(recall_fxn)
 
-    return recall_fxns
+	return recall_fxns
 
 
 def per_class_precision(labels):
-    precision_fxns = []
+	precision_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
-        string_fxn += '\tpredicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
+		string_fxn += '\tpredicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        precision_fxn = eval(label_key + '_precision')
-        precision_fxns.append(precision_fxn)
+		exec(string_fxn)
+		precision_fxn = eval(label_key + '_precision')
+		precision_fxns.append(precision_fxn)
 
-    return precision_fxns
+	return precision_fxns
 
 
 def get_metric_dict(labels=SNP_INDEL_LABELS):
-    metrics = {'precision':precision, 'recall':recall}
-    precision_fxns = per_class_precision(labels)
-    recall_fxns = per_class_recall(labels)
-    for i,label_key in enumerate(labels.keys()):
-        metrics[label_key+'_precision'] = precision_fxns[i]
-        metrics[label_key+'_recall'] = recall_fxns[i]
+	metrics = {'precision':precision, 'recall':recall}
+	precision_fxns = per_class_precision(labels)
+	recall_fxns = per_class_recall(labels)
+	for i,label_key in enumerate(labels.keys()):
+		metrics[label_key+'_precision'] = precision_fxns[i]
+		metrics[label_key+'_recall'] = recall_fxns[i]
 
-    return metrics
+	return metrics
 
 
 def per_class_recall_3d(labels):
-    recall_fxns = []
+	recall_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\tpossible_positives = K.sum(K.sum(K.round(K.clip(y_true, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\tpossible_positives = K.sum(K.sum(K.round(K.clip(y_true, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        recall_fxn = eval(label_key + '_recall')
-        recall_fxns.append(recall_fxn)
+		exec(string_fxn)
+		recall_fxn = eval(label_key + '_recall')
+		recall_fxns.append(recall_fxn)
 
-    return recall_fxns
+	return recall_fxns
 
 
 def per_class_precision_3d(labels):
-    precision_fxns = []
+	precision_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\tpredicted_positives = K.sum(K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\tpredicted_positives = K.sum(K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        precision_fxn = eval(label_key + '_precision')
-        precision_fxns.append(precision_fxn)
+		exec(string_fxn)
+		precision_fxn = eval(label_key + '_precision')
+		precision_fxns.append(precision_fxn)
 
-    return precision_fxns
+	return precision_fxns
 
 
 def get_metrics(classes=None, dim=2):
-    if classes and dim == 2:
-        return [metrics.categorical_accuracy] + per_class_precision(classes) + per_class_recall(classes)
-    elif classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
-    else:
-        return [metrics.categorical_accuracy, precision, recall]
+	if classes and dim == 2:
+		return [metrics.categorical_accuracy] + per_class_precision(classes) + per_class_recall(classes)
+	elif classes and dim == 3:
+		return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
+	else:
+		return [metrics.categorical_accuracy, precision, recall]
 
 
 ##############################
 ###### Utilities #############
 ##############################
+def apply_modifications(model, custom_objects=None):
+    """Applies modifications to the model layers to create a new Graph. For example, simply changing
+    `model.layers[idx].activation = new activation` does not change the graph. The entire graph needs to be updated
+    with modified inbound and outbound tensors because of change in layer building function.
+    Args:
+        model: The `keras.models.Model` instance.
+    Returns:
+        The modified model with changes applied. Does not mutate the original `model`.
+    """
+    # The strategy is to save the modified model and load it back. This is done because setting the activation
+    # in a Keras layer doesnt actually change the graph. We have to iterate the entire graph and change the
+    # layer inbound and outbound nodes with modified tensors. This is doubly complicated in Keras 2.x since
+    # multiple inbound and outbound nodes are allowed with the Graph API.
+    model_path = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.h5')
+    try:
+        model.save(model_path)
+        return load_model(model_path, custom_objects=custom_objects)
+    finally:
+        os.remove(model_path)
+
 
 def plain_name(full_name):
 	name = os.path.basename(full_name)

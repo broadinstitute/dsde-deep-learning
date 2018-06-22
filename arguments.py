@@ -36,6 +36,8 @@ def parse_args():
 	# Tensor defining arguments
 	parser.add_argument('--tensor_map', default='read_tensor',
 		help='Key which looks up the map from tensor channels to their meaning.')
+	parser.add_argument('--tensor_types', nargs='+', default=['read_tensor'],
+		help='List of keys which look up maps from tensor channels to their meaning. Only used when writing tensors.')	
 	parser.add_argument('--input_symbols', default=defines.inputs_indel,
 		help='Dict mapping input symbols to their index within input tensors.')
 	parser.add_argument('--batch_size', default=32, type=int,

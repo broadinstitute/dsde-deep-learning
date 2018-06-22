@@ -385,6 +385,7 @@ def read_tensor_to_image(args, tensor):
 	plt.show()
 
 
+
 def format_title(title):
 	t = title.split('/')[-1].replace('_', ' ')
 	tsplit = t.split('true')
