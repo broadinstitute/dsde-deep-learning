@@ -233,7 +233,7 @@ class HyperparameterOptimizer(object):
 				model = models.read_tensor_2d_model_from_args(args, 
 										conv_width = int(x['conv_width']),
 										conv_height = int(x['conv_height']),
-										conv_layers = x['conv_layers'],
+										#conv_layers = x['conv_layers'],
 										max_pools = x['max_pools_2d'],
 										padding = 'valid' if bool(x['valid_padding']) else 'same',
 										fc_layers = x['fc']
