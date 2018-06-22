@@ -86,12 +86,17 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.max_pool_sets_2d = [ 
-									#[], 
+									[],
 									[(1,2)], [(1,3)], [(2,1)], [(3,1)], [(4,1)], 
-									[(1,2),(1,2)], [(2,1),(2,1)], [(3,1),(3,1)], [(1,3), (1,3)],
-								  	[(2,1),(6,1)],[(4,1),(4,1)], [(4,1),(8,1)], 
-								  	[(3,3), (3,3)], [(4,4), (4,4)], [(4,8), (4,8)],
-								  	[(1,2),(1,2),(1,2)], [(2,1),(2,1),(2,1)], [(3,1),(3,1),(3,1)]
+									[(1,2),(1,2)], [(3,1),(3,1)], [(4,1),(4,1)], 
+									[(2,1),(2,1)], [(1,3), (1,3)], [(1,4),(1,4)], 
+								  	[(1,2),(1,2),(1,2)],  [(3,1),(3,1),(3,1)], 
+								  	[(2,1),(2,1),(2,1)], [(1,3),(1,3),(1,3)],
+								  	[(1,2),(1,2),(1,2),(1,2)], [(3,1),(3,1),(3,1),(3,1)], 
+								  	[(2,1),(2,1),(2,1),(2,1)], [(1,3),(1,3),(1,3),(1,3)],
+								  	[(2,2)], [(3,3)], [(4,4)], [(8,8)],
+								  	[(2,2),(2,2)], [(3,3), (3,3)], [(4,4), (4,4)], [(4,8), (4,8)],
+								  	[(2,2),(2,2),(2,2)], [(3,3), (3,3), (3,3)]
 								]
 
 		self.max_pool_sets_1d = [ 
@@ -212,20 +217,10 @@ class HyperparameterOptimizer(object):
 		generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
-		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))}
-		]
-
 		space = {
-			'conv_width' : hp.quniform('conv_width', 3, 19, 2),
-			'conv_height' : hp.quniform('conv_height', 3, 19, 2),
-			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'conv_width' : hp.quniform('conv_width', 3, 25, 2),
+			'conv_height' : hp.quniform('conv_height', 3, 25, 2),
+			#'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
 			'kernel_single_channel' : hp.choice('kernel_single_channel', [0, 1]),
 			'fc' : hp.choice('fc',self.fc_layer_sets),
 			'valid_padding' : hp.choice('valid_padding', [0, 1]),
@@ -233,10 +228,6 @@ class HyperparameterOptimizer(object):
 		}
 		
 		def hp_loss_from_params_2d(x):
-			#print('my x is:', x)
-			#conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
-			#max_pools = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
-			#fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			max_loss = 9e9
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
@@ -262,7 +253,6 @@ class HyperparameterOptimizer(object):
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
 				#limit_mem()
-				print('x is', x)
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				return loss_and_metrics[0]
 			
