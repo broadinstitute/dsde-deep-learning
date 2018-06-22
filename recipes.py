@@ -1263,6 +1263,14 @@ def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_sco
 					print(k, 'score, truth:', compare_scores[k][p])	
 
 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~ Utilities ~~~~~~~~~~~~~~~~~~~~~~~~
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def convert_theano_model_to_tensorflow(args):
+	models.convert_theano_model_to_tensorflow(args)
+
+
+
 # Back to the top!
 if "__main__" == __name__:
 	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunction(obj) }

@@ -1694,6 +1694,27 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	return model
 
 
+def convert_theano_model_to_tensorflow(args):
+	from keras.utils.conv_utils import convert_kernel
+	import tensorflow as tf
+	
+	model = set_args_and_get_model_from_semantics(args, args.architectures[0])
+	K.set_image_data_format('channels_last')
+
+	ops = []
+	for layer in model.layers:
+		if layer.__class__.__name__ in ['Convolution1D', 'Convolution2D', 'Convolution3D', 'AtrousConvolution2D']:
+			original_w = K.get_value(layer.W)
+			converted_w = convert_kernel(original_w)
+			ops.append(tf.assign(layer.W, converted_w).op)
+
+	K.get_session().run(ops)
+	tf_model_hd5 = args.weights_hd5.replace('.hd5', '_tf_convert.hd5')
+	print('Saving weights to:', tf_model_hd5)
+	model.save_weights(tf_model_hd5)
+	serialize_model_semantics(args, tf_model_hd5)
+
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Inspections ~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
