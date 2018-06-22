@@ -59,12 +59,10 @@ def run_training_data():
 		tensors_from_tensor_map_2channel(args, include_annotations=True)
 	elif 'write_tensors_no_annotations' == args.mode:
 		tensors_from_tensor_map(args, include_annotations=False)
-	elif 'write_tensors_gnomad_annotations' == args.mode:
+	elif 'write_tensors_gnomad_annotations_1d' == args.mode:
 		tensors_from_tensor_map_gnomad_annos(args)
 	elif 'write_tensors_gnomad_annotations_per_allele_1d' == args.mode:
-		tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=False, include_reference=True)
-	elif 'write_tensors_gnomad_1d' == args.mode:
-		tensors_from_tensor_map_gnomad_annos(args, include_reads=False, include_reference=True)		
+		tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=False, include_reference=True)	
 	elif 'write_depristo' == args.mode:
 		nist_samples_to_png(args)
 	elif 'write_calling_tensors' == args.mode:
@@ -180,22 +178,13 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 					stats['Missing ALL annotations'] += 1
 					continue # Require at least 1 annotation...
 				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-					
-			good_reads, insert_dict = get_good_reads(args, samfile, variant)
-			if len(good_reads) >= args.read_limit:
-				stats['More reads than read_limit'] += 1
-			if len(good_reads) == 0:
-				stats['No reads aligned'] += 1
-				continue
 
-			for i in sorted(insert_dict.keys(), key=int, reverse=True):
-				if i < 0:
-					reference_seq = defines.indel_char*insert_dict[i] + reference_seq
-				else:
-					reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
-
-			read_tensor = good_reads_to_tensor(args, good_reads, ref_start, insert_dict)
-			reference_sequence_into_tensor(args, reference_seq, read_tensor)
+			if "read_tensor" == args.tensor_map:	
+				read_tensor = make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
+			elif "paired_reads" == args.tensor_map:	
+				read_tensor = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
+			else:
+				raise ValueError("Unknown read tensor function.")
 
 			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
@@ -213,10 +202,6 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 				if pileup:
 					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
 					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
-			
-			if debug:
-				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
-				print(str(reference_seq)+'<- reference sequence\n\n')
 
 			stats['count'] += 1
 			if stats['count']%500 == 0:
@@ -497,12 +482,11 @@ def calling_tensors_from_tensor_map(args, pileup=False):
 		print(s, 'has:', stats[s])
 
 
-def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annotations=True, include_reference=False):
+def tensors_from_tensor_map_gnomad_annos(args):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
-	those called in args.negative_vcf and in the args.bed_file high confidence intervals, 
-	but not in args.train_vcf.
+	those filtered according to hard filters used to train gnomAD's Random forest model.
 
 	Arguments
 		args.data_dir: directory where tensors will live. Created here and filled with
@@ -543,13 +527,18 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 		contig = record_dict[variant.CHROM]	
 		record = contig[variant.POS-idx_offset: variant.POS+idx_offset]
 
+		annotation_variant = variant_in_vcf(variant, gnomads[variant.CHROM])
+		if not annotation_variant:
+			stats['Variants not in annotation_vcf'] += 1
+			continue
+
 		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
 		if variant_in_vcf(variant, vcf_ram) and in_bed:
 			class_prefix = ''
-		elif in_bed:
+		elif is_rf_hard_filter_negative(args, annotation_variant, stats):
 			class_prefix = 'NOT_'
 		else:
-			stats['Variant outside confident bed file'] += 1
+			stats['Unassigned truth status for variant'] += 1
 			continue
 
 		if variant.is_snp:
@@ -566,60 +555,31 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 				stats['Downsampled SNPs'] += 1
 				continue
 
-		if include_annotations:
-			annotation_variant = variant_in_vcf(variant, gnomads[variant.CHROM])
-			if not annotation_variant:
-				stats['Variants not in annotation_vcf'] += 1
-				continue
+		if all(map(lambda x: x not in annotation_variant.INFO and x != "QUAL", args.annotations)):
+			stats['Missing ALL annotations'] += 1
+			continue # Require at least 1 annotation...
 
-			if all(map(lambda x: x not in annotation_variant.INFO and x != "QUAL", args.annotations)):
-				stats['Missing ALL annotations'] += 1
-				continue # Require at least 1 annotation...
+		annotation_data = np.zeros(( len(args.annotations), ))
+		qual_and_dp_normalizer = 1000000.0
+		for i,a in enumerate(args.annotations):
+			if a == "QUAL":
+				annotation_data[i] = float(annotation_variant.QUAL)
+			else:
+				annotation_data[i] = annotation_variant.INFO[a]
+			
+			if a == "DP" or a == "QUAL":
+				 annotation_data[i] /= qual_and_dp_normalizer
 
-			annotation_data = np.zeros(( len(args.annotations), ))
-			qual_and_dp_normalizer = 1000000.0
-			for i,a in enumerate(args.annotations):
-				if a == "QUAL":
-					annotation_data[i] = float(annotation_variant.QUAL)
-				else:
-					annotation_data[i] = annotation_variant.INFO[a]
-				
+		dna_data = np.zeros( (args.window_size, len(defines.inputs)) )
+		for i,b in enumerate(record.seq):
+			if b in defines.inputs:
+				dna_data[i, defines.inputs[b]] = 1.0
+			elif b in defines.ambiguity_codes:
+				dna_data[i] = defines.ambiguity_codes[b]
+			else:
+				raise ValueError('Error! Unknown code:', b)
 
-				if a == "DP" or a == "QUAL":
-					 annotation_data[i] /= qual_and_dp_normalizer
-
-
-		if include_reference:
-			dna_data = np.zeros( (args.window_size, len(defines.inputs)) )
-			for i,b in enumerate(record.seq):
-				if b in defines.inputs:
-					dna_data[i, defines.inputs[b]] = 1.0
-				elif b in defines.ambiguity_codes:
-					dna_data[i] = defines.ambiguity_codes[b]
-				else:
-					raise ValueError('Error! Unknown code:', b)
-					
-		
-		if include_reads:
-			good_reads, insert_dict = get_good_reads(args, samfile, variant)
-			reference_seq = record.seq
-			for i in sorted(insert_dict.keys(), key=int, reverse=True):
-				reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
-
-			sequences, qualities, mapping_qualities, flags = good_reads_to_arrays(args, good_reads, ref_start, insert_dict)
-
-			if len(sequences) > 0:
-				ref_read_idx = defines.get_reference_and_read_channels(args)
-				if args.channels_last:
-					read_tensor = np.zeros( (args.read_limit, args.window_size, len(tensor_channel_map)) )
-					read_tensor[:,:,:ref_read_idx] = reads_to_tensor(args, sequences, qualities, reference_seq)
-				else:
-					read_tensor = np.zeros( (len(tensor_channel_map), args.read_limit, args.window_size) )
-					read_tensor[:ref_read_idx,:,:] = reads_to_tensor(args, sequences, qualities, reference_seq)
-				add_flags_to_read_tensor(args, read_tensor, tensor_channel_map, flags)
-				add_mq_to_read_tensor(args, read_tensor, tensor_channel_map, mapping_qualities)
-
-		tensor_path = get_path_to_train_valid_or_test(args.data_dir, variant.CHROM)	
+		tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)	
 		tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
 		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 		stats[cur_label_key] += 1
@@ -627,12 +587,8 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 		if not os.path.exists(os.path.dirname(tensor_path)):
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
-			if include_reads:
-				hf.create_dataset(args.tensor_map, data=read_tensor)
-			if include_annotations:
-				hf.create_dataset(args.annotation_set, data=annotation_data)
-			if include_reference:
-				hf.create_dataset('reference', data=dna_data)
+			hf.create_dataset(args.annotation_set, data=annotation_data)
+			hf.create_dataset(args.tensor_map, data=dna_data)
 
 		stats['count'] += 1
 		if stats['count']%400 == 0:
@@ -643,7 +599,7 @@ def tensors_from_tensor_map_gnomad_annos(args, include_reads=True, include_annot
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
 	print('Done generating gnomAD annotated tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
-
+	print('Tensors saved at: ', args.data_dir)
 
 
 def tensors_from_tensor_map_gnomad_annos_per_allele(args, include_reads=True, include_annotations=True, include_reference=False):
@@ -1481,6 +1437,22 @@ def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, refer
 	read_tensor = good_reads_to_tensor(args, good_reads, reference_start, insert_dict)
 	reference_sequence_into_tensor(args, reference_seq, read_tensor)
 
+	return read_tensor
+
+
+def make_paired_read_tensor(args, variant, samfile, ref_seq, ref_start, ref_end, stats):
+	good_reads, insert_dict, pairs = get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant)
+	if len(good_reads) >= args.read_limit:
+		stats['More reads than read_limit'] += 1
+	if len(good_reads) == 0:
+		stats['No reads aligned'] += 1
+		return None
+
+	for i in sorted(insert_dict.keys(), key=int, reverse=True):
+		ref_seq = ref_seq[:i] + defines.indel_char*insert_dict[i] + ref_seq[i:]
+
+	read_tensor = good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, pairs)
+	reference_sequence_into_tensor(args, ref_seq, read_tensor)	
 	return read_tensor
 
 
@@ -3064,37 +3036,6 @@ def position_string_from_tensor_name(tensor_name):
 	return pos_str	
 
 
-def force_symlink(file1, file2):
-	try:
-		if not os.path.exists(os.path.dirname(file2)):
-			os.makedirs(os.path.dirname(file2))
-		os.symlink(file1, file2)
-	except OSError as e:
-		if e.errno == errno.EEXIST:
-			os.remove(file2)
-			os.symlink(file1, file2)
-
-
-def split_and_symlink_images(args, valid_ratio=0.1):
-	new_image_path = os.path.split(args.data_dir)[0] + '_split_symlinked/'
-	train_path = os.path.join(new_image_path, 'train')
-	valid_path = os.path.join(new_image_path, 'valid')
-
-	count = 0
-	for label in os.listdir(args.data_dir):
-		if not os.path.isdir(args.data_dir+label):
-			continue
-		for img in [os.path.join(args.data_dir, label, img) for img in os.listdir(args.data_dir+label)]:
-			dice = np.random.rand()
-			if dice < valid_ratio:
-				force_symlink(img, os.path.join(valid_path, label, os.path.basename(img)))
-			else:
-				force_symlink(img, os.path.join(train_path, label, os.path.basename(img)))
-			count += 1
-			if count%1000 == 0:
-				print('symlinked:', count)
-
-
 def get_path_to_train_valid_or_test(args, contig):
 	if any(x == contig for x in args.valid_contigs):
 		return os.path.join(args.data_dir, 'valid/')
@@ -3914,11 +3855,13 @@ def scores_from_vcf(args, score_keys=['VQSLOD'], override_vcf=None):
 	done = False
 	for contig_key, np_intervals in sorted(bed_dict.items(), key=operator.itemgetter(0)):
 		for start,stop in zip(np_intervals[0], np_intervals[1]):
+			
 			try:
 				variants = vcf_reader.fetch(contig_key, start, stop)
 			except ValueError as e:
-				stats['Value Error on fetch'] += 1
+				stats['Value Error on fetch, contig:'+contig_key] += 1
 				continue
+				
 			for variant in variants:
 				for allele_idx, allele in enumerate(variant.ALT):
 					stats['allele_count'] += 1
@@ -4396,15 +4339,7 @@ def score_from_gnomad_site(args, variant, v_negative, vcf_mills, vcf_omni, stats
 			is_training_site = True
 
 		# Negative training sites	
-		if variant.INFO['QD'] < 2:
-			stats[args.random_forest_training_sites+' rf negative training example, QD'] += 1
-			is_training_site = True
-		if variant.INFO['FS'] > 60:
-			stats[args.random_forest_training_sites+' rf negative training example, FS'] += 1
-			is_training_site = True			
-		if variant.INFO['MQ'] < 30:
-			stats[args.random_forest_training_sites+' rf negative training example, MQ'] += 1
-			is_training_site = True
+		is_training_site = is_training_site or is_rf_hard_filter_negative(args, variant, stats)
 
 		if args.random_forest_training_sites == 'ignore' and is_training_site:
 			return
@@ -4440,6 +4375,19 @@ def score_from_gnomad_site(args, variant, v_negative, vcf_mills, vcf_omni, stats
 		return
 
 	return score	
+
+def is_rf_hard_filter_negative(args, variant, stats):
+	is_training_site = False
+	if variant.INFO['QD'] < 2:
+		stats[args.random_forest_training_sites+' rf negative training example, QD'] += 1
+		is_training_site = True
+	if variant.INFO['FS'] > 60:
+		stats[args.random_forest_training_sites+' rf negative training example, FS'] += 1
+		is_training_site = True			
+	if variant.INFO['MQ'] < 30:
+		stats[args.random_forest_training_sites+' rf negative training example, MQ'] += 1
+		is_training_site = True
+	return is_training_site
 
 
 def gnomad_scores_from_positions(args, positions, score_key='VQSLOD'):

@@ -230,7 +230,6 @@ def train_pileup_filter(args):
 	plots.plot_roc_per_class(model, test_pileups, test_labels, args.labels, args.id)
 
 
-
 def test_caller_pileup(args):
 	'''Tests the variant calling as 1D segmentation CNN architecture on tensors at the supplied data directory.
 
@@ -596,14 +595,14 @@ def train_ref_read_c(args):
 	model = models.read_tensor_2d_model_from_args(args, 
 									conv_width = 5, 
 									conv_height = 5,
-									conv_layers =  [256, 256, 192, 192, 128, 128, 96, 96, 64, 64],
-									conv_dropout = 0.2,
+									conv_layers =  [256, 256, 192, 192, 128, 128, 96, 96],
+									conv_dropout = 0.1,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
 									max_pools = [(2,1), (2,1), (2,1)],
 									padding='valid',
 									fc_layers = [24],
-									fc_dropout = 0.3,
+									fc_dropout = 0.2,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -854,19 +853,19 @@ def train_ref_read_anno_c(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 3,
-									conv_height = 3,
-									conv_layers = [256, 216, 192, 128, 96, 64],
-									conv_dropout = 0.2,
+									conv_width = 5,
+									conv_height = 5,
+									conv_layers = [256, 192, 128, 128, 108, 108, 64, 64],
+									conv_dropout = 0.1,
 									conv_batch_normalize = False,
-									kernel_single_channel = False,
-									spatial_dropout = False,
-									max_pools = [(3,1),(3,1),(3,1)],
-									padding='same',
+									kernel_single_channel = True,
+									spatial_dropout = True,
+									max_pools = [(3,1),(3,1)],
+									padding='valid',
 									annotation_units = 16,
 									annotation_shortcut = True,
-									fc_layers = [24],
-									fc_dropout = 0.3,
+									fc_layers = [28],
+									fc_dropout = 0.2,
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
@@ -1239,6 +1238,15 @@ def score_dict_from_shared_positions(args, kind, shared_positions, cnn_scores, c
 def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_scores, number_of_sites=5):
 	for a in args.architectures:
 		sorted_cnn = sorted([(p, cnn_scores[a][p]) for p in shared_positions], key=lambda s: s[1])
+		for i in range(len(sorted_cnn)):
+			p = sorted_cnn[i][0]
+			if p in shared_positions:
+				for k in compare_scores:
+					over = (sorted_cnn[i][1] > 0 and compare_scores[k][p][1] == 0) 
+					under = (sorted_cnn[i][1] < 0 and compare_scores[k][p][1] == 1) 
+					if over or under:
+						print('CNN Wrong :', sorted_cnn[i], 'but truth is: ', compare_scores[k][p][1], k, 'scored:', compare_scores[k][p][0])
+
 		for i in range(min(number_of_sites, len(sorted_cnn))):	
 			p = sorted_cnn[i][0]
 			print(kind, 'Bad CNN score:', sorted_cnn[i])

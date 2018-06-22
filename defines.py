@@ -124,6 +124,8 @@ def get_tensor_channel_map_from_args(args):
 
 	if 'read_tensor' == args.tensor_map:
 		return get_tensor_channel_map_rt()
+	elif 'paired_reads' == args.tensor_map:
+		return get_tensor_channel_map_rt()		
 	elif '2d_2bit' == args.tensor_map:
 		return get_tensor_channel_map_2bit()
 	elif '1d_calling'== args.tensor_map:
