@@ -1698,7 +1698,8 @@ def convert_theano_model_to_tensorflow(args):
 	from keras.utils.conv_utils import convert_kernel
 	import tensorflow as tf
 	
-	model = set_args_and_get_model_from_semantics(args, args.architectures[0])
+	semantics_json = args.architectures[0]
+	model = set_args_and_get_model_from_semantics(args, semantics_json)
 	K.set_image_data_format('channels_last')
 
 	ops = []
@@ -1709,7 +1710,7 @@ def convert_theano_model_to_tensorflow(args):
 			ops.append(tf.assign(layer.W, converted_w).op)
 
 	K.get_session().run(ops)
-	tf_model_hd5 = args.weights_hd5.replace('.hd5', '_tf_convert.hd5')
+	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
 	print('Saving weights to:', tf_model_hd5)
 	model.save_weights(tf_model_hd5)
 	serialize_model_semantics(args, tf_model_hd5)
