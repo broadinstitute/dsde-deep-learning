@@ -1710,6 +1710,7 @@ def convert_theano_model_to_tensorflow(args):
 			ops.append(tf.assign(layer.W, converted_w).op)
 
 	K.get_session().run(ops)
+	args.output_dir = os.path.dirname(semantics_json)
 	args.id = os.path.basename(semantics_json).replace('.json', '_tf_convert')
 	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
 	print('Saving weights to:', tf_model_hd5)
