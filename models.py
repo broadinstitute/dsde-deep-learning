@@ -1714,7 +1714,7 @@ def convert_theano_model_to_tensorflow(args):
 	args.id = os.path.basename(semantics_json).replace('.json', '_tf_convert')
 	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
 	print('Saving weights to:', tf_model_hd5)
-	model.save_weights(tf_model_hd5)
+	model.save(tf_model_hd5)
 	serialize_model_semantics(args, tf_model_hd5)
 
 

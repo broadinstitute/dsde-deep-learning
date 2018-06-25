@@ -190,16 +190,15 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz.recalibrated.vcf.gz
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, WGS1 HG38
-# DOWNSAMPLE_INDELS=0.25
-# ANNOTATION_SET=no_het0
-# SAMPLE_NAME=CHMI_CHMI3_WGS1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38_full/
-# TRAIN_VCF=/dsde/data/palantir/CHM-eval.kit/hybrid.m38.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/full.38.bed
-# BAM_FILE=/dsde/data/deep/vqsr/bams/g94794_chm_wgs1_hg38_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
-# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+DOWNSAMPLE_INDELS=0.25
+SAMPLE_NAME=CHMI_CHMI3_WGS1
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38_full_new/
+TRAIN_VCF=/dsde/data/palantir/CHM-eval.kit/hybrid.m38.vcf.gz
+BED_FILE=/dsde/data/deep/vqsr/beds/full.38.bed
+BAM_FILE=/dsde/data/deep/vqsr/bams/g94794_chm_wgs1_hg38_bamout.bam
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
+SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, WGS2 HG38
 # DOWNSAMPLE_INDELS=0.25
@@ -492,12 +491,12 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 
 # Project G94982 snapshot from Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x151
-TENSOR_MAP=paired_reads
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_platinum_paired_reads/
-BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_na12878.vcf.gz
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
+# TENSOR_MAP=paired_reads
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_platinum_paired_reads/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_na12878.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
 
 # Project G94982 snapshot from Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x151, Raw BAM
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_bam_test/
