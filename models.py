@@ -1774,7 +1774,7 @@ def convert_theano_model_to_tensorflow(args):
 			#weights[0] = weights[0].transpose((2, 3, 1, 0))
 			tf_dim_model.layers[index].set_weights(weights) # tf-kernels-tf-dim
 
-			nb_last_conv = th_layer.nb_filter # preserve last number of convolutions to use with dense layers
+			nb_last_conv = th_layer.filters # preserve last number of convolutions to use with dense layers
 			print("Converted layer %d : %s" % (index + 1, th_layer.name))
 		else:
 			if th_layer.__class__.__name__ == "Dense" and first_dense:
