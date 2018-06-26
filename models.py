@@ -1758,7 +1758,7 @@ def convert_theano_model_to_tensorflow(args, model_name='small'):
 									fc_batch_normalize = False)
 
 
-	args.output_dir = os.path.dirname(semantics_json) + '/'
+	args.output_dir = os.path.dirname(args.weights_hd5) + '/'
 	args.id = os.path.basename(args.weights_hd5).replace('.hd5', '_tf_convert')
 	tf_model_hd5 = args.weights_hd5.replace('.hd5', '_tf_convert.hd5')
 	print('Saving weights to:', tf_model_hd5)
