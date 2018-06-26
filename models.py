@@ -1694,30 +1694,130 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	return model
 
 
+# def convert_theano_model_to_tensorflow(args):
+# 	from keras.utils.conv_utils import convert_kernel
+# 	from keras.utils.layer_utils import convert_all_kernels_in_model
+# 	import tensorflow as tf
+	
+# 	semantics_json = args.architectures[0]
+# 	model = set_args_and_get_model_from_semantics(args, semantics_json)
+# 	args.channels_last = True
+# 	K.set_image_data_format('channels_last')
+
+# 	ops = []
+# 	for layer in model.layers:
+# 		if layer.__class__.__name__ in ['Conv1D', 'Conv2D', 'Conv3D']:
+# 			original_w = K.get_value(layer.kernel)
+# 			converted_w = convert_kernel(original_w)
+# 			ops.append(tf.assign(layer.kernel, converted_w).op)
+
+# 	K.get_session().run(ops)
+# 	model.summary()
+# 	args.output_dir = os.path.dirname(semantics_json) + '/'
+# 	args.id = os.path.basename(semantics_json).replace('.json', '_tf_convert')
+# 	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
+# 	print('Saving weights to:', tf_model_hd5)
+# 	model.save(tf_model_hd5)
+# 	serialize_model_semantics(args, tf_model_hd5)
+
 def convert_theano_model_to_tensorflow(args):
 	from keras.utils.conv_utils import convert_kernel
+	from keras.utils.layer_utils import convert_all_kernels_in_model
 	import tensorflow as tf
-	
+
 	semantics_json = args.architectures[0]
-	model = set_args_and_get_model_from_semantics(args, semantics_json)
+	th_dim_model = set_args_and_get_model_from_semantics(args, semantics_json)
+
 	args.channels_last = True
 	K.set_image_data_format('channels_last')
+	tf_dim_model = read_tensor_2d_annotation_model_from_args(args, 
+									conv_width = 3,
+									conv_height = 11,
+									conv_layers = [128, 96, 64, 48],
+									conv_dropout = 0.2,
+									conv_batch_normalize = False,
+									spatial_dropout = True,
+									kernel_single_channel = False,
+									max_pools = [(3,1),(3,1),(3,1)],
+									padding='same',
+									annotation_units = 16,
+									annotation_shortcut = True,
+									fc_layers = [24],
+									fc_dropout = 0.3,
+									fc_batch_normalize = False)
 
-	ops = []
-	for layer in model.layers:
-		if layer.__class__.__name__ in ['Conv1D', 'Conv2D', 'Conv3D']:
-			original_w = K.get_value(layer.kernel)
-			converted_w = convert_kernel(original_w)
-			ops.append(tf.assign(layer.kernel, converted_w).op)
+	first_dense = True
+	nb_last_conv = 0
 
-	K.get_session().run(ops)
-	model.summary()
+	convert_all_kernels_in_model(th_dim_model)
+	K.set_image_data_format('channels_first')
+
+	count_dense = 0
+	for layer in th_dim_model.layers:
+		if layer.__class__.__name__ == "Dense":
+			count_dense += 1
+
+	if count_dense == 1:
+		first_dense = False # If there is only 1 dense, no need to perform row shuffle in Dense layer
+
+	print("Nb layers : ", len(th_dim_model.layers))
+	for index, th_layer in enumerate(th_dim_model.layers):
+		if th_layer.__class__.__name__ in ['Conv1D',
+										   'Conv2D',
+										   'Conv3D',
+										   'AtrousConvolution1D'
+										   'AtrousConvolution2D',
+										   'Conv2DTranspose',
+										   'SeparableConv2D',
+										   'DepthwiseConv2D',
+										   ]:
+			weights = th_layer.get_weights() # tf-kernels-th-dim
+			weights[0] = weights[0].transpose((2, 3, 1, 0))
+			tf_dim_model.layers[index].set_weights(weights) # tf-kernels-tf-dim
+
+			nb_last_conv = th_layer.nb_filter # preserve last number of convolutions to use with dense layers
+			print("Converted layer %d : %s" % (index + 1, th_layer.name))
+		else:
+			if th_layer.__class__.__name__ == "Dense" and first_dense:
+				weights = th_layer.get_weights()
+				nb_rows_dense_layer = weights[0].shape[0] // nb_last_conv
+
+				print("Magic Number 1 : ", nb_last_conv)
+				print("Magic nunber 2 : ", nb_rows_dense_layer)
+
+				weights[0] = shuffle_rows(weights[0], nb_last_conv, nb_rows_dense_layer)
+				tf_dim_model.layers[index].set_weights(weights)
+
+				first_dense = False
+				print("Shuffled Dense Weights layer and saved %d : %s" % (index + 1, th_layer.name))
+			else:
+				tf_dim_model.layers[index].set_weights(th_layer.get_weights())
+				print("Saved layer %d : %s" % (index + 1, th_layer.name))
+
+	tf_dim_model.summary()
 	args.output_dir = os.path.dirname(semantics_json) + '/'
 	args.id = os.path.basename(semantics_json).replace('.json', '_tf_convert')
 	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
 	print('Saving weights to:', tf_model_hd5)
-	model.save(tf_model_hd5)
+	tf_dim_model.save(tf_model_hd5)
 	serialize_model_semantics(args, tf_model_hd5)
+
+
+def shuffle_rows(original_w, nb_last_conv, nb_rows_dense):
+	''' Note :
+	This algorithm to shuffle dense layer rows was provided by Kent Sommers (@kentsommer)
+	in a gist : https://gist.github.com/kentsommer/e872f65926f1a607b94c2b464a63d0d3
+	'''
+	converted_w = np.zeros(original_w.shape)
+	count = 0
+	for index in range(original_w.shape[0]):
+		if (index % nb_last_conv) == 0 and index != 0:
+			count += 1
+		new_index = ((index % nb_last_conv) * nb_rows_dense) + count
+		print("index from " + str(index) + " -> " + str(new_index))
+		converted_w[index] = original_w[new_index]
+
+	return converted_w
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
