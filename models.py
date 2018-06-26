@@ -1705,10 +1705,10 @@ def convert_theano_model_to_tensorflow(args):
 
 	ops = []
 	for layer in model.layers:
-		if layer.__class__.__name__ in ['Conv1D', 'Conv2D', 'Conv3D', 'Convolution1D', 'Convolution2D', 'Convolution3D', 'AtrousConvolution2D']:
-			original_w = K.get_value(layer.W)
+		if layer.__class__.__name__ in ['Conv1D', 'Conv2D', 'Conv3D']:
+			original_w = K.get_value(layer.kernel)
 			converted_w = convert_kernel(original_w)
-			ops.append(tf.assign(layer.W, converted_w).op)
+			ops.append(tf.assign(layer.kernel, converted_w).op)
 
 	K.get_session().run(ops)
 	model.summary()
