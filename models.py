@@ -1748,7 +1748,7 @@ def convert_theano_model_to_tensorflow(args, model_name='small'):
 									fc_dropout = 0.3,
 									fc_batch_normalize = False)
 	elif model_name == 'small':
-		tf_dim_model = models.read_tensor_2d_annotation_model_from_args(args, 
+		tf_dim_model = read_tensor_2d_annotation_model_from_args(args, 
 									conv_width = 25,
 									conv_height = 25,
 									conv_layers = [64, 48, 32, 24],
