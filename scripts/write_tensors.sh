@@ -190,15 +190,15 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz.recalibrated.vcf.gz
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, WGS1 HG38
-DOWNSAMPLE_SNPS=0.01 #0.005
-DOWNSAMPLE_INDELS=0.1 #0.03
-DOWNSAMPLE_NOT_SNPS=0.3
-DOWNSAMPLE_NOT_INDELS=0.15
-CHANNEL_ORDER=channels_last
+DOWNSAMPLE_SNPS=0.02 #0.005
+DOWNSAMPLE_INDELS=0.2 #0.03
+#DOWNSAMPLE_NOT_SNPS=0.3
+#DOWNSAMPLE_NOT_INDELS=0.15
+#CHANNEL_ORDER=channels_last
 SAMPLE_NAME=CHMI_CHMI3_WGS1
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38_full_channels_last/
-TRAIN_VCF=/dsde/data/palantir/CHM-eval.kit/hybrid.m38.vcf.gz
-BED_FILE=/dsde/data/deep/vqsr/beds/full.38.bed
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38_full_new/
+TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.38.vcf.gz
+BED_FILE=/dsde/working/sam/CHM-eval.kit/full.38.bed
 BAM_FILE=/dsde/data/deep/vqsr/bams/g94794_chm_wgs1_hg38_bamout.bam
 NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
 SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
