@@ -1720,7 +1720,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 # 	model.save(tf_model_hd5)
 # 	serialize_model_semantics(args, tf_model_hd5)
 
-def convert_theano_model_to_tensorflow(args):
+def convert_theano_model_to_tensorflow(args, model_name='small'):
 	from keras.utils.conv_utils import convert_kernel
 	from keras.utils.layer_utils import convert_all_kernels_in_model
 	import tensorflow as tf
@@ -1730,7 +1730,9 @@ def convert_theano_model_to_tensorflow(args):
 
 	args.channels_last = True
 	K.set_image_data_format('channels_last')
-	tf_dim_model = read_tensor_2d_annotation_model_from_args(args, 
+	
+	if model_name == 'rrab':
+		tf_dim_model = read_tensor_2d_annotation_model_from_args(args, 
 									conv_width = 3,
 									conv_height = 11,
 									conv_layers = [128, 96, 64, 48],
@@ -1745,7 +1747,22 @@ def convert_theano_model_to_tensorflow(args):
 									fc_layers = [24],
 									fc_dropout = 0.3,
 									fc_batch_normalize = False)
-
+	elif model_name == 'small':
+		tf_dim_model = models.read_tensor_2d_annotation_model_from_args(args, 
+									conv_width = 25,
+									conv_height = 25,
+									conv_layers = [64, 48, 32, 24],
+									conv_dropout = 0.1,
+									conv_batch_normalize = False,
+									spatial_dropout = True,
+									kernel_single_channel = True,
+									max_pools = [(3,1),(3,1)],
+									padding='valid',
+									annotation_units = 64,
+									annotation_shortcut = False,
+									fc_layers = [24],
+									fc_dropout = 0.3,
+									fc_batch_normalize = False)
 	first_dense = True
 	nb_last_conv = 0
 
