@@ -180,7 +180,7 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
 
 			if "read_tensor" == args.tensor_map:	
-				read_tensor = make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
+				read_tensor = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
 			elif "paired_reads" == args.tensor_map:	
 				read_tensor = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
 			else:
