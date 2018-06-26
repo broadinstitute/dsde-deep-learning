@@ -1749,7 +1749,7 @@ def convert_theano_model_to_tensorflow(args):
 	first_dense = True
 	nb_last_conv = 0
 
-	K.set_image_data_format('channels_first')
+	#K.set_image_data_format('channels_first')
 	convert_all_kernels_in_model(th_dim_model)
 	count_dense = 0
 	for layer in th_dim_model.layers:
@@ -1771,7 +1771,7 @@ def convert_theano_model_to_tensorflow(args):
 										   'DepthwiseConv2D',
 										   ]:
 			weights = th_layer.get_weights() # tf-kernels-th-dim
-			#weights[0] = weights[0].transpose((2, 3, 1, 0))
+			weights[0] = weights[0].transpose((2, 3, 1, 0))
 			tf_dim_model.layers[index].set_weights(weights) # tf-kernels-tf-dim
 
 			nb_last_conv = th_layer.filters # preserve last number of convolutions to use with dense layers
@@ -1794,6 +1794,8 @@ def convert_theano_model_to_tensorflow(args):
 				print("Saved layer %d : %s" % (index + 1, th_layer.name))
 
 	tf_dim_model.summary()
+	args.channels_last = True
+	K.set_image_data_format('channels_last')
 	args.output_dir = os.path.dirname(semantics_json) + '/'
 	args.id = os.path.basename(semantics_json).replace('.json', '_tf_convert')
 	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
