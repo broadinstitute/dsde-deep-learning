@@ -1787,9 +1787,10 @@ def convert_theano_model_to_tensorflow(args, model_name='small'):
 										   'SeparableConv2D',
 										   'DepthwiseConv2D',
 										   ]:
-			weights = th_layer.get_weights() # tf-kernels-th-dim
-			#weights[0] = weights[0].transpose((2, 3, 1, 0))
-			tf_dim_model.layers[index].set_weights(weights) # tf-kernels-tf-dim
+			th_weights = th_layer.get_weights() # tf-kernels-th-dim
+			tf_weights = tf_dim_model.layers[index].get_weights()
+			tf_weights[0] = th_weights[0].transpose((2, 3, 1, 0))
+			tf_dim_model.layers[index].set_weights(tf_weights) # tf-kernels-tf-dim
 
 			nb_last_conv = th_layer.filters # preserve last number of convolutions to use with dense layers
 			print("Converted layer %d : %s" % (index + 1, th_layer.name))
