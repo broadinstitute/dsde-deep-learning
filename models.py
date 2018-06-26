@@ -1749,9 +1749,8 @@ def convert_theano_model_to_tensorflow(args):
 	first_dense = True
 	nb_last_conv = 0
 
-	convert_all_kernels_in_model(th_dim_model)
 	K.set_image_data_format('channels_first')
-
+	convert_all_kernels_in_model(th_dim_model)
 	count_dense = 0
 	for layer in th_dim_model.layers:
 		if layer.__class__.__name__ == "Dense":
