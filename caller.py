@@ -58,7 +58,6 @@ def infer_tensor(args):
 				stats['cur_tensor'] = 0
 				gpos_batch = []
 
-
 def infer_vcf(args):
 	stats = Counter()
 	model = models.load_model(args.weights_hd5, custom_objects=models.get_all_custom_objects(args.labels))
@@ -68,22 +67,28 @@ def infer_vcf(args):
 	print('got vcfs.')
 
 	reference = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	print('got ref.')
+	print('Loaded reference FASTA:', args.reference_fasta)
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	print('got sam.')	
 
-	intervals = td.bed_file_to_dict(args.bed_file)
-	print('got intervals.')
+	if args.chrom:
+		intervals = { args.chrom : [int(args.start_pos), int(args.end_pos)] }
+	elif args.bed_file:
+		intervals = td.bed_file_to_dict(args.bed_file)
+	else:
+		raise ValueError('What do you want to iterate over? Use arguments --bed_file or --chrom --start_pos --end_pos')
 
 	tensor_batch = np.zeros((args.batch_size,)+defines.tensor_shape_from_args(args))
 	gpos_batch = []
+
+	print(len(intervals), 'intervals to iterate over, contigs:', intervals.keys())
 	for k in intervals:
 		contig = reference[k]
+		args.chrom = k
 		for start,stop in zip(intervals[k][0], intervals[k][1]):
 			cur_pos = start
 			for cur_pos in range(start, stop, args.window_size):		
-				
 				record = contig[cur_pos: cur_pos+args.window_size]
 				print(str(record))
 				tensor_batch[stats['cur_tensor']] = td.make_calling_tensor(args, samfile, record, cur_pos, stats)				
@@ -91,15 +96,14 @@ def infer_vcf(args):
 				stats['cur_tensor'] += 1
 
 				if stats['cur_tensor'] == args.batch_size:
-					## Evaluate the model
 					predictions = model.predict(tensor_batch) # predictions is a numpy arra
-					predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer)
+					predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, record)
 					tensor_batch = np.zeros((args.batch_size,)+defines.tensor_shape_from_args(args))
 					stats['cur_tensor'] = 0
 					gpos_batch = []
 
 
-def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer):
+def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, record=None):
 	index2labels = {v:k for k,v in defines.calling_labels.items()}
 	indel_start = -1
 	ref_offset = 0
@@ -108,14 +112,17 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 		cur_tensor = tensor_batch[i]
 		print('Prediction shape:', predictions.shape)
 		print('Guess:', guess)
-		print('gpos:', gpos)
+		print('Genomic position:', gpos)
 		for j in range(guess.shape[0]):
 			if index2labels[guess[j]] == 'REFERENCE':
 				continue
 
 			ref_start = int(gpos[1])-ref_offset
 			# Does NOT properly handle multiallelics
-			ref_allele = reference_base_from_tensor(args, cur_tensor, j)
+			if record and j < len(record):
+				ref_allele = record[j]
+			else:
+				ref_allele = reference_base_from_tensor(args, cur_tensor, j)
 			alt = strongest_alt_allele_from_tensor(args, cur_tensor, j, ref_allele)
 
 			is_indel = 'DELETION' in index2labels[guess[j]] or 'INSERTION' in index2labels[guess[j]]
@@ -140,7 +147,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				d = get_deleted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
-									  stop=ref_start+indel_start+(j-indel_start)+1,
+									  stop=ref_start+indel_start+(j-indel_start)+2,
 									  alleles=[d, d[0]],
 									  qual=predictions[i][j][guess[j]])
 				vcf_writer.write(v)
@@ -149,18 +156,21 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				d = get_deleted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
-									  stop=ref_start+indel_start+(j-indel_start)+1,
+									  stop=ref_start+indel_start+(j-indel_start)+2,
 									  alleles=[d, d[0]],
 									  qual=predictions[i][j][guess[j]])
 				vcf_writer.write(v)
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_INSERTION' and variant_edge(index2labels, guess, j):
-				ref = reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-1))
-				if ref == defines.indel_char:
-					print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
-					if (ref_offset+(indel_start-1))  > 0:
-						print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
-				
+				if record and ref_offset+(indel_start-1) < len(record):
+					ref = record[ref_offset+(indel_start-1)]
+				else:
+					ref = reference_base_from_tensor(args, cur_tensor, )
+					if ref == defines.indel_char:
+						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
+						if (ref_offset+(indel_start-1))  > 0:
+							print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
+
 				insert = get_inserted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start,
@@ -171,11 +181,15 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				ref_offset += j-indel_start
 				indel_start = -1	
 			elif index2labels[guess[j]] == 'HET_INSERTION' and variant_edge(index2labels, guess, j):
-				ref = reference_base_from_tensor(args, cur_tensor, ref_offset+indel_start-1)
-				if ref == defines.indel_char:
-					print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
-					if (ref_offset+(indel_start-1)) > 0:
-						print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
+				if record and ref_offset+(indel_start-1) < len(record):
+					ref = record[ref_offset+(indel_start-1)]
+				else:
+					ref = reference_base_from_tensor(args, cur_tensor, )
+					if ref == defines.indel_char:
+						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
+						if (ref_offset+(indel_start-1))  > 0:
+							print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
+
 				insert = get_inserted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0],
 									  start=ref_start+indel_start,

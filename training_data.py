@@ -1457,6 +1457,8 @@ def make_paired_read_tensor(args, variant, samfile, ref_seq, ref_start, ref_end,
 
 
 def make_calling_tensor(args, samfile, reference_seq, reference_start, stats):
+	print('Try to get reads.')
+
 	good_reads, insert_dict = get_good_reads_in_window(args, samfile, reference_start, reference_start+args.window_size)
 	print('Got reads:', len(good_reads))
 	if len(good_reads) >= args.read_limit:
