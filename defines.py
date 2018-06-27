@@ -73,7 +73,7 @@ anno_norms_g947i = { # anno: mean, std
 ambiguity_codes = { 
 					'K':[0,0,0.5,0.5], 'M':[0.5,0.5,0,0], 'R':[0.5,0,0,0.5], 'Y':[0,0.5,0.5,0], 'S':[0,0.5,0,0.5],
 					'W':[0.5,0,0.5,0], 'B':[0,0.333,0.333,0.334], 'V':[0.333,0.333,0,0.334],'H':[0.333,0.333,0.334,0],
-				  	'D':[0.333,0,0.333,0.334],'X':[0.25,0.25,0.25,0.25], 'N':[0.25,0.25,0.25,0.25],
+				  	'D':[0.333,0,0.333,0.334], 'N':[0.25,0.25,0.25,0.25]
 				  	}
 
 skip_char = '~'
@@ -124,6 +124,8 @@ def get_tensor_channel_map_from_args(args):
 
 	if 'read_tensor' == args.tensor_map:
 		return get_tensor_channel_map_rt()
+	elif 'paired_reads' == args.tensor_map:
+		return get_tensor_channel_map_rt()		
 	elif '2d_2bit' == args.tensor_map:
 		return get_tensor_channel_map_2bit()
 	elif '1d_calling'== args.tensor_map:
