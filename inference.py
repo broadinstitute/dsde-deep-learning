@@ -37,8 +37,8 @@ def run():
 def annotate_vcf_with_inference(args):
 	cnns = {}
 	stats = Counter()
-	vcf_reader = pysam.VariantFile(args.negative_vcf, 'r')
-	pyvcf_vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
+	vcf_reader = pysam.VariantFile(args.negative_vcf, 'rb')
+	pyvcf_vcf_reader = vcf.Reader(open(args.negative_vcf, 'rb'))
 	input_tensors = {}
 
 	for a in args.architectures:	
