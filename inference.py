@@ -106,6 +106,8 @@ def annotate_vcf_with_inference(args):
 				reference_tensor = td.make_reference_tensor(args, record.seq)
 				batch[tm][stats[batch_key]] = reference_tensor
 				stats[batch_key] += 1
+				print('ref seq:', str(record.seq))
+
 
 		positions.append(variant.contig + '_' + str(variant.pos))
 		variant_batch.append(variant)
