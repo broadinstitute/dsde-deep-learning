@@ -53,8 +53,6 @@ def run_training_data():
 	# Writing tensor datasets for training
 	if 'write_tensors' == args.mode:
 		tensors_from_tensor_map(args)
-	elif 'write_paired_read_tensors' == args.mode:
-		paired_read_tensors_from_map(args)
 	elif 'write_tensors_2bit' == args.mode:
 		tensors_from_tensor_map_2channel(args, include_annotations=True)
 	elif 'write_tensors_no_annotations' == args.mode:
@@ -99,7 +97,10 @@ def run_training_data():
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine'], pileup=False, reference_map='reference'):
+def tensors_from_tensor_map(args, 
+							annotation_sets=['best_practices', 'mix', 'combine'], 
+							pileup=False, 
+							reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -120,7 +121,7 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 		args.start_pos: Only write tensors after this position (optional, used for parallelization)
 		args.end_pos: Only write tensors before this position (optional, used for parallelization)
 	'''	
-	print('Writing tensors with:', args.tensor_map, 'channel map.')
+	print('Writing tensors with tensor type(s):', args.tensor_types, 'channel map.')
 	stats = Counter()
 	debug = False
 
@@ -179,12 +180,15 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 					continue # Require at least 1 annotation...
 				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
 
-			if "read_tensor" == args.tensor_map:	
-				read_tensor = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
-			elif "paired_reads" == args.tensor_map:	
-				read_tensor = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
-			else:
-				raise ValueError("Unknown read tensor function.")
+			read_tensors = {}
+			for tt in args.tensor_types:
+				args.tensor_map = tt
+				if "read_tensor" == tt:
+					read_tensors[tt] = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
+				elif "paired_reads" == tt:	
+					read_tensors[tt] = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
+				else:
+					raise ValueError("Unknown read tensor mapping."+tt)
 
 			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
@@ -194,7 +198,8 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
-				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
+				for rt in read_tensors:
+					hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
 				for a_set in annotation_sets:
 					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
 				if reference_map is not None:
@@ -213,116 +218,6 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 		print(s, 'has:', stats[s])
 	if variant:
 		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
-
-
-def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine'], reference_map='reference'):
-	'''Create tensors structured as tensor map of paired reads organized by labels in the data directory.
-
-	Defines true variants as those in the args.train_vcf, defines false variants as 
-	those called in args.negative_vcf and in the args.bed_file high confidence intervals, 
-	but not in args.train_vcf.
-
-	Arguments
-		args.data_dir: directory where tensors will live. Created here and filled with
-			subdirectories of test, valid and train, each containing
-			subdirectories for each label with tensors stored as hd5 files.
-		args.bam_file: BAM or BAMout file where the aligned reads are stored
-		args.negative_vcf: VCF file with annotation values from Haplotype caller or VQSR
-		args.train_vcf: VCF file with true variant (from NIST or Platinum genomes, etc.)
-		args.bed_file: High confidence intervals for the calls in args.train_vcf
-		args.window_size: Size of sequence window around variant (width of the tensor)
-		args.read_limit: Maximum number of reads to include (height of the tensor)
-		args.chrom: Only write tensors from this chromosome (optional, used for parallelization)
-		args.start_pos: Only write tensors after this position (optional, used for parallelization)
-		args.end_pos: Only write tensors before this position (optional, used for parallelization)
-	'''	
-	print('Writing paired read tensors from', args.tensor_map, 'channel map.')
-	stats = Counter()
-	debug = False
-
-	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
-	bed_dict = bed_file_to_dict(args.bed_file)
-	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
-	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
-	
-	tensor_channel_map = defines.get_tensor_channel_map_from_args(args)
-
-	if args.chrom:
-		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
-	else:
-		variants = vcf_reader
-
-	for variant in variants:
-		for allele_idx, allele in enumerate(variant.ALT):
-			idx_offset, ref_start, ref_end = get_variant_window(args, variant)
-			contig = record_dict[variant.CHROM]	
-			record = contig[ ref_start : ref_end ]
-
-			if args.label_sites:
-				cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
-			else:
-				cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
-
-			if not cur_label_key or downsample(args, cur_label_key, stats):
-				continue
-
-			annotation_data = {}
-			for a_set in annotation_sets:
-				annos = defines.annotations[a_set]
-				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
-					stats['Missing ALL annotations'] += 1
-					continue # Require at least 1 annotation...
-				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-
-			good_reads, insert_dict, pairs = get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant)	
-			reference_seq = record.seq
-			if reference_map is not None:
-				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
-				for i,b in enumerate(reference_seq):						
-					b = b.upper()
-					if b in defines.inputs:
-						reference_tensor[i, defines.inputs[b]] = 1.0
-					elif b in defines.ambiguity_codes:
-						reference_tensor[i] = defines.ambiguity_codes[b]
-					elif b == '\x00':
-						break
-					else:
-						raise ValueError('Error! Unknown code:', b)
-
-			for i in sorted(insert_dict.keys(), key=int, reverse=True):
-				reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
-
-			read_tensor = good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, pairs)
-			reference_sequence_into_tensor(args, reference_seq, read_tensor)
-			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
-			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
-			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
-			stats[cur_label_key] += 1
-
-			if not os.path.exists(os.path.dirname(tensor_path)):
-				os.makedirs(os.path.dirname(tensor_path))
-			with h5py.File(tensor_path, 'w') as hf:
-				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
-				for a_set in annotation_sets:
-					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
-				if reference_map is not None:
-					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
-
-			if debug:
-				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
-				print(str(reference_seq)+'<- reference sequence\n\n')
-
-			stats['count'] += 1
-			if stats['count']%400 == 0:
-				print('Wrote', stats['count'], 'tensors out of', args.samples, ' last variant:', str(variant))
-			if stats['count'] >= args.samples:
-				break
-
-	for s in stats.keys():
-		print(s, 'has:', stats[s])
-	if stats['count'] > 0:
-		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
 
 
 def calling_tensors_from_tensor_map(args, pileup=False):
@@ -2053,16 +1948,6 @@ def image_as_matrix(image_path, expand_dims=False, shape=(224,224), channels_las
 	return img
 
 
-def train_valid_test_generators_from_args(args, with_positions=False):
-	train_paths, valid_paths, test_paths = get_train_valid_test_paths(args)
-
-	train_generator = tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions)
-	valid_generator = tensor_generator_from_label_dirs_and_args(args, valid_paths, with_positions)
-	test_generator = tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions)
-
-	return train_generator, valid_generator, test_generator
-
-
 def image_generator(args, train_paths, shape=(224,224)):
 	"""Data generator of PNGs for DeepVariant.
 
@@ -2624,6 +2509,16 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 		yield ({args.tensor_map:tensor, args.annotation_set:annotations}, label_matrix)
 		label_matrix = np.zeros((args.batch_size, len(args.labels)))		
 		annotations = np.zeros((args.batch_size,len(args.annotations)))
+
+
+def train_valid_test_generators_from_args(args, with_positions=False):
+	train_paths, valid_paths, test_paths = get_train_valid_test_paths(args)
+
+	train_generator = tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions)
+	valid_generator = tensor_generator_from_label_dirs_and_args(args, valid_paths, with_positions)
+	test_generator = tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions)
+
+	return train_generator, valid_generator, test_generator
 
 
 def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=False):

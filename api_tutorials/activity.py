@@ -171,6 +171,7 @@ def multilayer_perceptron_on_mnist(args):
 	mlp_model = Sequential()
 	for fc in args.fc_layers:
 		mlp_model.add(Dense(fc, activation=args.activation, input_dim=784))
+		
 	mlp_model.add(Dense(num_labels, activation='softmax'))
 	mlp_model.compile(loss='categorical_crossentropy', optimizer='sgd', metrics=['accuracy'])
 	mlp_model.summary()

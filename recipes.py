@@ -745,18 +745,17 @@ def train_ref_read_annotation_model(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-
-	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
-	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 
 	weight_path = arguments.weight_path_from_args(args)
-
 	model = models.build_read_tensor_2d_and_annotations_model(args)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id, batch_size=args.batch_size)
+	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
+	test = td.big_batch_from_minibatch_generator(args, generate_test)
+	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
+	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
+	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
 
 def train_ref_read_annotation_exome_model(args):
@@ -805,10 +804,7 @@ def train_ref_read_anno_b(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
-	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
-	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions=True)
+	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
@@ -828,6 +824,8 @@ def train_ref_read_anno_b(args):
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+	
+	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
 	test = td.big_batch_from_minibatch_generator(args, generate_test)
 	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
 	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
@@ -847,9 +845,7 @@ def train_ref_read_anno_c(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
-	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
@@ -867,12 +863,14 @@ def train_ref_read_anno_c(args):
 									fc_layers = [28],
 									fc_dropout = 0.2,
 									fc_batch_normalize = False)
-	
+
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id)
-	return plots.get_per_class_auc(model, [test[0], test[1]], test[2], args.labels)
+	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
+	test = td.big_batch_from_minibatch_generator(args, generate_test)
+	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
+	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
+	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
 
 def train_ref_read_anno_d(args):
@@ -888,9 +886,7 @@ def train_ref_read_anno_d(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
-	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
+	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
@@ -911,8 +907,11 @@ def train_ref_read_anno_d(args):
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test = td.load_tensors_and_annotations_from_class_dirs(args, test_paths, per_class_max=args.samples)
-	plots.plot_roc_per_class(model, [test[0], test[1]], test[2], args.labels, args.id)
+	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
+	test = td.big_batch_from_minibatch_generator(args, generate_test)
+	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
+	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
+	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
 
 def train_ref_read_anno_small(args):
@@ -928,10 +927,7 @@ def train_ref_read_anno_small(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
-	train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-	generate_train = td.tensor_generator_from_label_dirs_and_args(args, train_paths)
-	generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
-	generate_test = td.tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions=True)
+	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_annotation_model_from_args(args, 
@@ -951,10 +947,13 @@ def train_ref_read_anno_small(args):
 									fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
+
+	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
 	test = td.big_batch_from_minibatch_generator(args, generate_test)
 	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
 	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
 	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
+
 
 def bqsr_train_tensor(args):
 	'''Trains the bqsr tensor architecture on tensors at the supplied data directory.
@@ -1207,14 +1206,8 @@ def test_architectures(args):
 			models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
 		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
-		test = td.big_batch_from_minibatch_generator(args, test_generator)
-
-		positions = test[-1]
-		test_data = [test[0][args.tensor_map]]
-		if defines.annotations_from_args(args):
-			test_data.append(test[0][args.annotation_set])
-
-		cnn_predictions = model.predict(test_data, batch_size=args.batch_size)
+		test, _, positions = td.big_batch_from_minibatch_generator(args, test_generator)
+		cnn_predictions = model.predict(test, batch_size=args.batch_size)
 		cnn_snp_dicts[a], cnn_indel_dicts[a] = models.predictions_to_snp_indel_scores(args, cnn_predictions, positions)
 
 	compare_snp, compare_indel = score_dicts_from_positions(args, positions)

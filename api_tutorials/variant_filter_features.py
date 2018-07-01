@@ -78,8 +78,8 @@ def run():
 		draw_loop(args, model)
 	elif 'journey' == args.mode:
 		image_journey(args, model)	
-	elif 'write_video' == args.mode:
-		write_dream_video(args, model)		
+	elif 'saliency' == args.mode:
+		write_saliency(args, model)		
 	else:
 		raise ValueError('unknown variant visualize mode:', args.mode)
 
@@ -110,7 +110,7 @@ def parse_args():
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
-	parser.add_argument('--annotation_set', default='gatk', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
+	parser.add_argument('--annotation_set', default='best_practices', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
 
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
@@ -237,6 +237,10 @@ def write_filters(args, model):
 			with h5py.File(out_file, 'w') as hf:
 				hf.create_dataset(args.tensor_name, data=read_tensor[0], compression='gzip')
 			print('Wrote tensor to:', out_file)
+
+
+#def write_saliency(args, model):
+			
 
 
 def excite_neuron(args, model):
@@ -801,111 +805,111 @@ def get_reference_and_read_channels(args):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 def precision(y_true, y_pred):
-    '''Calculates the precision, a metric for multi-label classification of
-    how many selected items are relevant.
-    '''
-    true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
-    predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
-    precision = true_positives / (predicted_positives + K.epsilon())
-    return precision
+	'''Calculates the precision, a metric for multi-label classification of
+	how many selected items are relevant.
+	'''
+	true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)))
+	predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)))
+	precision = true_positives / (predicted_positives + K.epsilon())
+	return precision
 
 
 def recall(y_true, y_pred):
-    '''Calculates the recall, a metric for multi-label classification of
-    how many relevant items are selected.
-    '''
-    true_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)))
-    possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
-    recall = true_positives / (possible_positives + K.epsilon())
-    return recall
+	'''Calculates the recall, a metric for multi-label classification of
+	how many relevant items are selected.
+	'''
+	true_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)))
+	possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)))
+	recall = true_positives / (possible_positives + K.epsilon())
+	return recall
 
 
 def per_class_recall(labels):
-    recall_fxns = []
+	recall_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
-        string_fxn += '\tpossible_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
+		string_fxn += '\tpossible_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        recall_fxn = eval(label_key + '_recall')
-        recall_fxns.append(recall_fxn)
+		exec(string_fxn)
+		recall_fxn = eval(label_key + '_recall')
+		recall_fxns.append(recall_fxn)
 
-    return recall_fxns
+	return recall_fxns
 
 
 def per_class_precision(labels):
-    precision_fxns = []
+	precision_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
-        string_fxn += '\tpredicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0)\n'
+		string_fxn += '\tpredicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        precision_fxn = eval(label_key + '_precision')
-        precision_fxns.append(precision_fxn)
+		exec(string_fxn)
+		precision_fxn = eval(label_key + '_precision')
+		precision_fxns.append(precision_fxn)
 
-    return precision_fxns
+	return precision_fxns
 
 
 def get_metric_dict(labels=SNP_INDEL_LABELS):
-    metrics = {'precision':precision, 'recall':recall}
-    precision_fxns = per_class_precision(labels)
-    recall_fxns = per_class_recall(labels)
-    for i,label_key in enumerate(labels.keys()):
-        metrics[label_key+'_precision'] = precision_fxns[i]
-        metrics[label_key+'_recall'] = recall_fxns[i]
+	metrics = {'precision':precision, 'recall':recall}
+	precision_fxns = per_class_precision(labels)
+	recall_fxns = per_class_recall(labels)
+	for i,label_key in enumerate(labels.keys()):
+		metrics[label_key+'_precision'] = precision_fxns[i]
+		metrics[label_key+'_recall'] = recall_fxns[i]
 
-    return metrics
+	return metrics
 
 
 def per_class_recall_3d(labels):
-    recall_fxns = []
+	recall_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\tpossible_positives = K.sum(K.sum(K.round(K.clip(y_true, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\tpossible_positives = K.sum(K.sum(K.round(K.clip(y_true, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        recall_fxn = eval(label_key + '_recall')
-        recall_fxns.append(recall_fxn)
+		exec(string_fxn)
+		recall_fxn = eval(label_key + '_recall')
+		recall_fxns.append(recall_fxn)
 
-    return recall_fxns
+	return recall_fxns
 
 
 def per_class_precision_3d(labels):
-    precision_fxns = []
+	precision_fxns = []
 
-    for label_key in labels:
-        label_idx = labels[label_key]
-        string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
-        string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\tpredicted_positives = K.sum(K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0), axis=0)\n'
-        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
+	for label_key in labels:
+		label_idx = labels[label_key]
+		string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
+		string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\tpredicted_positives = K.sum(K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0), axis=0)\n'
+		string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-        exec(string_fxn)
-        precision_fxn = eval(label_key + '_precision')
-        precision_fxns.append(precision_fxn)
+		exec(string_fxn)
+		precision_fxn = eval(label_key + '_precision')
+		precision_fxns.append(precision_fxn)
 
-    return precision_fxns
+	return precision_fxns
 
 
 def get_metrics(classes=None, dim=2):
-    if classes and dim == 2:
-        return [metrics.categorical_accuracy] + per_class_precision(classes) + per_class_recall(classes)
-    elif classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
-    else:
-        return [metrics.categorical_accuracy, precision, recall]
+	if classes and dim == 2:
+		return [metrics.categorical_accuracy] + per_class_precision(classes) + per_class_recall(classes)
+	elif classes and dim == 3:
+		return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
+	else:
+		return [metrics.categorical_accuracy, precision, recall]
 
 
 ##############################

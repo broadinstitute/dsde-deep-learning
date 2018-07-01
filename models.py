@@ -1966,7 +1966,6 @@ def write_filters_1d(args, model):
 				hf.create_dataset('reference', data=input_tensor[0])
 
 
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Training ~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
