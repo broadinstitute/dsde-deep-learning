@@ -100,13 +100,13 @@ def annotate_vcf_with_inference(args):
 				if read_tensor is None:
 					batch[tm][stats[batch_key]] = np.zeros(input_tensors[tm])
 				stats[batch_key] += 1
+				print('ref seq:', str(record.seq))
 
 			if tm in defines.reference_tensor_maps:
 				args.tensor_map = tm
 				reference_tensor = td.make_reference_tensor(args, record.seq)
 				batch[tm][stats[batch_key]] = reference_tensor
 				stats[batch_key] += 1
-				print('ref seq:', str(record.seq))
 
 
 		positions.append(variant.contig + '_' + str(variant.pos))
