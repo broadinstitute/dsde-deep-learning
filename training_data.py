@@ -1317,6 +1317,7 @@ def make_reference_tensor(args, reference_seq):
 
 def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, reference_start, stats):
 	good_reads, insert_dict = get_good_reads(args, samfile, variant)
+	print('got good reads:', len(good_reads))
 	if len(good_reads) >= args.read_limit:
 		stats['More reads than read_limit'] += 1
 	if len(good_reads) == 0:

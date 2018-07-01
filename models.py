@@ -754,8 +754,6 @@ def build_read_tensor_2d_and_annotations_model(args):
 	Returns
 		The keras model
 	'''		
-	#print('IN MODEL K.image_data_format:', K.image_data_format())
-	#K.set_image_data_format('channels_first')
 	in_channels = defines.total_input_channels_from_args(args)
 	if args.channels_last:
 		in_shape = (args.read_limit, args.window_size, in_channels)
