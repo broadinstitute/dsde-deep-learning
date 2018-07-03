@@ -3725,14 +3725,14 @@ def scores_from_vcf(args, score_keys=['VQSLOD'], override_vcf=None):
 	allele_specific_score_keys = ['AS_RF']
 
 	bed_dict = bed_file_to_dict(args.bed_file)
-	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
-	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
-	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
+	vcf_nist = vcf.Reader(open(args.train_vcf, 'rb'))
+	#vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
+	#vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
 
 	if override_vcf:
-		vcf_reader = vcf.Reader(open(override_vcf, 'r'))
+		vcf_reader = vcf.Reader(open(override_vcf, 'rb'))
 	else:
-		vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
+		vcf_reader = vcf.Reader(open(args.negative_vcf, 'rb'))
 	
 	if args.ignore_vcf:
 		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'r'))
