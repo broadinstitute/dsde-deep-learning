@@ -545,12 +545,8 @@ class HyperparameterOptimizer(object):
 		Arguments:
 			iterations: how many architectures to try
 		'''
-		args.window_size = 0	
-		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-
-		generate_train = td.dna_annotation_generator(args, train_paths)
-		generate_valid = td.dna_annotation_generator(args, valid_paths)
-		generate_test = td.dna_annotation_generator(args, test_paths)
+		args.tensor_map = None	
+		generate_train, generate_valid, generate_test = td.train_valid_test_generators_from_args(args)
 
 		stats = Counter()
 		bounds = [
@@ -731,47 +727,8 @@ class HyperparameterOptimizer(object):
 		for k, v in sorted(self.performances.items()):	
 			print(k, '\nGot AUC:', self.performances[k])
 
-
-	def random_search_1d(self, args, iterations):
-		'''Random search in hyperparameter space for good architectures.
-		
-		Create a bunch of random architectures and test their performance.
-		Archtiectures are created from within the bounds defined at the top of this class.
-
-		Arguments:
-			iterations: how many architectures to try
-		'''		
-		train_paths, valid_paths, test_paths = td.get_train_valid_test_paths(args)
-
-		generate_train = td.dna_annotation_generator(args, train_paths)
-		generate_valid = td.dna_annotation_generator(args, valid_paths)
-		test = td.load_dna_annotations_positions_from_class_dirs(args, test_paths, per_class_max=args.samples)
-
-		for i in range(iterations):
-			try:
-				model, params = self.get_random_architecture_1d(args)
-			except ValueError as e:
-				print('value error on architecture, skipping this iteration. Error is:\n', str(e))
-				continue
-
-			param_str = 'Iteration: ' + str(i) + '\nParameter set:\n' + str(params) + '\nTotal params:' + str(model.count_params())
-			print(param_str)
-			weight_path = './weights/hyper_opt_' + str(i) + '.hd5'
-			model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
-			param_str += plots.string_auc_per_class(model, [test[0], test[1]], test[2], args.labels)
-			plots.print_auc_per_class(model, [test[0], test[1]], test[2], args.labels)
-			self.performances[param_str] = plots.get_auc(model, [test[0], test[1]], test[2], args.labels)
-
-		self.write_results_to_file('./param_opt_1d_' + args.id + '.txt')
-		for k, v in sorted(self.performances.items(), key=operator.itemgetter(1)):
-			print(k, '\nGot AUC:', self.performances[k])
-
-
 	def conv_layers_from_params(self, x):
 		return [ min(350, max(1, int(x[4]*(x[3]**i)))) for i in range(int(x[2]))]
-
-
-
 
 
 	def get_random_architecture_1d(self, args):

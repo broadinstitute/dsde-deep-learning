@@ -14,12 +14,14 @@ import json
 import h5py
 import time
 import scipy
+import tempfile
 import argparse
 import numpy as np
 from scipy import interpolate
 import matplotlib.pyplot as plt
 
 from keras import metrics
+from keras import activations
 from keras import backend as K
 from keras.applications import inception_v3
 from keras.models import Sequential, load_model
@@ -87,7 +89,6 @@ def run():
 def parse_args():
 	parser = argparse.ArgumentParser()
 
-	parser.add_argument('--maxfun', default=9, type=int)
 	parser.add_argument('--fps', default=1, type=int)
 	parser.add_argument('--learning_rate', default=0.01, type=float)
 	parser.add_argument('--jitter', default=0.0, type=float)
@@ -96,6 +97,7 @@ def parse_args():
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=0.00001, type=float)
 	parser.add_argument('--neuron', default=58, type=int)
+	parser.add_argument('--undo_softmax', default=False, action='store_true', help='Replace softmax activation with linear.')
 
 
 	# Tensor defining arguments
@@ -184,6 +186,11 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	weight_path_hd5 = os.path.join(os.path.dirname(semantics_json), semantics['architecture'])
 	print('Loading keras weight file from:', weight_path_hd5)
 	model = load_model(weight_path_hd5, custom_objects=get_metric_dict(args.labels))
+
+	if args.undo_softmax:
+		model.layers[-1].activation = activations.linear
+		apply_modifications(model, custom_objects=get_metric_dict(args.labels))
+
 	model.summary()
 	return model
 
@@ -193,7 +200,6 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 ################################################
 
 def write_filters(args, model):
-	#
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 	exclude = [args.annotation_set, 'dropout', 'flatten', 'activation', 'batch_normalization', 'concatenate']
 
@@ -223,15 +229,17 @@ def write_filters(args, model):
 			# run gradient ascent
 			for i in range(args.iterations):
 				#print("predictions:", model.predict([read_tensor, annos])[0])
+				print("Annotations are:", annos)
 				random_jitter = args.jitter * (np.random.random(expand_dim_shape) - 0.5)
 				read_tensor += random_jitter
-				loss_value, grads_value = iterate([read_tensor, annos])
+				loss_value, grads_value, anno_grads = iterate([read_tensor, annos])
 				read_tensor -= random_jitter
 
 				read_tensor += args.learning_rate*grads_value
+				annos += args.learning_rate*anno_grads
+
 				if i % (max(args.iterations,4)//4) == 0:
 					print("After iteration:", i, "of:", args.iterations, "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index)
-			
 			if not os.path.exists(os.path.dirname(out_file)):
 				os.makedirs(os.path.dirname(out_file))
 			with h5py.File(out_file, 'w') as hf:
@@ -397,12 +405,15 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(objective, input_tensor)[0]
+	anno_grads = K.gradients(objective, annos)[0]
 
 	# normalization trick: we normalize the gradient
 	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
+	# normalization trick: we normalize the gradient
+	anno_grads /= (K.sqrt(K.mean(K.square(anno_grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
-	iterate = K.function([input_tensor, annos], [objective, grads])
+	iterate = K.function([input_tensor, annos], [objective, grads, anno_grads])
 	return iterate
 
 
@@ -915,6 +926,26 @@ def get_metrics(classes=None, dim=2):
 ##############################
 ###### Utilities #############
 ##############################
+def apply_modifications(model, custom_objects=None):
+    """Applies modifications to the model layers to create a new Graph. For example, simply changing
+    `model.layers[idx].activation = new activation` does not change the graph. The entire graph needs to be updated
+    with modified inbound and outbound tensors because of change in layer building function.
+    Args:
+        model: The `keras.models.Model` instance.
+    Returns:
+        The modified model with changes applied. Does not mutate the original `model`.
+    """
+    # The strategy is to save the modified model and load it back. This is done because setting the activation
+    # in a Keras layer doesnt actually change the graph. We have to iterate the entire graph and change the
+    # layer inbound and outbound nodes with modified tensors. This is doubly complicated in Keras 2.x since
+    # multiple inbound and outbound nodes are allowed with the Graph API.
+    model_path = os.path.join(tempfile.gettempdir(), next(tempfile._get_candidate_names()) + '.h5')
+    try:
+        model.save(model_path)
+        return load_model(model_path, custom_objects=custom_objects)
+    finally:
+        os.remove(model_path)
+
 
 def plain_name(full_name):
 	name = os.path.basename(full_name)

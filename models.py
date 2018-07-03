@@ -99,7 +99,8 @@ def build_reference_model(args):
 def annotation_multilayer_perceptron_from_args(args,
 											fc_layers = [128, 128, 128, 128],
 											dropout = 0.3,
-											initializer='glorot_normal',
+											initializer = 'glorot_normal',
+											activation = 'relu',
 											batch_normalize_input = False,
 											batch_normalization = False,
 											skip_connection = False):
@@ -384,14 +385,15 @@ def build_reference_annotation_1d_model_from_args(args,
 													spatial_dropout = True,
 													max_pools = [],
 													padding='valid',
+													activation = 'relu',
 													annotation_units = 16,
 													annotation_shortcut = False,
 													annotation_batch_normalize = True,	
 													fc_layers = [64],
 													fc_dropout = 0.0,
 													fc_batch_normalize = False,
-													fc_initializer='glorot_normal',
-													kernel_initializer='glorot_normal'
+													fc_initializer = 'glorot_normal',
+													kernel_initializer = 'glorot_normal'
 												):
 	'''Build Reference 1d CNN model for classifying variants.
 
@@ -417,9 +419,9 @@ def build_reference_annotation_1d_model_from_args(args,
 		if conv_batch_normalize:
 			x = Conv1D(filters=c, kernel_size=conv_width, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Conv1D(filters=c, kernel_size=conv_width, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = Conv1D(filters=c, kernel_size=conv_width, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
 		if conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout1D(conv_dropout)(x)
@@ -434,16 +436,16 @@ def build_reference_annotation_1d_model_from_args(args,
 	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	if annotation_batch_normalize:
 		annotations_in = BatchNormalization(axis=concat_axis)(annotations_in)
-	annotation_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_in)
+	annotation_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
 	
 	x = layers.concatenate([f, annotation_mlp], axis=1)
 	for fc in fc_layers:
 		if fc_batch_normalize:
 			x = Dense(units=fc, activation='linear', kernel_initializer=fc_initializer)(x)
 			x = BatchNormalization(axis=1)(x)
-			x = Activation('relu')(x)		
+			x = Activation(activation)(x)		
 		else:
-			x = Dense(units=fc, activation='relu', kernel_initializer=fc_initializer)(x)
+			x = Dense(units=fc, activation=activation, kernel_initializer=fc_initializer)(x)
 		
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
@@ -474,13 +476,14 @@ def read_tensor_2d_model_from_args(args,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
 									max_pools = [(3,1), (3,1)],
-									padding='valid',
+									padding = 'valid',
+									activation = 'relu',
 									fc_layers = [64],
 									fc_dropout = 0.0,
 									fc_batch_normalize = False,
-									fc_initializer='glorot_normal',
-									kernel_initializer='glorot_normal',
-									kernel_single_channel=True,
+									fc_initializer = 'glorot_normal',
+									kernel_initializer = 'glorot_normal',
+									kernel_single_channel = True
 									):
 	'''Builds Read Tensor 2d CNN model for classifying variants.
 
@@ -524,9 +527,9 @@ def read_tensor_2d_model_from_args(args,
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
 		if conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout2D(conv_dropout)(x)
@@ -543,9 +546,9 @@ def read_tensor_2d_model_from_args(args,
 		if fc_batch_normalize:
 			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
 			x = BatchNormalization(axis=1)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 
@@ -574,17 +577,19 @@ def read_tensor_2d_annotation_model_from_args(args,
 											conv_batch_normalize = False,
 											spatial_dropout = True,
 											max_pools = [(3,1), (3,3)],
-											padding='valid',
+											padding = 'valid',
 											annotation_units = 16,
 											annotation_shortcut = False,
 											annotation_batch_normalize = True,
 											fc_layers = [64],
 											fc_dropout = 0.0,
 											fc_batch_normalize = False,
-											kernel_initializer='glorot_normal',
-											kernel_single_channel=True,
-											freeze_bn=False,
-											fc_initializer='glorot_normal'):
+											fc_initializer = 'glorot_normal',
+											activation = 'relu',
+											kernel_initializer = 'glorot_normal',
+											kernel_single_channel = True,
+											freeze_bn = False
+											):
 	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
 
 	Arguments specify widths and depths of each layer.
@@ -627,9 +632,9 @@ def read_tensor_2d_annotation_model_from_args(args,
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
 		if conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout2D(conv_dropout)(x)
@@ -646,7 +651,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 	if annotation_batch_normalize:
 		annotations_in = BatchNormalization(axis=-1)(annotations)
 
-	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_in)
+	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
 	x = layers.concatenate([x, annotations_mlp], axis=concat_axis)
 
 	# Fully connected layers
@@ -655,9 +660,9 @@ def read_tensor_2d_annotation_model_from_args(args,
 		if fc_batch_normalize:
 			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
 			x = BatchNormalization(axis=1)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)		
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
 
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
