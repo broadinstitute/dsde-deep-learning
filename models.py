@@ -99,7 +99,8 @@ def build_reference_model(args):
 def annotation_multilayer_perceptron_from_args(args,
 											fc_layers = [128, 128, 128, 128],
 											dropout = 0.3,
-											initializer='glorot_normal',
+											initializer = 'glorot_normal',
+											activation = 'relu',
 											batch_normalize_input = False,
 											batch_normalization = False,
 											skip_connection = False):
