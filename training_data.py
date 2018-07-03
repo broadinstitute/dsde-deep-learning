@@ -2009,77 +2009,6 @@ def image_generator(args, train_paths, shape=(224,224)):
 		yield (image_matrix, label_matrix)
 
 
-def dna_annotation_generator(args, train_paths):
-	"""Data generator of DNA and annotation tensors.
-
-	Assumes train paths contains example in labelled directories.
-	Loops over all examples sampling args.batch_size examples
-	uniformly from each label.
-
-	Arguments:
-		args: args object needed for batch_size, labels, and annotations
-		train_paths: array of label directories with hd5 tensors within each
-
-	Returns:
-		A tuple with a dict of the input tensors 
-		and a 1-Hot matrix (2D numpy array) of the labels.
-	"""		
-	debug = False
-	per_batch_per_label = (args.batch_size // len(args.labels)) 
-	tensor_counts = Counter()
-	tensors = {}
-
-	if args.window_size > 0:
-		channel_map = defines.get_tensor_channel_map_from_args(args)
-		tensor = np.zeros((args.batch_size, args.window_size, len(channel_map)))
-
-	annotation_data = np.zeros((args.batch_size, len(args.annotations)))
-	label_matrix = np.zeros((args.batch_size, len(args.labels)))
-
-	for tp in train_paths:
-		label_key = os.path.basename(tp)
-		if label_key not in args.labels:
-			print('Skipping label directory:', label_key, ' which is not in args label set:', args.labels.keys())
-			continue
-		label = args.labels[label_key] 
-
-		tensors[label] = [os.path.join(tp, t) for t in os.listdir(tp) if os.path.splitext(t)[1] in tensor_exts]
-		tensor_counts[label] = 0
-		
-	while True:
-		cur_example = 0
-		for label in tensors.keys():
-			for i in range(per_batch_per_label):
-				tensor_path = tensors[label][tensor_counts[label]]
-				label_matrix[cur_example, label] = 1.0
-				with h5py.File(tensor_path,'r') as hf:
-					annotation_data[cur_example,:] = np.array(hf.get(args.annotation_set))
-					if args.window_size > 0:
-						tensor[cur_example,:,:] = np.array(hf.get(args.tensor_map))
-				
-				tensor_counts[label] += 1
-				if tensor_counts[label] == len(tensors[label]):
-					np.random.shuffle(tensors[label])
-					print('\n\nGenerator shuffled & looped over:', tensor_counts[label], 'examples of label:', label, '\n\nLast tensor was:', tensor_path)
-					tensor_counts[label] = 0
-				cur_example += 1
-				if cur_example == args.batch_size:
-					if args.normalize_annotations:
-						for i,a in enumerate(args.annotations):
-							annotation_data[:,i] -= defines.anno_norms_g947i[a][0]
-							annotation_data[:,i] /= defines.anno_norms_g947i[a][1]
-					break
-
-		if debug:
-			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
-
-		if args.window_size > 0:
-			yield ({args.tensor_map:tensor, args.annotation_set:annotation_data}, label_matrix)
-		else:
-			yield (annotation_data, label_matrix)
-
-
-
 def pileup_tensor_generator(args, train_paths, include_annotations=False):
 	"""Pileup Tensor generator of DNA and per site read summaries (i.e. pileup) tensors.
 
@@ -2577,11 +2506,6 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 						for key in batch.keys():
 							hf_tensor = hf.get(key)
 							if hf_tensor:
-								#REMOVE THISSSSSSSSS
-								#if key == args.tensor_map:
-								#	batch[key][cur_example] = np.rollaxis(np.array(hf_tensor), 0, 3	)
-								#else:
-								#	batch[key][cur_example] = np.array(hf_tensor)
 								batch[key][cur_example] = np.array(hf_tensor)
 							else:
 								raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
@@ -2856,53 +2780,6 @@ def load_bqsr_tensors_annotations_from_class_dirs(args, train_paths, per_class_m
 			labels.append(y_vector)
 
 	return (np.asarray(tensors), np.asarray(annotations), np.asarray(labels))
-
-
-def load_dna_annotations_positions_from_class_dirs(args, train_paths, per_class_max=4000, include_dna=True, include_annotations=True):
-	count = 0
-
-	annotation_data = []
-	reference_data = []
-	labels_data = []
-	positions = []
-	
-	for tp in train_paths:
-		label_key = os.path.basename(tp)
-		if label_key not in args.labels:
-			print('Skipping label directory:', label_key, ' which is not in args label set:', args.labels.keys())
-			continue
-		label = args.labels[label_key]		
-		imgs = os.listdir(tp)
-		count += 1
-		print(count, " dir out of:", len(train_paths), tp, "has:", len(imgs))
-		this_t = 0
-		for t in imgs:	
-			this_t += 1
-			if this_t > per_class_max:
-				print('Per class max reached. bailing at', this_t)
-				break
-
-			fn, file_extension = os.path.splitext(t)
-			if not file_extension.lower() in tensor_exts:
-				continue
-
-			with h5py.File(tp+'/'+t, 'r') as hf:
-				if include_annotations:
-					annotation_data.append(np.array(hf.get(args.annotation_set)))
-				if include_dna:
-					reference_data.append(np.array(hf.get(args.tensor_map)))
-				
-			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
-			y_vector[label] = 1.0
-			labels_data.append(y_vector)
-			positions.append(position_string_from_tensor_name(t))
-
-	if include_dna and include_annotations:
-		return (np.asarray(reference_data), np.asarray(annotation_data), np.asarray(labels_data), np.asarray(positions))
-	elif include_annotations:
-		return (np.asarray(annotation_data), np.asarray(labels_data), np.asarray(positions))
-	elif include_dna:
-		return (np.asarray(reference_data), np.asarray(labels_data), np.asarray(positions))
 
 
 def position_string_from_tensor_name(tensor_name):
