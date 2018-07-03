@@ -90,8 +90,6 @@ def annotate_vcf_with_inference(args):
 				annotation_data = td.get_annotation_data(args, v, stats)
 				batch[tm][stats[batch_key]] = annotation_data
 				stats[batch_key] += 1
-				print('annotation data:', annotation_data)
-
 
 			if tm in defines.read_tensor_maps:
 				args.tensor_map = tm
@@ -100,7 +98,6 @@ def annotate_vcf_with_inference(args):
 				if read_tensor is None:
 					batch[tm][stats[batch_key]] = np.zeros(input_tensors[tm])
 				stats[batch_key] += 1
-				print('ref seq:', str(record.seq))
 
 			if tm in defines.reference_tensor_maps:
 				args.tensor_map = tm
