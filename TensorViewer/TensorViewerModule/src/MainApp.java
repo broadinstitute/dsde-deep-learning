@@ -23,9 +23,9 @@ public class MainApp extends PApplet {
     String data_root = "/dsde/data/deep/vqsr/tensors/";
     private String[] datasets = {
             data_root+"g947j_paired_read2/train",data_root+"g947j_baseline2/train",
+            "/dsde/working/sam/dsde-deep-learning/weights/g947_site_labelled_rrab3/",
             data_root+"g94982_calling_channels_last/", data_root+"g94982_na12878_ref_read_anno_channels_first/test",
             data_root+"g947_paired_read2/train", data_root+"g947u_paired_read/train",
-            "/dsde/working/sam/dsde-deep-learning/weights/rra_b_g947_anno_mix/",
             data_root+"g94982_channels_first_calling_tensors_het_enrich/",
             data_root+"g94982_calling_tensors_indel_only/", data_root+"g94982_calling_tensors_variant_sort/"
     };
@@ -43,7 +43,7 @@ public class MainApp extends PApplet {
     float min_scale = 10;
 
     List<List<Path>> tensor_files;
-    float[] annotations;
+
 
     int num_channels = 15;
     int window_size = 128;
@@ -71,9 +71,10 @@ public class MainApp extends PApplet {
     int cur_kernel = 92;
     int cur_layer_idx =  0;
     String[] layer_names = {"conv2d_1", "conv2d_2", "conv2d_3", "conv2d_4"};
-    int samples = 3;
+    int samples = 10;
+    String annotation_set = "best_practices";
     String[] annotation_names = {"MQ", "DP", "SOR", "FS", "QD", "MQRankSum", "ReadPosRankSum"};
-    boolean load_annotations = false;
+    boolean load_annotations = true;
     int cur_mode = 0;
     boolean highlight_channel = false;
     boolean max_logo_only = false;
@@ -97,6 +98,9 @@ public class MainApp extends PApplet {
         th.load_convolution_kernels(weights_path, layer_names[cur_layer_idx]);
         if (calling_tensors){
             th.load_label_tensor(tensor_files.get(cur_label).get(cur_tensor), "site_labels", tensor_shape[1]);
+        }
+        if (load_annotations){
+            th.load_annotations(annotation_set, annotation_names.length, tensor_files.get(cur_label).get(cur_tensor));
         }
     }
 
@@ -127,10 +131,12 @@ public class MainApp extends PApplet {
                 text_y += text_line_height;
             }
             if (load_annotations) {
+                text_y = height - 20;
+                textSize(20);
                 fill(20);
                 for (int i = 0; i < annotation_names.length; i++) {
-                    text_y += text_line_height;
-                    text(annotation_names[i] + " : " + Float.toString(annotations[i]), 30, text_y);
+                    text_y -= text_line_height*0.7f;
+                    text(annotation_names[i] + " : " + Float.toString(th.annotations[i]), width-270, text_y);
                 }
             }
 
@@ -218,6 +224,9 @@ public class MainApp extends PApplet {
             th.load_tensor_3d(tensor_files.get(cur_label).get(cur_tensor), "read_tensor", tensor_shape);
             if (calling_tensors){
                 th.load_label_tensor(tensor_files.get(cur_label).get(cur_tensor), "site_labels", tensor_shape[1]);
+            }
+            if (load_annotations){
+                th.load_annotations(annotation_set, annotation_names.length, tensor_files.get(cur_label).get(cur_tensor));
             }
         }
 

@@ -128,7 +128,7 @@ public class TensorHolder {
     }
 
 
-    private void load_annotations(Path tensor_file){
+    public void load_annotations(String annotation_set, int num_annotations, Path tensor_file){
         int file_id = -1;
         int annotation_data_id = -1;
 
@@ -143,7 +143,7 @@ public class TensorHolder {
         // Open dataset using the default properties.
         try {
             if (file_id >= 0) {
-                annotation_data_id = H5.H5Dopen(file_id, "annotations", HDF5Constants.H5P_DEFAULT);
+                annotation_data_id = H5.H5Dopen(file_id, annotation_set, HDF5Constants.H5P_DEFAULT);
 
             }
         }
@@ -151,14 +151,14 @@ public class TensorHolder {
             e.printStackTrace();
         }
 
-        annotations = new float[annotation_names.length];
+        annotations = new float[num_annotations];
 
         if(annotation_data_id >= 0){
             try {
                 H5.H5Dread(annotation_data_id, HDF5Constants.H5T_NATIVE_FLOAT,
                         HDF5Constants.H5S_ALL, HDF5Constants.H5S_ALL,
                         HDF5Constants.H5P_DEFAULT, annotations);
-                System.out.println("Annotations loaded.");
+                System.out.println(annotation_set + " set of annotations loaded.");
             } catch (HDF5Exception e) {
                 e.printStackTrace();
             }
