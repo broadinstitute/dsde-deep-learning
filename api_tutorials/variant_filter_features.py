@@ -201,7 +201,6 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 
 def write_filters(args, model):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	exclude = [args.annotation_set, 'dropout', 'flatten', 'activation', 'batch_normalization', 'concatenate']
 
 	for layer in model.layers:
 		if not any([l in layer.name for l in args.layers]):
@@ -248,6 +247,32 @@ def write_filters(args, model):
 
 
 #def write_saliency(args, model):
+			
+def excite_mlp(args, model):
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+	for layer in model.layers:
+		if not any([l in layer.name for l in args.layers]):
+			continue
+		
+		for filter_index in range(0, num_layer_channels(layer), args.fps):
+			print("Layer name:", layer.name, "filter index:", filter_index)
+			fxn = excite_dense(args, model, layer_dict, layer.name, filter_index)
+			annos = np.random.random((1, len(args.annotations)))
+			
+			if os.path.exists(args.tensor_example):
+				with h5py.File(args.tensor_example, 'r') as hf:
+					annos[0] = np.array(hf.get(args.annotation_set))
+				out_file = args.output_dir + '%s/%s/write_%s_filter_%d.hd5' % (plain_name(args.semantics_json), plain_name(args.tensor_example), layer.name, filter_index)
+			else:
+				out_file = args.output_dir + '%s/random/write_filters/%s_filter_%d.hd5' % (plain_name(args.semantics_json), layer.name, filter_index)
+
+			# run gradient ascent
+			for i in range(args.iterations):
+				loss_value, anno_grads = iterate([read_tensor, annos])
+				annos += args.learning_rate*anno_grads
+
+				if i % (max(args.iterations,4)//4) == 0:
+					print("After iteration:", i, "of:", args.iterations, "annos are:", annos[0], "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index)
 			
 
 
@@ -414,6 +439,25 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 
 	# this function returns the loss and grads given the input picture
 	iterate = K.function([input_tensor, annos], [objective, grads, anno_grads])
+	return iterate
+
+def excite_dense(args, model, layer_dict, layer_name, neuron):
+	annos = model.input
+
+	x = layer_dict[layer_name].output[:, neuron]
+
+	objective = K.variable(0.)
+
+	objective += args.activity_weight*K.sum(K.square(x)) 
+
+	# compute the gradient of the input picture wrt this loss
+	grads = K.gradients(objective, annos)[0]
+
+	# normalization trick: we normalize the gradient
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
+
+	# this function returns the loss and grads given the input picture
+	iterate = K.function([annos], [objective, grads])
 	return iterate
 
 
