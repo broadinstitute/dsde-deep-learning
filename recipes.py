@@ -352,10 +352,10 @@ def train_annotation_multilayer_perceptron(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.annotation_multilayer_perceptron_from_args(args,
-											fc_layers = [128],
+											fc_layers = [128, 128],
 											dropout = 0.3,
 											skip_connection = True,
-											batch_normalization = True)
+											batch_normalize_input = True)
 
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 	
@@ -395,7 +395,7 @@ def train_mlp_selu(args):
 	test = td.big_batch_from_minibatch_generator(args, generate_test)
 	plots.plot_roc_per_class(model, [test[0][args.annotation_set]], test[1], args.labels, args.id)
 	return plots.get_per_class_auc(model, [test[0][args.annotation_set]], test[1], args.labels)
-	
+
 
 def train_reference_only(args):
 	'''Train a 1D Convolution architecture on reference tracks.
