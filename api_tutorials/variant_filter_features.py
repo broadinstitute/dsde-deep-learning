@@ -484,7 +484,7 @@ def grad_towards_input(args, model, desired_input, layer_dict, layer_name='conv5
 	grads = K.gradients(objective, input_tensor)[0]
 
 	# normalization trick: we normalize the gradient
-	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
 	iterate = K.function([input_tensor], [objective, grads])
