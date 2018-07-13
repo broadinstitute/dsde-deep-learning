@@ -68,8 +68,8 @@ def run():
 		write_filters(args, model)
 	elif 'excite_neuron' == args.mode:
 		excite_neuron(args, model)
-	elif 'excite_layer' == args.mode:
-		excite_layer(args, model)
+	elif 'excite_mlp' == args.mode:
+		excite_mlp(args, model)
 	elif 'excite_softmax' == args.mode:
 		excite_softmax(args, model)			
 	elif 'deep_dream' == args.mode:
@@ -256,7 +256,7 @@ def excite_mlp(args, model):
 		
 		for filter_index in range(0, num_layer_channels(layer), args.fps):
 			print("Layer name:", layer.name, "filter index:", filter_index)
-			fxn = excite_dense(args, model, layer_dict, layer.name, filter_index)
+			objective_fxn = excite_dense(args, model, layer_dict, layer.name, filter_index)
 			annos = np.random.random((1, len(args.annotations)))
 			
 			if os.path.exists(args.tensor_example):
@@ -273,8 +273,17 @@ def excite_mlp(args, model):
 
 				if i % (max(args.iterations,4)//4) == 0:
 					print("After iteration:", i, "of:", args.iterations, "annos are:", annos[0], "loss is:", loss_value," layer name:", layer.name, "filter index:", filter_index)
-			
 
+			print("Starting annotations:", zip(args.annotations, annos[0])) 
+			# run gradient ascent
+			for i in range(args.iterations):
+				loss_value, anno_grads = objective_fxn([annos])
+				annos += args.learning_rate*anno_grads
+
+				if i % (max(args.iterations,4)//4) == 0:
+					print(" After iteration:", i, "of:", args.iterations, "loss is:", loss_value)
+			print("filter index:", filter_index, zip(args.annotations, annos[0]))
+			print("Model prediction:", model.predict(annos))
 
 def excite_neuron(args, model):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
@@ -483,7 +492,7 @@ def grad_towards_input(args, model, desired_input, layer_dict, layer_name='conv5
 	grads = K.gradients(objective, input_tensor)[0]
 
 	# normalization trick: we normalize the gradient
-	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-5)
+	grads /= (K.sqrt(K.mean(K.square(grads))) + 1e-6)
 
 	# this function returns the loss and grads given the input picture
 	iterate = K.function([input_tensor], [objective, grads])
