@@ -105,7 +105,6 @@ def annotate_vcf_with_inference(args):
 				batch[tm][stats[batch_key]] = reference_tensor
 				stats[batch_key] += 1
 
-
 		positions.append(variant.contig + '_' + str(variant.pos))
 		variant_batch.append(variant)
 

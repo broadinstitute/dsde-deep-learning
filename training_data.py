@@ -3719,103 +3719,6 @@ def scores_from_vcf(args, score_keys=['VQSLOD'], override_vcf=None):
 	return snp_scores, snp_truth, indel_scores, indel_truth
 
 
-def concordance_scores_from_vcf(args, score_key='VQSLOD', override_vcf=None):
-
-
-	bed_dict = bed_file_to_dict(args.bed_file)
-	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
-	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
-	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
-
-	vcf_1 = vcf.Reader(open(args.negative_vcf, 'r')) 
-	snp_data = {'scores':[], 'truth':[]}
-	indel_data = {'scores':[], 'truth':[]}
-
-	vcf_2 = vcf.Reader(open(args.negative_vcf_2, 'r'))
-	snp_data_2 = {'scores':[], 'truth':[]}
-	indel_data_2 = {'scores':[], 'truth':[]}
-
-	vcf_3 = vcf.Reader(open(args.negative_vcf_3, 'r')) 
-	snp_data_3 = {'scores':[], 'truth':[]}
-	indel_data_3 = {'scores':[], 'truth':[]}
-
-	vcf_writer = vcf.Writer(open('/dsde/working/mduran/modelFP.vcf', 'w'), vcf_1)
-	
-	for variant in vcf_1:
-
-		#is this variant in the other two?
-		v2 = variant_in_vcf(variant, vcf_2)
-		v3 = variant_in_vcf(variant, vcf_3)
-
-		if not (v2 and v3): #if its not in both of the others, continue
-			continue
-
-		score1 = float(variant.INFO[score_key])
-		score2 = float(v2.INFO[score_key])
-		score3 = float(v3.INFO[score_key])
-
-		#get the truth status of each 
-
-		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
-		in_bed_2 = in_bed_file(bed_dict, v2.CHROM, v2.POS)
-		in_bed_3 = in_bed_file(bed_dict, v3.CHROM, v3.POS)
-
-		if variant_in_vcf(variant, vcf_nist) and in_bed:
-			v1_truth = 1
-		elif in_bed:
-			v1_truth = 0
-		else:
-			continue
-
-		if variant_in_vcf(v2, vcf_nist) and in_bed_2:
-			v2_truth = 1
-		elif in_bed:
-			v2_truth = 0
-		else:
-			continue
-
-		if variant_in_vcf(v3, vcf_nist) and in_bed_3:
-			v3_truth = 1
-		elif in_bed:
-			v3_truth = 0
-		else:
-			continue
-
-		if score1 > score2 and score1 > score3 and v1_truth==0:
-			#print(score1, score2, score3, variant.POS)
-			vcf_writer.write_record(variant)
-
-
-
-		if variant.is_snp and v2.is_snp and v3.is_snp:
-
-			snp_data['scores'].append(score1)
-			snp_data['truth'].append(v1_truth)
-
-			snp_data_2['scores'].append(score2)
-			snp_data_2['truth'].append(v2_truth)
-
-			snp_data_3['scores'].append(score3)
-			snp_data_3['truth'].append(v3_truth)
-
-
-		elif variant.is_indel and v2.is_indel and v3.is_indel:
-
-
-			indel_data['scores'].append(score1)
-			indel_data['truth'].append(v1_truth)
-
-			indel_data_2['scores'].append(score2)
-			indel_data_2['truth'].append(v2_truth)
-
-			indel_data_3['scores'].append(score3)
-			indel_data_3['truth'].append(v3_truth)
-
-	vcf_writer.close()
-		
-	return snp_data, indel_data, snp_data_2, indel_data_2, snp_data_3, indel_data_3
-
-
 def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	'''Get score and truth status for given vcf.
 
@@ -3851,7 +3754,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	indel_truth = []
 
 	for variant in vcf_reader:
-
+		
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):
 			stats['In ignore vcf'] += 1
 			continue	
@@ -3889,7 +3792,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 				if 'VQSLOD' not in variant.INFO:
 					stats['No single sample vqslod'] += 1
 					missing_key = True
-			elif score_key not in gnomad_variant.INFO:
+			elif score_key not in gnomad_variant.INFO and score_key not in variant.INFO:
 				stats['No score key:'+score_key] += 1
 				missing_key = True
 		if missing_key:
@@ -3899,13 +3802,16 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 		for score_key in score_keys:
 			if score_key == 'VQSLOD':
 				scores[score_key] = gnomad_variant.INFO[score_key]
-			elif score_key == 'VQSR Single Sample':
-				scores[score_key] = variant.INFO['VQSLOD']
 			elif score_key == 'AS_RF':
 				scores[score_key] = score_from_gnomad_site(args, gnomad_variant, variant, vcf_mills, vcf_omni, stats)
 				if scores[score_key] is None:
 					missing_key = True
 					stats["Missing AS_RF"] += 1
+			elif score_key == 'VQSR Single Sample':
+				scores[score_key] = variant.INFO['VQSLOD']
+			else:
+				scores[score_key] = variant.INFO[score_key]
+
 		if missing_key:		
 			continue
 
@@ -3922,7 +3828,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 		else:
 			stats['Not SNP or INDEL'] += 1
 
-		if len(snp_truth)%1000 == 0:
+		if len(snp_truth)%100 == 0:
 			for k in stats.keys():
 				print(k, 'has:', stats[k])			
 			print('last variant was:', str(variant))
