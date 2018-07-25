@@ -41,7 +41,7 @@ from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
 from keras.layers.convolutional import SeparableConv2D, MaxPooling1D, MaxPooling2D, AveragePooling2D
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
-from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+from keras.layers import Add, Input, Dense, Dropout, AlphaDropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
 
 ResidualLayer = namedtuple("ResidualLayer", "identity filters strides")
 
@@ -393,7 +393,8 @@ def build_reference_annotation_1d_model_from_args(args,
 													fc_dropout = 0.0,
 													fc_batch_normalize = False,
 													fc_initializer = 'glorot_normal',
-													kernel_initializer = 'glorot_normal'
+													kernel_initializer = 'glorot_normal',
+													alpha_dropout = False
 												):
 	'''Build Reference 1d CNN model for classifying variants.
 
@@ -423,7 +424,9 @@ def build_reference_annotation_1d_model_from_args(args,
 		else:
 			x = Conv1D(filters=c, kernel_size=conv_width, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
-		if conv_dropout > 0 and spatial_dropout:
+		if conv_dropout > 0 and alpha_dropout:
+			x = AlphaDropout(conv_dropout)(x)
+		elif conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout1D(conv_dropout)(x)
 		elif conv_dropout > 0:
 			x = Dropout(conv_dropout)(x)
@@ -447,7 +450,9 @@ def build_reference_annotation_1d_model_from_args(args,
 		else:
 			x = Dense(units=fc, activation=activation, kernel_initializer=fc_initializer)(x)
 		
-		if fc_dropout > 0:
+		if fc_dropout > 0 and alpha_dropout:
+			x = AlphaDropout(fc_dropout)(x)
+		elif fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 	
 	if annotation_shortcut:
