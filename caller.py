@@ -108,7 +108,7 @@ def infer_vcf(args):
 
 					if stats['batches_processed'] % 100 == 0:
 						elapsed = time.time() - start_time
-						t_per_minute = stats['batches processed']*args.batch_size / (elapsed/60)
+						t_per_minute = stats['batches_processed']*args.batch_size / (elapsed/60)
 						print('At genomic position:', k, cur_pos, 'Tensors per minute:', t_per_minute,'Batches processed:', stats['batches_processed'])
 						for s in stats.keys():
 							print(s, 'has:', stats[s])	
