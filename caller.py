@@ -83,6 +83,7 @@ def infer_vcf(args):
 	gpos_batch = []
 
 	print(len(intervals), 'intervals to iterate over, contigs:', intervals.keys())
+	start_time = time.time()
 	for k in intervals:
 		contig = reference[k]
 		args.chrom = k
@@ -90,17 +91,30 @@ def infer_vcf(args):
 			cur_pos = start
 			for cur_pos in range(start, stop, args.window_size):		
 				record = contig[cur_pos: cur_pos+args.window_size]
-				print(str(record))
-				tensor_batch[stats['cur_tensor']] = td.make_calling_tensor(args, samfile, record, cur_pos, stats)				
-				gpos_batch.append((k, cur_pos, record))
-				stats['cur_tensor'] += 1
+				t = td.make_calling_tensor(args, samfile, record, cur_pos, stats)
+				
+				if not t is None:
+					tensor_batch[stats['cur_tensor']] = t	
+					gpos_batch.append((k, cur_pos, record))
+					stats['cur_tensor'] += 1
 
 				if stats['cur_tensor'] == args.batch_size:
 					predictions = model.predict(tensor_batch) # predictions is a numpy arra
 					predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, record)
 					tensor_batch = np.zeros((args.batch_size,)+defines.tensor_shape_from_args(args))
 					stats['cur_tensor'] = 0
+					stats['batches_processed'] += 1
 					gpos_batch = []
+
+					if stats['batches_processed'] % 100 == 0:
+						elapsed = time.time() - start_time
+						v_per_minute = stats['batches processed']*args.batch_size / (elapsed/60)
+						print('At genomic position:', cur_pos, 'Tensors per minute:', ,'Batches processed:', stats['batches_processed'])
+						for s in stats.keys():
+							print(s, 'has:', stats[s])	
+	
+	for s in stats.keys():
+		print(s, 'has:', stats[s])	
 
 
 def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, record=None):
@@ -110,9 +124,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 	for i,gpos in enumerate(gpos_batch):
 		guess = np.argmax(predictions[i], axis=1)
 		cur_tensor = tensor_batch[i]
-		print('Prediction shape:', predictions.shape)
-		print('Guess:', guess)
-		print('Genomic position:', gpos)
+
 		for j in range(guess.shape[0]):
 			if index2labels[guess[j]] == 'REFERENCE':
 				continue
