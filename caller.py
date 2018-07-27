@@ -168,8 +168,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
 						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
-						if (ref_offset+(indel_start-1))  > 0:
-							print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
+						#if (ref_offset+(indel_start-1))  > 0:
+						#	print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
 
 				insert = get_inserted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0], 
@@ -187,8 +187,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
 						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
-						if (ref_offset+(indel_start-1))  > 0:
-							print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
+						#if (ref_offset+(indel_start-1)) > 0:
+						#	print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
 
 				insert = get_inserted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0],
