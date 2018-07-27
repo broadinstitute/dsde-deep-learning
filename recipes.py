@@ -511,7 +511,7 @@ def train_reference_annotation_c(args):
 	model = models.build_reference_annotation_1d_model_from_args(args, 
 											conv_width = 7, 
 											conv_layers = [216, 180, 128, 64, 32],
-											conv_dropout = 0.2, # was .3
+											conv_dropout = 0.0, # was .3
 											conv_batch_normalize = False,
 											max_pools = [],
 											padding = 'valid',
@@ -520,7 +520,7 @@ def train_reference_annotation_c(args):
 											annotation_shortcut = True,
 											annotation_batch_normalize = True,
 											fc_layers = [64, 64, 64, 64, 64],
-											fc_dropout = 0.3,
+											fc_dropout = 0.0,
 											fc_batch_normalize = False,
 											alpha_dropout=True)
 	

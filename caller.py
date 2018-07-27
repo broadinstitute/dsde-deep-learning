@@ -220,7 +220,7 @@ def reference_base_from_tensor(args, tensor, tensor_site):
 			if args.channels_last and tensor[0, tensor_site, channels[c]] > 0:
 				return c[-1].upper() # reference channels are strings like reference_A or reference_C
 				# Here we want just the nucleic acid. 
-			elif tensor[channels[c], 0, tensor_site] > 0:
+			elif not args.channels_last and tensor[channels[c], 0, tensor_site] > 0:
 				return c[-1].upper()
 
 
