@@ -165,7 +165,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				if record and ref_offset+(indel_start-1) < len(record):
 					ref = record[ref_offset+(indel_start-1)]
 				else:
-					ref = reference_base_from_tensor(args, cur_tensor, )
+					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
 						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
 						if (ref_offset+(indel_start-1))  > 0:
@@ -184,7 +184,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				if record and ref_offset+(indel_start-1) < len(record):
 					ref = record[ref_offset+(indel_start-1)]
 				else:
-					ref = reference_base_from_tensor(args, cur_tensor, )
+					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
 						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
 						if (ref_offset+(indel_start-1))  > 0:
