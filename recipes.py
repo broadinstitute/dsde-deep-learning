@@ -352,7 +352,7 @@ def train_annotation_multilayer_perceptron(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.annotation_multilayer_perceptron_from_args(args,
-											fc_layers = [128, 128],
+											fc_layers = [128, 128, 256, 256, 128, 128],
 											dropout = 0.3,
 											skip_connection = True,
 											batch_normalize_input = True)
@@ -385,7 +385,7 @@ def train_mlp_selu(args):
 											fc_layers = [32, 48, 64, 96, 128, 96, 64, 48, 32],
 											dropout = 0,
 											activation = 'selu',
-											batch_normalization = True,
+											#batch_normalization = True,
 											batch_normalize_input = True,
 											skip_connection = False)
 
@@ -668,15 +668,15 @@ def train_ref_read_c(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_model_from_args(args, 
-									conv_width = 5, 
+									conv_width = 7, 
 									conv_height = 5,
-									conv_layers =  [256, 256, 192, 192, 128, 128, 96, 96],
+									conv_layers =  [216, 192, 160, 128, 108, 96, 64, 48],
 									conv_dropout = 0.1,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
-									max_pools = [(2,1), (2,1), (2,1)],
+									max_pools = [(3,1), (3,1), (3,1)],
 									padding='valid',
-									fc_layers = [24],
+									fc_layers = [32],
 									fc_dropout = 0.2,
 									fc_batch_normalize = False)
 	
@@ -1400,14 +1400,6 @@ def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_sco
 			if p in shared_positions:
 				for k in compare_scores:
 					print(k, 'score, truth:', compare_scores[k][p])	
-
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~ Utilities ~~~~~~~~~~~~~~~~~~~~~~~~
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def convert_theano_model_to_tensorflow(args):
-	models.convert_theano_model_to_tensorflow(args)
-
 
 
 # Back to the top!
