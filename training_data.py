@@ -98,7 +98,7 @@ def run_training_data():
 
 
 def tensors_from_tensor_map(args, 
-							annotation_sets=['best_practices', 'mix', 'combine'], 
+							annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
 							pileup=False, 
 							reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
@@ -799,17 +799,11 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 			if read_idx-args.window_size < 0:
 				read_string = defines.skip_char * (args.window_size-read_idx) + read_string
 				read_qualities = [0] * (args.window_size-read_idx) + read_qualities
-
-			# print (cur_label_key,contig[ref_pos], read.query_sequence[read_idx] )
-			# print ('read Qualzz:%s'%str(read_qualities))
-			# print ('read string:%s'%read_string)
-			# print ('refr string:%s'%ref_string)
 			
 			read_tensor = np.zeros((args.window_size, len(tensor_channel_map)))
 			read_tensor[:, 0:len(args.input_symbols)] = base_string_to_tensor(args, read_string, read_qualities)
 			read_tensor[:, len(args.input_symbols):(2*len(args.input_symbols))] = base_string_to_tensor(args, ref_string)
 			
-			#print (read_tensor)
 			if include_annotations:
 				max_mq = 60.0
 				max_read_pos = 151.0
@@ -1117,7 +1111,8 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 		args.annotations: List of variant annotations to use
 		annotation_variant: the variant with annotation
 		stats: Counter of run statistics
-		allele_index: The allele index used by allele specific annotations
+		allele_index: The allele index used by allele specific annotations 
+			(0 is first allele so we need +1 when ref is included)
 		override_annotations: optional array of annotations to prevent using arg's annotations 
 
 	Returns:
@@ -1144,7 +1139,7 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 					annotation_data[i] = call.data.MBQ[allele_index]
 				else:
 					annotation_data[i] = call.data.MBQ
-			elif a == 'MBQ' and hasattr(call.data, a):
+			elif a == 'MPOS' and hasattr(call.data, a):
 				if len(annotation_variant.ALT) > 1:
 					annotation_data[i] = call.data.MPOS[allele_index]
 				else:
@@ -1159,9 +1154,15 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 			elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
 				annotation_data[i] = call.data.MFRL[allele_index+1] 
 			elif a == 'AD_0' and hasattr(call.data, 'AD'):
-				annotation_data[i] = call.data.AD[0] 
+				annotation_data[i] = call.data.AD[0]
 			elif a == 'AD_1' and hasattr(call.data, 'AD'):
-				annotation_data[i] = call.data.AD[allele_index+1]
+				annotation_data[i] = call.data.AD[allele_index+1]				
+			elif a == 'MBQ_0' and hasattr(call.data, 'MBQ') and isinstance(call.data.MBQ, list):
+				annotation_data[i] = call.data.MBQ[0]
+			elif a == 'MBQ_0' and hasattr(call.data, 'MBQ') and not isinstance(call.data.MBQ, list):
+				annotation_data[i] = call.data.MBQ	
+			elif a == 'MBQ_1' and hasattr(call.data, 'MBQ') and isinstance(call.data.MBQ, list) and len(call.data.MBQ) > allele_index+1:
+				annotation_data[i] = call.data.MBQ[allele_index+1]	
 			else:
 				stats['Could not handle genotyped annotation:'+a] += 1
 		elif len(annotation_variant.samples) == 0 and genotype_annotation(a):
@@ -2505,7 +2506,10 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 							if hf_tensor:
 								batch[key][cur_example] = np.array(hf_tensor)
 							else:
-								raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+								#raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+								print('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path)
+								del tensors[label][tensor_counts[label]]
+								continue
 				except IOError as e:
 					print('\n\nSkipping corrupt tensor at:', tensor_path, '\n ')
 					del tensors[label][tensor_counts[label]]
@@ -3507,6 +3511,10 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 		for v in variants:
 			if v.POS == pos and v.CHROM == chrom:
 				variant = v
+
+		if chrom not in args.test_contigs:
+			stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
+			continue
 
 		if not variant:
 			stats['Not in negative vcf'] += 1
