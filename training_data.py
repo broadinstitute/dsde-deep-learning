@@ -2499,13 +2499,6 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 		for label in tensors.keys():
 			for i in range(per_batch_per_label):
 				tensor_path = tensors[label][tensor_counts[label]]
-				if with_positions:
-					contig = contig_string_from_tensor_name(tensor_path)
-					if contig in args.test_contigs: # We assume with_positions is only true during testing
-						positions.append(position_string_from_tensor_name(tensor_path))
-					else:
-						del tensors[label][tensor_counts[label]]
-						continue
 				try:
 					with h5py.File(tensor_path, 'r') as hf:
 						for key in batch.keys():
@@ -2531,7 +2524,8 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 					print('\n\nGenerator looped over:', tensor_counts[label], 'examples of label:', label, '\n\nShuffled them. Last tensor was:', tensor_path)
 					tensor_counts[label] = 0
 				
-
+				if with_positions:
+					positions.append(position_string_from_tensor_name(tensor_path))
 
 				cur_example += 1
 				if cur_example == args.batch_size:
@@ -2815,10 +2809,6 @@ def position_string_from_tensor_name(tensor_name):
 			pos_str += '_'+str(gsplit[i+1])
 
 	return pos_str	
-
-def contig_string_from_tensor_name(tensor_path):
-	position_string = position_string_from_tensor_name(tensor_path)
-	return position_string.split('_')[0]
 
 
 def get_path_to_train_valid_or_test(args, contig):
