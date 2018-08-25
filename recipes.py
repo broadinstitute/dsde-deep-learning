@@ -1052,7 +1052,7 @@ def train_ref_read_anno_small(args):
 									fc_layers = [24],
 									fc_dropout = 0.3,
 									fc_batch_normalize = False)
-	
+	model.save(weight_path)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
