@@ -3512,9 +3512,9 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 			if v.POS == pos and v.CHROM == chrom:
 				variant = v
 
-		# if chrom not in args.test_contigs:
-		# 	stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
-		# 	continue
+		if chrom not in args.test_contigs:
+			stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
+			continue
 
 		if not variant:
 			stats['Not in negative vcf'] += 1
