@@ -492,7 +492,7 @@ def build_discriminative(args):
 
 def build_mnist_generative_model(args):
 	# Build Generative model ...
-	nch = 50
+	nch = 24
 	bn_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(nch*7*7, kernel_initializer='glorot_normal')(g_input)
@@ -500,7 +500,7 @@ def build_mnist_generative_model(args):
 	H = Activation('relu')(H)
 	H = Reshape( [7, 7, nch] )(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Conv2D(nch*6, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	H = Conv2D(nch*4, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
 	H = BatchNormalization(axis=bn_axis, scale=False)(H)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
@@ -522,14 +522,14 @@ def build_mnist_generative_model(args):
 def build_mnist_discriminative(args):
 	# Build Discriminative model ...
 	d_input = Input(shape=args.in_shape)
-	H = Conv2D(256, (5, 5), strides=(2, 2), padding='same', activation='relu')(d_input)
+	H = Conv2D(128, (5, 5), strides=(2, 2), padding='same', activation='relu')(d_input)
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(args.dropout)(H)
-	H = Conv2D(216, (3, 3), strides=(2, 2), padding='same', activation='relu')(H)
+	H = Conv2D(108, (3, 3), strides=(2, 2), padding='same', activation='relu')(H)
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(args.dropout)(H)
 	H = Flatten()(H)
-	H = Dense(108)(H)
+	H = Dense(64)(H)
 	H = LeakyReLU(0.2)(H)
 	H = Dropout(args.dropout)(H)
 	d_V = Dense(2, activation='softmax')(H)
