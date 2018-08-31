@@ -261,12 +261,10 @@ def image_as_matrix(image_path, expand_dims=False, shape=(224,224)):
 	return img
 
 
-def make_trainable(net, val, opt):
+def make_trainable(net, val):
 	net.trainable = val
 	for l in net.layers:
 		l.trainable = val
-	net.compile(loss='binary_crossentropy', optimizer=opt)
-
 
 def wasserstein(y_true, y_pred):
 	return K.mean(y_true * y_pred)
@@ -572,7 +570,6 @@ def train_imagenet_gan(args, generator, discriminator, gan):
 		y[:n, 0] = 1
 		y[n:, 1] = 1
 		print('np sum 1s:', np.sum(y[:,0]), 'x shape:', x.shape)
-		make_trainable(discriminator, True, RMSprop(lr=args.discriminator_learning_rate))
 		discriminator.fit(x,y, epochs=1, batch_size=32, validation_split=0.1, shuffle=True)
 		y_hat = discriminator.predict(x, batch_size=32, verbose=1)
 
@@ -610,7 +607,6 @@ def train_cifar_gan(args, generator, discriminator, gan):
 		y[:n, 0] = 1
 		y[n:, 1] = 1
 		print('np sum 1s:', np.sum(y[:,0]), 'x shape:', x.shape)
-		make_trainable(discriminator,True, RMSprop(lr=args.discriminator_learning_rate))
 		discriminator.fit(x,y, epochs=1, batch_size=32, validation_split=0.1, shuffle=True)
 		y_hat = discriminator.predict(x)
 
@@ -647,7 +643,6 @@ def train_mnist_gan(args, generator, discriminator, gan):
 		y[:n, 0] = 1
 		y[n:, 1] = 1
 
-		make_trainable(discriminator, True, RMSprop(lr=args.discriminator_learning_rate))
 		discriminator.fit(X,y, epochs=1, batch_size=128, validation_split=0.1, shuffle=True)
 		y_hat = discriminator.predict(X, batch_size=128, verbose=1)
 
@@ -680,10 +675,11 @@ def train_for_n(args, data, generator, discriminator, gan):
 	print(x_test.shape[0], 'test samples')
 
 	samples_seeds = np.random.uniform(0,1,size=[args.plot_examples, args.seeds])
-
+	opt = RMSprop(lr=args.discriminator_learning_rate)
 	for e in range(args.epochs):
-		make_trainable(discriminator, False, RMSprop(lr=args.discriminator_learning_rate))
-		make_trainable(generator, True, RMSprop(lr=args.generator_learning_rate))
+		make_trainable(discriminator, False)
+		make_trainable(generator, True)
+		gan.compile(loss='binary_crossentropy', optimizer=opt)
 		for _ in range(args.generator_loops):	
 			# train Generator-Discriminator stack on input noise to non-generated output class
 			noise_tr = np.random.uniform(0, 1, size=[args.batch_size, args.seeds])
@@ -693,8 +689,9 @@ def train_for_n(args, data, generator, discriminator, gan):
 			g_loss = gan.train_on_batch(noise_tr, y2)
 			losses["g"].append(g_loss)
 
-		make_trainable(discriminator, True, RMSprop(lr=args.discriminator_learning_rate))
-		make_trainable(generator, False, RMSprop(lr=args.generator_learning_rate))
+		make_trainable(discriminator, True)
+		make_trainable(generator, False)
+		gan.compile(loss='binary_crossentropy', optimizer=opt)
 		for _ in range(args.discriminator_loops):
 			# Make generative images
 			image_batch = x_train[np.random.randint(0,x_train.shape[0], size=args.batch_size),:,:,:]    
