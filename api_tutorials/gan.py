@@ -16,8 +16,11 @@ import time
 import random
 import argparse
 import numpy as np
-import matplotlib.pyplot as plt
 import pickle, random, sys, keras
+
+import matplotlib
+matplotlib.use('Agg') # Need this to write images from the GSA servers.  Order matters:
+import matplotlib.pyplot as plt # First import matplotlib, then use Agg, then import plt
 
 import keras.models as models
 from keras import backend as K
@@ -726,7 +729,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 				plot_gen_color(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
 		
 
-def plot_real(x_train, n_ex=16,dim=(4,4), figsize=(10,10) ):	
+def plot_real(x_train, n_ex=16, dim=(4,4), figsize=(10,10)):	
 	idx = np.random.randint(0,x_train.shape[0],n_ex)
 	generated_images = x_train[idx,:,:,:]
 
@@ -737,7 +740,10 @@ def plot_real(x_train, n_ex=16,dim=(4,4), figsize=(10,10) ):
 		plt.imshow(img)
 		plt.axis('off')
 	plt.tight_layout()
-	plt.show()
+	plot_name = "./figures/plot_real.png"
+	if not os.path.exists(os.path.dirname(plot_name)):
+		os.makedirs(os.path.dirname(plot_name))		
+	plt.savefig(plot_name)
 
 
 def plot_color(x_train, n_ex=16,dim=(4,4), figsize=(10,10) ):	
@@ -751,7 +757,10 @@ def plot_color(x_train, n_ex=16,dim=(4,4), figsize=(10,10) ):
 		plt.imshow(img)
 		plt.axis('off')
 	plt.tight_layout()
-	plt.show()
+	plot_name = "./figures/plot_color.png"
+	if not os.path.exists(os.path.dirname(plot_name)):
+		os.makedirs(os.path.dirname(plot_name))		
+	plt.savefig(plot_name)
 
 
 def plot_gen_color(args, generator, n_ex=16, dim=(4,4), figsize=(24,24), random_seeds=None, save_path=None):
