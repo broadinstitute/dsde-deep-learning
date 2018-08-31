@@ -265,6 +265,7 @@ def make_trainable(net, val):
 	net.trainable = val
 	for l in net.layers:
 		l.trainable = val
+	net.compile()
 
 
 def wasserstein(y_true, y_pred):
