@@ -50,7 +50,7 @@ recall_label = 'Recall | Sensitivity | True Positive Rate | TP/(TP+FN)'
 fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 
 
-def plot_precision_recall_from_scores(truth, scores, title):
+def plot_precision_recall_from_scores(truth, scores, title, baseline_key=None):
 	# Compute Precision-Recall and plot curve
 	precision = dict()
 	recall = dict()
@@ -83,6 +83,15 @@ def plot_precision_recall_from_scores(truth, scores, title):
 		os.makedirs(os.path.dirname(plot_name))		
 	plt.savefig(plot_name)
 	print('Saved plot at:', plot_name)
+	if baseline_key is not None and baseline_key in scores:
+		diffs = []
+		baseline_score = average_precision[baseline_key]
+		print('Find generalization ', baseline_key, 'with score:', baseline_score)
+		for k, v in sorted(scores.items()):
+			if 'GATK4' in k:
+				diffs.append("{:.3f}".format(average_precision[k]-baseline_score))
+		print('cost & benefit for key:', baseline_key, '\t,\t', '\t\t,'.join(diffs))
+
 
 
 def plot_simple_roc(truth, scores, title):

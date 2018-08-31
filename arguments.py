@@ -183,6 +183,7 @@ def parse_args():
 		help='Compare to gnomad random forest and VQSR.')
 	parser.add_argument('--hard_filter_compare', default=False, action='store_true',
 		help='Compare to GATK best practices hard filters and filter from CHM syndip paper.')
+	parser.add_argument('--baseline_key', help='String to identify baseline model to compare against.')	
 
 	# Run specific arguments
 	parser.add_argument('--id', default='no_id',

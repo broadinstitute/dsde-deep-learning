@@ -2469,6 +2469,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 
 	batch = {}
 	tensors = {}
+	stats = Counter()
 	tensor_counts = Counter()
 	per_batch_per_label = (args.batch_size // len(args.labels) ) 
 
@@ -2521,7 +2522,8 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 				tensor_counts[label] += 1
 				if tensor_counts[label] == len(tensors[label]):
 					np.random.shuffle(tensors[label])
-					print('\n\nGenerator looped over:', tensor_counts[label], 'examples of label:', label, '\n\nShuffled them. Last tensor was:', tensor_path)
+					stats['label'+str(label)+'epochs'] += 1
+					print('\n\nGenerator looped over:', tensor_counts[label], 'examples of label:', label, 'epochs:',stats['label'+str(label)+'epochs'],'\n\nShuffled them. Last tensor was:', tensor_path)
 					tensor_counts[label] = 0
 				
 				if with_positions:
@@ -3503,6 +3505,11 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 	for p in positions:
 		gpos_parts = p.split('_')
 		chrom = gpos_parts[0]
+
+		if chrom not in args.test_contigs:
+			stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
+			continue
+
 		pos = int(gpos_parts[1])
 		allele_idx = None if len(gpos_parts) < 3 else int(gpos_parts[2])
 		variants = vcf_ram.fetch(chrom, pos-1, pos+1)
@@ -3512,9 +3519,7 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 			if v.POS == pos and v.CHROM == chrom:
 				variant = v
 
-		if chrom not in args.test_contigs:
-			stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
-			continue
+
 
 		if not variant:
 			stats['Not in negative vcf'] += 1
