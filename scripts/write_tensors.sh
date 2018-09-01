@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=echo
+ECHO=
 
 MODE=write_tensors
 
@@ -207,6 +207,7 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz
 
 # Project G94982 1D gnomAD tensors
+DOWNSAMPLE_SNPS=0.15
 MODE=write_tensors_gnomad_annotations_1d
 TENSOR_MAP=reference
 DATA_DIR=/dsde/data/deep/vqsr/tensors/syndip_wgs4_hg19_gnomad_anno/

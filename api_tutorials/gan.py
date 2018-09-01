@@ -64,6 +64,7 @@ def parse_args():
 
 	parser.add_argument('--batch_size', default=32, type=int)
 	parser.add_argument('--epochs', default=5000, type=int)
+	parser.add_argument('--num_labels', default=100, type=int)
 	parser.add_argument('--save_path', default='./frames/gan/')
 	parser.add_argument('--fps', default=12, type=int)
 	parser.add_argument('--plot_examples', default=16, type=int)
@@ -188,7 +189,7 @@ def load_imagenet(num_labels=24,shape=(128,128)):
 def load_faces(num_labels=100, shape=(128,128)):
 	imagenet_path = '/images/lfw/'
 	train_paths = [ imagenet_path + tp for tp in sorted(os.listdir(imagenet_path)) if os.path.isdir(imagenet_path + tp)  ]
-	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=shape, args.)
+	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=shape)
 
 	x_train = x_train.astype('float32')
 	x_test = x_test.astype('float32')
@@ -553,7 +554,7 @@ def build_stacked_gan(args, generator, discriminator):
 
 
 def train_imagenet_gan(args, generator, discriminator, gan):
-	imagenet_data = load_faces(shape=(args.in_shape[0], args.in_shape[1]))
+	imagenet_data = load_faces(args.num_labels, shape=(args.in_shape[0], args.in_shape[1]))
 	(x_train, y_train), (x_test, y_test) = imagenet_data
 	#plot_color(x_train)
 
