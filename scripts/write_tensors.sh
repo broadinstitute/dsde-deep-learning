@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=
+ECHO=echo
 
 MODE=write_tensors
 
@@ -205,6 +205,16 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs4_g94794_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz
+
+# Project G94982 1D gnomAD tensors
+MODE=write_tensors_gnomad_annotations_1d
+TENSOR_MAP=reference
+DATA_DIR=/dsde/data/deep/vqsr/tensors/syndip_wgs4_hg19_gnomad_anno/
+TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
+BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs4_g94794_bamout.bam
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex1
 # DOWNSAMPLE_SNPS=0.2
@@ -631,13 +641,13 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
 # Project G94982 1D gnomAD tensors
-MODE=write_tensors_gnomad_annotations_1d
-TENSOR_MAP=reference
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_gnomad_annos_rf_negatives/
-BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_solexa_269365_bamout.raw.snps.indels.vcf.gz
-BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_solexa_269365_bamout_no_trim.bam
+# MODE=write_tensors_gnomad_annotations_1d
+# TENSOR_MAP=reference
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_gnomad_annos_rf_negatives/
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_solexa_269365_bamout.raw.snps.indels.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_solexa_269365_bamout_no_trim.bam
 
 # Project G94982 snapshot from Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x151, Raw BAM
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_bam_test/
