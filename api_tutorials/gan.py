@@ -168,7 +168,6 @@ def load_cifar():
 
 
 def load_imagenet(num_labels=24,shape=(128,128)):
-
 	imagenet_path = '/home/sam/big_data/imagenet/ILSVRC2014_DET_train/'
 	train_paths = [ imagenet_path + tp for tp in sorted(os.listdir(imagenet_path)) if os.path.isdir(imagenet_path + tp)  ]
 	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=shape)
@@ -345,8 +344,8 @@ def total_variation_norm(x):
 
 def build_imagenet_generative_model(args):
 	# Build Generative model ...
-	nch = 50
-	dense_channels = 32
+	nch = 16
+	dense_channels = 16
 	inner_dim = 16
 	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
@@ -391,15 +390,15 @@ def build_imagenet_discriminative(args):
 	# Build Discriminative model ...
 	channel_axis = -1
 	d_input = Input(shape=args.in_shape)
-	H = Conv2D(216, (5, 5), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
+	H = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(256,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
+	H = Conv2D(108,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(128,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Conv2D(96,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(H)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
@@ -408,7 +407,7 @@ def build_imagenet_discriminative(args):
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
 	H = Flatten()(H)
-	H = Dense(44)(H)
+	H = Dense(32)(H)
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, probability_out)
