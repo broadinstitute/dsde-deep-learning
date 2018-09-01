@@ -187,7 +187,7 @@ def load_imagenet(num_labels=24,shape=(128,128)):
 
 
 def load_faces(num_labels=14000, shape=(128,128)):
-	imagenet_path = '/home/sam/big_data/faces/lfw/'
+	imagenet_path = '/images/lfw/'
 	train_paths = [ imagenet_path + tp for tp in sorted(os.listdir(imagenet_path)) if os.path.isdir(imagenet_path + tp)  ]
 	(x_train, y_train), (x_test, y_test) = load_images_from_class_dirs(train_paths, num_labels, shape=shape)
 
