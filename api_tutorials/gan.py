@@ -717,7 +717,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 		if args.learning_rate_decay and (e+1)%args.learning_rate_decay == 0:
 			args.discriminator_learning_rate /= 2
 			args.generator_learning_rate /= 2
-			limit_mem()
+			#limit_mem()
 			opt = RMSprop(lr=args.discriminator_learning_rate)
 			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
 
