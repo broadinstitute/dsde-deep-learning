@@ -717,6 +717,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 		if args.learning_rate_decay and (e+1)%args.learning_rate_decay == 0:
 			args.discriminator_learning_rate /= 2
 			args.generator_learning_rate /= 2
+			opt = RMSprop(lr=args.discriminator_learning_rate)
 			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
 
 		# Save images during optimization 
@@ -733,7 +734,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 				plot_gen(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
 			elif x_train.shape[channel_idx] == 3 or x_train.shape[channel_idx] == 4:
 				plot_gen_color(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
-		
+			
+			limit_mem()
 
 def plot_real(x_train, n_ex=16, dim=(4,4), figsize=(10,10)):	
 	idx = np.random.randint(0,x_train.shape[0],n_ex)
@@ -820,6 +822,15 @@ def plot_gen(args, generator, n_ex=16, dim=(4,4), figsize=(10,10), random_seeds=
 	else:
 		plt.show()
 
+def limit_mem():
+	try:
+		K.clear_session()
+		K.get_session().close()
+		cfg = K.tf.ConfigProto()
+		cfg.gpu_options.allow_growth = True
+		K.set_session(K.tf.Session(config=cfg))
+	except AttributeError as e:
+		print('Could not clear session. Maybe you are using Theano backend?')
 
 if __name__=='__main__':
 	run()

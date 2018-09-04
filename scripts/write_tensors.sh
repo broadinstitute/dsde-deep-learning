@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=echo
+ECHO=
 
 MODE=write_tensors
 
@@ -216,14 +216,16 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs4_g94794_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz
 
-DOWNSAMPLE_SNPS=0.15
+DOWNSAMPLE_SNPS=0.75
+DOWNSAMPLE_NOT_SNPS=0.45
 MODE=write_tensors_gnomad_annotations_1d
 TENSOR_MAP=reference
-DATA_DIR=/dsde/data/deep/vqsr/tensors/syndip_hg19_gnomad_anno_rf_labels/
+DATA_DIR=/dsde/data/deep/vqsr/tensors/syndip_hg19_gnomad_anno_rf_labels_chrom1/
 TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
 BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
 BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs1_g94794_bamout_all_calls.bam
 NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs1_g94794_all_calls.vcf.gz
+SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/chrom1_10m_split.interval_list
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex1
 # DOWNSAMPLE_SNPS=0.2

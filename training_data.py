@@ -4061,13 +4061,13 @@ def score_from_gnomad_site(args, variant, v_negative, vcf_mills, vcf_omni, stats
 
 def is_rf_hard_filter_negative(args, variant, stats):
 	is_training_site = False
-	if variant.INFO['QD'] < 2:
+	if 'QD' in variant.INFO and variant.INFO['QD'] < 2:
 		stats[args.random_forest_training_sites+' rf negative training example, QD'] += 1
 		is_training_site = True
-	if variant.INFO['FS'] > 60:
+	if 'FS' in variant.INFO and variant.INFO['FS'] > 60:
 		stats[args.random_forest_training_sites+' rf negative training example, FS'] += 1
 		is_training_site = True			
-	if variant.INFO['MQ'] < 30:
+	if 'MQ' in variant.INFO and variant.INFO['MQ'] < 30:
 		stats[args.random_forest_training_sites+' rf negative training example, MQ'] += 1
 		is_training_site = True
 	return is_training_site
