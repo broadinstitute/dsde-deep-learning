@@ -719,9 +719,6 @@ def train_for_n(args, data, generator, discriminator, gan):
 			args.generator_learning_rate /= 2
 			limit_mem()
 			opt = RMSprop(lr=args.discriminator_learning_rate)
-			generator.compile(loss="binary_crossentropy", optimizer=opt)
-			discriminator.compile(loss="binary_crossentropy", optimizer=opt)
-			gan.compile(loss='binary_crossentropy', optimizer=opt)
 			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
 
 		# Save images during optimization 
