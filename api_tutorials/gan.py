@@ -383,8 +383,8 @@ def build_imagenet_generative_model(args):
 	generator = Model(g_input, generation)
 	opt = RMSprop(lr=args.generator_learning_rate)		
 
-	gloss = generator_loss(args, pre_logit)	
-	generator.compile(loss=gloss, optimizer=opt)
+	#gloss = generator_loss(args, pre_logit)	
+	generator.compile(loss="binary_crossentropy", optimizer=opt)
 	generator.summary()
 	return generator
 
@@ -719,6 +719,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 			args.generator_learning_rate /= 2
 			limit_mem()
 			opt = RMSprop(lr=args.discriminator_learning_rate)
+			generator.compile(loss="binary_crossentropy", optimizer=opt)
+			discriminator.compile(loss="binary_crossentropy", optimizer=opt)
 			gan.compile(loss='binary_crossentropy', optimizer=opt)
 			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
 
