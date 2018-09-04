@@ -51,7 +51,7 @@ def run():
 	elif 'mnist' == args.mode:
 		gan_on_mnist(args)
 	elif 'faces' == args.mode:
-		gan_on_imagenet(args)
+		gan_on_faces(args)
 	else:
 		raise ValueError('Unknown adversarial mode:', args.mode)
 
@@ -98,6 +98,14 @@ def gan_on_imagenet(args):
 	gan = build_stacked_gan_imagenet(args, generator, discriminator)	
 	
 	train_imagenet_gan(args, generator, discriminator, gan)	
+
+def gan_on_faces(args):
+	args.in_shape = (256,256,3)
+	generator = build_imagenet_generative_model(args)
+	discriminator = build_imagenet_discriminative(args)
+	gan = build_stacked_gan_imagenet(args, generator, discriminator)	
+	
+	train_faces_gan(args, generator, discriminator, gan)	
 
 
 def gan_on_cifar(args):
@@ -391,19 +399,19 @@ def build_imagenet_discriminative(args):
 	# Build Discriminative model ...
 	channel_axis = -1
 	d_input = Input(shape=args.in_shape)
-	H = Conv2D(128, (5, 5), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
+	H = Conv2D(128, (3, 3), strides=(2, 2), padding='same', kernel_initializer='glorot_uniform')(d_input)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(108,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
+	H = Conv2D(96,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(96,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Conv2D(64,  (3, 3), strides=(2, 2), padding='valid', kernel_initializer='glorot_uniform')(H)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(64,  (3, 3), strides=(2, 2),  padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Conv2D(48,  (3, 3), strides=(2, 2),  padding='valid', kernel_initializer='glorot_uniform')(H)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
@@ -553,7 +561,7 @@ def build_stacked_gan(args, generator, discriminator):
 	return GAN
 
 
-def train_imagenet_gan(args, generator, discriminator, gan):
+def train_faces_gan(args, generator, discriminator, gan):
 	imagenet_data = load_faces(args.num_labels, shape=(args.in_shape[0], args.in_shape[1]))
 	(x_train, y_train), (x_test, y_test) = imagenet_data
 	#plot_color(x_train)

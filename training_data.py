@@ -403,18 +403,15 @@ def tensors_from_tensor_map_gnomad_annos(args):
 
 	gnomads = gnomads_to_dict(args)
 
-	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
-	bed_dict = bed_file_to_dict(args.bed_file)
+	#bed_dict = bed_file_to_dict(args.bed_file)
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
+	#vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
 	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
-
+	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
+	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
 	tensor_channel_map = defines.get_tensor_channel_map() 
 
-	if args.chrom:
-		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
-	else:
-		variants = vcf_reader
+	variants = gnomads[args.chrom].fetch(args.chrom, args.start_pos, args.end_pos)
 
 	for variant in variants:
 		idx_offset, ref_start, ref_end = get_variant_window(args, variant)
@@ -422,15 +419,16 @@ def tensors_from_tensor_map_gnomad_annos(args):
 		contig = record_dict[variant.CHROM]	
 		record = contig[variant.POS-idx_offset: variant.POS+idx_offset]
 
-		annotation_variant = variant_in_vcf(variant, gnomads[variant.CHROM])
-		if not annotation_variant:
-			stats['Variants not in annotation_vcf'] += 1
-			continue
+		# annotation_variant = variant_in_vcf(variant, gnomads[variant.CHROM])
+		# if not annotation_variant:
+		# 	stats['Variants not in annotation_vcf'] += 1
+		# 	continue
 
-		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
-		if variant_in_vcf(variant, vcf_ram) and in_bed:
+		# in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
+		#if variant_in_vcf(variant, vcf_ram) and in_bed:
+		if variant_in_vcf(variant, vcf_mills) or variant_in_vcf(variant, vcf_omni):
 			class_prefix = ''
-		elif is_rf_hard_filter_negative(args, annotation_variant, stats):
+		elif is_rf_hard_filter_negative(args, variant, stats):
 			class_prefix = 'NOT_'
 		else:
 			stats['Unassigned truth status for variant'] += 1
@@ -450,18 +448,13 @@ def tensors_from_tensor_map_gnomad_annos(args):
 				stats['Downsampled SNPs'] += 1
 				continue
 
-		if all(map(lambda x: x not in annotation_variant.INFO and x != "QUAL", args.annotations)):
+		if all(map(lambda x: x not in variant.INFO and x != "QUAL", args.annotations)):
 			stats['Missing ALL annotations'] += 1
 			continue # Require at least 1 annotation...
 
-		annotation_data = np.zeros(( len(args.annotations), ))
+		annotation_data = get_annotation_data(args, variant, stats)
 		qual_and_dp_normalizer = 1000000.0
 		for i,a in enumerate(args.annotations):
-			if a == "QUAL":
-				annotation_data[i] = float(annotation_variant.QUAL)
-			else:
-				annotation_data[i] = annotation_variant.INFO[a]
-			
 			if a == "DP" or a == "QUAL":
 				 annotation_data[i] /= qual_and_dp_normalizer
 
@@ -475,7 +468,7 @@ def tensors_from_tensor_map_gnomad_annos(args):
 				raise ValueError('Error! Unknown code:', b)
 
 		tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)	
-		tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
+		tensor_prefix = plain_name(defines.omni_vcf) + '-' + cur_label_key 
 		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 		stats[cur_label_key] += 1
 
@@ -493,7 +486,7 @@ def tensors_from_tensor_map_gnomad_annos(args):
 
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
-	print('Done generating gnomAD annotated tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
+	print('Done generating gnomAD annotated tensors. Last variant:', str(variant), 'count is:', stats['count'])
 	print('Tensors saved at: ', args.data_dir)
 
 
