@@ -426,7 +426,7 @@ def build_imagenet_discriminative(args):
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, probability_out)
-	discriminator.compile(loss='binary_crossentropy', optimizer=opt)
+	discriminator.compile(loss='binary_crossentropy', optimizer=args.opt)
 	discriminator.summary()
 	return discriminator
 
