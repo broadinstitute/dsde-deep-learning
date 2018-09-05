@@ -717,7 +717,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 		if args.learning_rate_decay and (e+1)%args.learning_rate_decay == 0:
 			args.discriminator_learning_rate /= 2
 			args.generator_learning_rate /= 2
-			#limit_mem()
+			
 			opt = RMSprop(lr=args.discriminator_learning_rate)
 			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
 
@@ -731,11 +731,13 @@ def train_for_n(args, data, generator, discriminator, gan):
 				channel_idx = 1
 			else:
 				channel_idx = -1
+			
 			if x_train.shape[channel_idx] == 1:
 				plot_gen(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
 			elif x_train.shape[channel_idx] == 3 or x_train.shape[channel_idx] == 4:
 				plot_gen_color(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
 			
+			limit_mem()
 			
 
 def plot_real(x_train, n_ex=16, dim=(4,4), figsize=(10,10)):	
