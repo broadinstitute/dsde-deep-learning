@@ -40,6 +40,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.core import Reshape, Dense, Dropout, Activation, Flatten, SpatialDropout2D, ActivityRegularization
 from keras.layers.convolutional import Conv2D, Convolution2D, MaxPooling2D, ZeroPadding2D, UpSampling2D, AveragePooling2D
 
+import tensorflow as tf
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -85,6 +86,9 @@ def parse_args():
 	parser.add_argument('-dlr', '--discriminator_learning_rate', default=1e-4, type=float)
 	parser.add_argument('-lrd', '--learning_rate_decay', default=0, type=int)
 
+	config = tf.ConfigProto()
+	config.gpu_options.allow_growth = True
+	session = tf.Session(config=config)
 
 	args = parser.parse_args()
 	print('Arguments are', args)	
@@ -736,9 +740,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 				plot_gen(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
 			elif x_train.shape[channel_idx] == 3 or x_train.shape[channel_idx] == 4:
 				plot_gen_color(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
-			
-			limit_mem()
-			
+						
 
 def plot_real(x_train, n_ex=16, dim=(4,4), figsize=(10,10)):	
 	idx = np.random.randint(0,x_train.shape[0],n_ex)
