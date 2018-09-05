@@ -691,7 +691,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 	for e in range(args.epochs):
 		make_trainable(discriminator, False)
 		make_trainable(generator, True)
-		gan.compile(loss='binary_crossentropy', optimizer=gan.optimizer)
+		discriminator.compile(loss='binary_crossentropy', optimizer=discriminator.optimizer)
+		generator.compile(loss='binary_crossentropy', optimizer=generator.optimizer)
 		for _ in range(args.generator_loops):	
 			# train Generator-Discriminator stack on input noise to non-generated output class
 			noise_tr = np.random.uniform(0, 1, size=[args.batch_size, args.seeds])
@@ -703,7 +704,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 
 		make_trainable(discriminator, True)
 		make_trainable(generator, False)
-		gan.compile(loss='binary_crossentropy', optimizer=gan.optimizer)
+		discriminator.compile(loss='binary_crossentropy', optimizer=discriminator.optimizer)
+		generator.compile(loss='binary_crossentropy', optimizer=generator.optimizer)
 		for _ in range(args.discriminator_loops):
 			# Make generative images
 			image_batch = x_train[np.random.randint(0,x_train.shape[0], size=args.batch_size),:,:,:]    
