@@ -86,9 +86,8 @@ def parse_args():
 	parser.add_argument('-dlr', '--discriminator_learning_rate', default=1e-4, type=float)
 	parser.add_argument('-lrd', '--learning_rate_decay', default=0, type=int)
 
-	config = tf.ConfigProto()
-	config.gpu_options.per_process_gpu_memory_fraction = 0.95
-	session = tf.Session(config=config)
+	gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.8)
+	sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 	
 	args = parser.parse_args()
 	print('Arguments are', args)	
