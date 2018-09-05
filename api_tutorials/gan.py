@@ -87,7 +87,6 @@ def parse_args():
 	parser.add_argument('-lrd', '--learning_rate_decay', default=0, type=int)
 	
 	cfg = K.tf.ConfigProto()
-	cfg.gpu_options.allow_growth = True
 	cfg.gpu_options.per_process_gpu_memory_fraction=0.8
 	K.set_session(K.tf.Session(config=cfg))
 	
@@ -720,11 +719,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 			losses["d"].append(d_loss)
 		
 		if args.learning_rate_decay and (e+1)%args.learning_rate_decay == 0:
-			args.discriminator_learning_rate /= 2
-			args.generator_learning_rate /= 2
-			
-			opt = RMSprop(lr=args.discriminator_learning_rate)
-			print('Learning rates decayed, dlr:', args.discriminator_learning_rate, 'glr:', args.generator_learning_rate)
+			gan.optimizer.lr /= 2	
+			print('Learning rates decayed, dlr:', gan.optimizer.lr)
 
 		# Save images during optimization 
 		if e%args.fps == args.fps-1:
@@ -841,7 +837,7 @@ def limit_mem():
 		K.clear_session()
 		K.get_session().close()
 		cfg = K.tf.ConfigProto()
-		cfg.gpu_options.allow_growth = True
+		cfg.gpu_options.per_process_gpu_memory_fraction=0.8
 		K.set_session(K.tf.Session(config=cfg))
 	except AttributeError as e:
 		print('Could not clear session. Maybe you are using Theano backend?')
