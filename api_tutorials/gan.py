@@ -78,7 +78,6 @@ def parse_args():
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=1e-5, type=float)
 	parser.add_argument('--continuity_loss', default=0, type=float)
-	parser.add_argument('--opt', default=None)
 
 	parser.add_argument('-bn',  '--batch_normalize', default=False, action='store_true')
 	parser.add_argument('-gl',  '--generator_loops', default=5, type=int)
@@ -93,8 +92,7 @@ def parse_args():
 	K.set_session(K.tf.Session(config=cfg))
 	
 	args = parser.parse_args()
-	print('Arguments are', args)
-	args.opt = RMSprop(lr=args.discriminator_learning_rate)
+	print('Arguments are', args)	
 	return args
 
 
@@ -388,9 +386,10 @@ def build_imagenet_generative_model(args):
 	pre_logit = Conv2D(3, (1, 1), padding='same', kernel_initializer='glorot_uniform')(H)
 	generation = Activation('sigmoid')(pre_logit)
 	generator = Model(g_input, generation)
+	opt = RMSprop(lr=args.generator_learning_rate)		
 
 	#gloss = generator_loss(args, pre_logit)	
-	generator.compile(loss="binary_crossentropy", optimizer=args.opt)
+	generator.compile(loss="binary_crossentropy", optimizer=opt)
 	generator.summary()
 	return generator
 
@@ -426,7 +425,8 @@ def build_imagenet_discriminative(args):
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, probability_out)
-	discriminator.compile(loss='binary_crossentropy', optimizer=args.opt)
+	dopt = RMSprop(lr=args.discriminator_learning_rate)	
+	discriminator.compile(loss='binary_crossentropy', optimizer=dopt)
 	discriminator.summary()
 	return discriminator
 
@@ -437,7 +437,8 @@ def build_stacked_gan_imagenet(args, generator, discriminator):
 	H = generator(gan_input)
 	gan_V = discriminator(H)
 	GAN = Model(gan_input, gan_V)
-	GAN.compile(loss='binary_crossentropy', optimizer=args.opt)
+	opt = RMSprop(lr=args.generator_learning_rate)	
+	GAN.compile(loss='binary_crossentropy', optimizer=opt)
 	GAN.summary()
 	return GAN
 
@@ -473,7 +474,8 @@ def build_generative_model(args):
 	H = Activation('sigmoid')(H)
 
 	generator = Model(g_input, H)
-	generator.compile(loss='binary_crossentropy', optimizer=args.opt)
+	opt = RMSprop(lr=args.generator_learning_rate) #RMSprop(lr=1e-5)
+	generator.compile(loss='binary_crossentropy', optimizer=opt)
 	generator.summary()
 	return generator
 
@@ -495,7 +497,8 @@ def build_discriminative(args):
 	H = LeakyReLU(0.2)(H)
 	d_V = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, d_V)
-	discriminator.compile(loss='binary_crossentropy', optimizer=args.opt)
+	dopt = RMSprop(lr=args.discriminator_learning_rate) #RMSprop(lr=1e-5)	
+	discriminator.compile(loss='binary_crossentropy', optimizer=dopt)
 	discriminator.summary()
 	return discriminator
 
@@ -523,7 +526,8 @@ def build_mnist_generative_model(args):
 	H = Conv2D(1, (1, 1), padding='same', kernel_initializer='glorot_uniform')(H)
 	g_V = Activation('sigmoid')(H)
 	generator = Model(g_input,g_V)
-	generator.compile(loss='binary_crossentropy', optimizer=args.opt)
+	opt = RMSprop(lr=args.generator_learning_rate)	
+	generator.compile(loss='binary_crossentropy', optimizer=opt)
 	generator.summary()
 	return generator
 
@@ -543,7 +547,8 @@ def build_mnist_discriminative(args):
 	H = Dropout(args.dropout)(H)
 	d_V = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input,d_V)
-	discriminator.compile(loss='binary_crossentropy', optimizer=args.opt)
+	dopt = RMSprop(lr=args.discriminator_learning_rate)	
+	discriminator.compile(loss='binary_crossentropy', optimizer=dopt)
 	discriminator.summary()
 	return discriminator
 
@@ -554,7 +559,9 @@ def build_stacked_gan(args, generator, discriminator):
 	H = generator(gan_input)
 	gan_V = discriminator(H)
 	GAN = Model(gan_input, gan_V)
-	GAN.compile(loss='binary_crossentropy', optimizer=args.opt)
+	#opt = RMSprop(lr=2e-5)	
+	opt = RMSprop(lr=args.generator_learning_rate)		
+	GAN.compile(loss='binary_crossentropy', optimizer=opt)
 	GAN.summary()
 	return GAN
 
@@ -680,12 +687,12 @@ def train_for_n(args, data, generator, discriminator, gan):
 	print(x_train.shape[0], 'train samples')
 	print(x_test.shape[0], 'test samples')
 
-	samples_seeds = np.random.uniform(0, 1, size=[args.plot_examples, args.seeds])
+	samples_seeds = np.random.uniform(0,1,size=[args.plot_examples, args.seeds])
 	
 	for e in range(args.epochs):
 		make_trainable(discriminator, False)
 		make_trainable(generator, True)
-		gan.compile(loss='binary_crossentropy', optimizer=args.opt)
+		gan.compile(loss='binary_crossentropy', optimizer=gan.optimizer)
 		for _ in range(args.generator_loops):	
 			# train Generator-Discriminator stack on input noise to non-generated output class
 			noise_tr = np.random.uniform(0, 1, size=[args.batch_size, args.seeds])
@@ -697,7 +704,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 
 		make_trainable(discriminator, True)
 		make_trainable(generator, False)
-		gan.compile(loss='binary_crossentropy', optimizer=args.opt)
+		gan.compile(loss='binary_crossentropy', optimizer=gan.optimizer)
 		for _ in range(args.discriminator_loops):
 			# Make generative images
 			image_batch = x_train[np.random.randint(0,x_train.shape[0], size=args.batch_size),:,:,:]    
