@@ -741,7 +741,15 @@ def train_for_n(args, data, generator, discriminator, gan):
 				plot_gen(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
 			elif x_train.shape[channel_idx] == 3 or x_train.shape[channel_idx] == 4:
 				plot_gen_color(args, generator, n_ex=args.plot_examples, dim=(dim, dim), random_seeds=samples_seeds, save_path=save_path)
-						
+
+			gan.save('gan.hd5')
+			generator.save('generator.hd5') 
+			discriminator.save('discriminator.hd5')
+			limit_mem()
+			gan = load_model('gan.hd5')
+			generator = load_model('generator.hd5')
+			discriminator = load_model('discriminator.hd5')
+
 
 def plot_real(x_train, n_ex=16, dim=(4,4), figsize=(10,10)):	
 	idx = np.random.randint(0,x_train.shape[0],n_ex)
