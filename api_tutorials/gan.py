@@ -418,12 +418,12 @@ def build_imagenet_discriminative(args):
 	H = MaxPooling2D((2, 2))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(48,  (3, 3),  padding='valid', kernel_initializer='glorot_uniform')(H)
+	H = Conv2D(32,  (3, 3),  padding='valid', kernel_initializer='glorot_uniform')(H)
 	H = MaxPooling2D((2, 2))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
 	H = Flatten()(H)
-	H = Dense(32)(H)
+	H = Dense(24)(H)
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, probability_out)
@@ -692,10 +692,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 	samples_seeds = np.random.uniform(0,1,size=[args.plot_examples, args.seeds])
 	
 	for e in range(args.epochs):
-		# make_trainable(discriminator, False)
-		# make_trainable(generator, True)
-		# discriminator.compile(loss='binary_crossentropy', optimizer=discriminator.optimizer)
-		# generator.compile(loss='binary_crossentropy', optimizer=generator.optimizer)
+		make_trainable(discriminator, False)
+		#discriminator.compile(loss='binary_crossentropy', optimizer=discriminator.optimizer)
 		for _ in range(args.generator_loops):	
 			# train Generator-Discriminator stack on input noise to non-generated output class
 			noise_tr = np.random.uniform(0, 1, size=[args.batch_size, args.seeds])
@@ -705,10 +703,8 @@ def train_for_n(args, data, generator, discriminator, gan):
 			g_loss = gan.train_on_batch(noise_tr, y2)
 			losses["g"].append(g_loss)
 
-		# make_trainable(discriminator, True)
-		# make_trainable(generator, False)
+		make_trainable(discriminator, True)
 		# discriminator.compile(loss='binary_crossentropy', optimizer=discriminator.optimizer)
-		# generator.compile(loss='binary_crossentropy', optimizer=generator.optimizer)
 		for _ in range(args.discriminator_loops):
 			# Make generative images
 			image_batch = x_train[np.random.randint(0,x_train.shape[0], size=args.batch_size),:,:,:]    
@@ -724,8 +720,9 @@ def train_for_n(args, data, generator, discriminator, gan):
 			losses["d"].append(d_loss)
 		
 		if args.learning_rate_decay and (e+1)%args.learning_rate_decay == 0:
-			gan.optimizer.lr /= 2	
-			print('Learning rates decayed, dlr:', gan.optimizer.lr)
+			gan.optimizer.lr = gan.optimizer.lr / 2
+			discriminator.optimizer.lr = discriminator.optimizer.lr / 2	
+			print('Learning rates decayed, glr:', gan.optimizer.lr, ' dlr:', gan.optimizer.lr)
 
 		# Save images during optimization 
 		if e%args.fps == args.fps-1:
