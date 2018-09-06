@@ -359,7 +359,7 @@ def total_variation_norm(x):
 def build_imagenet_generative_model(args):
 	# Build Generative model ...
 	nch = 32
-	dense_channels = 8
+	dense_channels = 12
 	inner_dim = 16
 	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
@@ -406,24 +406,24 @@ def build_imagenet_discriminative(args):
 	# Build Discriminative model ...
 	channel_axis = -1
 	d_input = Input(shape=args.in_shape)
-	H = Conv2D(128, (3, 3), padding='valid', kernel_initializer='glorot_uniform')(d_input)
-	H = MaxPooling2D((2, 2))(H)
+	H = Conv2D(128, (5, 5), strides=(2,2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
+	#H = MaxPooling2D((2, 2))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(96,  (3, 3), padding='valid', kernel_initializer='glorot_uniform')(d_input)
-	H = MaxPooling2D((2, 2))(H)
+	H = Conv2D(96,  (3, 3), strides=(2,2), padding='valid', kernel_initializer='glorot_uniform')(d_input)
+	#H = MaxPooling2D((2, 2))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(64,  (3, 3), padding='valid', kernel_initializer='glorot_uniform')(H)
-	H = MaxPooling2D((2, 2))(H)
+	H = Conv2D(64,  (3, 3), strides=(2,2), padding='valid', kernel_initializer='glorot_uniform')(H)
+	#H = MaxPooling2D((2, 2))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
-	H = Conv2D(32,  (3, 3),  padding='valid', kernel_initializer='glorot_uniform')(H)
-	H = MaxPooling2D((2, 2))(H)
+	H = Conv2D(32,  (3, 3), strides=(2,2), padding='valid', kernel_initializer='glorot_uniform')(H)
+	#H = MaxPooling2D((2, 2))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
 	H = Flatten()(H)
-	H = Dense(24)(H)
+	H = Dense(32)(H)
 	H = Dropout(args.dropout)(H)
 	probability_out = Dense(2, activation='softmax')(H)
 	discriminator = Model(d_input, probability_out)
