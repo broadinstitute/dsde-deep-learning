@@ -365,7 +365,6 @@ def build_imagenet_generative_model(args):
 	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(dense_channels*inner_dim*inner_dim, kernel_initializer='glorot_normal')(g_input)
-	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = Reshape( [inner_dim, inner_dim, dense_channels] )(H)
 	H = UpSampling2D(size=(2, 2))(H)
@@ -378,7 +377,6 @@ def build_imagenet_generative_model(args):
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
