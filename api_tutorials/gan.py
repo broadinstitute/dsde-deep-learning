@@ -451,7 +451,7 @@ def build_generative_model(args):
 	bn_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(nch*inner_dim*inner_dim, kernel_initializer='glorot_normal')(g_input)
-	#H = BatchNormalization(axis=bn_axis, scale=False,)(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	if K.image_data_format() == 'channels_first':
 		H = Reshape( [nch, inner_dim, inner_dim] )(H)
@@ -460,15 +460,15 @@ def build_generative_model(args):
 	
 	H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch*6, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = BatchNormalization(axis=bn_axis, scale=False)(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch*5, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	#H = BatchNormalization(axis=bn_axis, scale=False)(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = Conv2D(nch*6, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
 	H = Dropout(0.2)(H)
-	#H = BatchNormalization(axis=bn_axis, scale=False)(H)
+	H = batch_normalize_or_not(args, H, channel_axis)
 
 	H = Activation('relu')(H)
 	H = Conv2D(3, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
