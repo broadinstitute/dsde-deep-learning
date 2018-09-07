@@ -309,9 +309,9 @@ def generator_loss(args, pre_logit):
 		loss = -K.sum(loss, -1)
 
 		loss -= args.total_variation * total_variation_norm(pre_logit)
-		loss -= args.continuity_loss * continuity_loss(pre_logit)
+		#loss -= args.continuity_loss * continuity_loss(pre_logit)
 
-		loss -= args.l2 * K.sum(K.square(pre_logit)) / np.prod(args.in_shape)
+		#loss -= args.l2 * K.sum(K.square(pre_logit)) / np.prod(args.in_shape)
 
 		return loss
 
@@ -386,8 +386,8 @@ def build_imagenet_generative_model(args):
 	generator = Model(g_input, generation)
 	opt = RMSprop(lr=args.generator_learning_rate)		
 
-	#gloss = generator_loss(args, pre_logit)	
-	generator.compile(loss="binary_crossentropy", optimizer=opt)
+	gloss = generator_loss(args, pre_logit)	
+	generator.compile(loss=gloss, optimizer=opt)
 	generator.summary()
 	return generator
 
