@@ -106,7 +106,7 @@ def gan_on_imagenet(args):
 	train_imagenet_gan(args, generator, discriminator, gan)	
 
 def gan_on_faces(args):
-	args.in_shape = (256,256,3)
+	args.in_shape = (128,128,3)
 	generator = build_imagenet_generative_model(args)
 	discriminator = build_imagenet_discriminative(args)
 	gan = build_stacked_gan_imagenet(args, generator, discriminator)	
@@ -377,10 +377,10 @@ def build_imagenet_generative_model(args):
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Conv2D(nch, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	H = batch_normalize_or_not(args, H, channel_axis)	
-	H = Activation('relu')(H)
-	H = UpSampling2D(size=(2, 2))(H)
+	# H = Conv2D(nch, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	# H = batch_normalize_or_not(args, H, channel_axis)	
+	# H = Activation('relu')(H)
+	# H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
 	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)	
