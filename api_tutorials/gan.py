@@ -365,6 +365,7 @@ def build_imagenet_generative_model(args):
 	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(dense_channels*inner_dim*inner_dim, kernel_initializer='glorot_normal')(g_input)
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = Reshape( [inner_dim, inner_dim, dense_channels] )(H)
 	H = UpSampling2D(size=(2, 2))(H)
@@ -381,7 +382,7 @@ def build_imagenet_generative_model(args):
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	H = batch_normalize_or_not(args, H, channel_axis)	
+	H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)	
 	pre_logit = Conv2D(3, (1, 1), padding='same', kernel_initializer='glorot_uniform')(H)
 	generation = Activation('sigmoid')(pre_logit)
@@ -602,7 +603,7 @@ def train_faces_gan(args, generator, discriminator, gan):
 	save_model(generator, 'face3_generator.hd5') 
 	save_model(discriminator, 'face3_discriminator.hd5')
 	# Plot some generated images from our GAN after training
-	plot_gen_color(generator, 25, (5,5), (34,34))
+	plot_gen_color(args, generator, 25, (5,5), (34,34))
 
 
 def train_cifar_gan(args, generator, discriminator, gan):
@@ -638,7 +639,7 @@ def train_cifar_gan(args, generator, discriminator, gan):
 	save_model(generator, 'cifar10_generator2.hd5') 
 	save_model(discriminator, 'cifar10_discriminator2.hd5')
 	# Plot some generated images from our GAN
-	plot_gen_color(generator, 25,(5,5),(12,12))
+	plot_gen_color(args, generator, 25,(5,5),(12,12))
 
 
 def train_mnist_gan(args, generator, discriminator, gan):
@@ -783,7 +784,7 @@ def plot_color(x_train, n_ex=16,dim=(4,4), figsize=(10,10) ):
 
 def plot_gen_color(args, generator, n_ex=16, dim=(4,4), figsize=(24,24), random_seeds=None, save_path=None):
 	if random_seeds is None:
-		random_seeds = np.random.uniform(0,1,size=[n_ex,args.seeds])
+		random_seeds = np.random.uniform(0,1,size=[n_ex, args.seeds])
 	generated_images = generator.predict(random_seeds)
 
 	fig = plt.figure(figsize=figsize)
