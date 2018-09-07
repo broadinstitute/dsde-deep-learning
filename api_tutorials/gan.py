@@ -448,7 +448,7 @@ def build_generative_model(args):
 	# Build Generative model ...
 	nch = 44
 	inner_dim = 8
-	bn_axis = -1
+	channel_axis = -1
 	g_input = Input(shape=[args.seeds])
 	H = Dense(nch*inner_dim*inner_dim, kernel_initializer='glorot_normal')(g_input)
 	H = batch_normalize_or_not(args, H, channel_axis)
