@@ -73,7 +73,7 @@ def parse_args():
 	parser.add_argument('--dropout', default=0.2, type=float)
 	parser.add_argument('--in_shape', default=(28,28,1))
 	parser.add_argument('--pretrain', default=0, type=int)
-	parser.add_argument('--l2', default=0.0, type=float)
+	parser.add_argument('--l2', default=1e-6, type=float)
 	parser.add_argument('--l1', default=0.0, type=float)
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=1e-5, type=float)
@@ -311,7 +311,7 @@ def generator_loss(args, pre_logit):
 		loss -= args.total_variation * total_variation_norm(pre_logit)
 		#loss -= args.continuity_loss * continuity_loss(pre_logit)
 
-		#loss -= args.l2 * K.sum(K.square(pre_logit)) / np.prod(args.in_shape)
+		loss -= args.l2 * K.sum(K.square(pre_logit)) / np.prod(args.in_shape)
 
 		return loss
 
@@ -471,10 +471,11 @@ def build_generative_model(args):
 	H = batch_normalize_or_not(args, H, channel_axis)
 
 	H = Activation('relu')(H)
-	H = Conv2D(3, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	H = Activation('sigmoid')(H)
+	pre_logit = Conv2D(3, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	pixel = Activation('sigmoid')(pre_logit)
+	gloss = generator_loss(args, pre_logit)	
 
-	generator = Model(g_input, H)
+	generator = Model(g_input, pixel)
 	opt = RMSprop(lr=args.generator_learning_rate) #RMSprop(lr=1e-5)
 	generator.compile(loss='binary_crossentropy', optimizer=opt)
 	generator.summary()
