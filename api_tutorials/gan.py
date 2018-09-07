@@ -78,6 +78,7 @@ def parse_args():
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=1e-5, type=float)
 	parser.add_argument('--continuity_loss', default=0, type=float)
+	parser.add_argument('--id', default='no_id')
 
 	parser.add_argument('-bn',  '--batch_normalize', default=False, action='store_true')
 	parser.add_argument('-gl',  '--generator_loops', default=5, type=int)
@@ -723,7 +724,7 @@ def train_for_n(args, data, generator, discriminator, gan):
 
 		# Save images during optimization 
 		if e%args.fps == args.fps-1:
-			save_path = args.save_path + '/' + args.mode + '/epoch_' + str(e) + '.jpg'
+			save_path = args.save_path + '/' + args.mode + '/' + args.id + '/epoch_' + str(e) + '.jpg'
 			print('iteration:',e, 'of:', args.epochs, 'generator loss:', g_loss, 'discriminator loss:', d_loss, '\nsave image at:', save_path)
 			dim = np.sqrt(args.plot_examples)
 
