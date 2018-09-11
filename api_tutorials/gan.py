@@ -405,7 +405,7 @@ def build_imagenet_discriminative(args):
 	# Build Discriminative model ...
 	channel_axis = -1
 	d_input = Input(shape=args.in_shape)
-	H = Conv2D(256, (3, 3), padding='valid', kernel_initializer='glorot_uniform')(d_input)
+	H = Conv2D(256, (5, 5), padding='valid', kernel_initializer='glorot_uniform')(d_input)
 	H = MaxPooling2D((3, 3))(H)
 	H = Dropout(args.dropout)(H)
 	H = Activation('relu')(H)
