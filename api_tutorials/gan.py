@@ -389,8 +389,8 @@ def build_imagenet_generative_model(args):
 	generator = Model(g_input, generation)
 	opt = RMSprop(lr=args.generator_learning_rate)		
 
-	gloss = generator_loss(args, pre_logit)	
-	generator.compile(loss=gloss, optimizer=opt)
+	#gloss = generator_loss(args, pre_logit)	
+	generator.compile(loss='binary_crossentropy', optimizer=opt)
 	generator.summary()
 	return generator
 
