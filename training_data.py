@@ -3499,9 +3499,9 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 		gpos_parts = p.split('_')
 		chrom = gpos_parts[0]
 
-		if chrom not in args.test_contigs:
-			stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
-			continue
+		# if chrom not in args.test_contigs:
+		# 	stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
+		# 	continue
 
 		pos = int(gpos_parts[1])
 		allele_idx = None if len(gpos_parts) < 3 else int(gpos_parts[2])
