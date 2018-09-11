@@ -377,8 +377,8 @@ def build_imagenet_generative_model(args):
 	#H = batch_normalize_or_not(args, H, channel_axis)
 	H = Activation('relu')(H)
 	H = UpSampling2D(size=(2, 2))(H)
-	H = Conv2D(nch*8, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
-	H = batch_normalize_or_not(args, H, channel_axis)	
+	H = Conv2D(nch*4, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
+	#H = batch_normalize_or_not(args, H, channel_axis)	
 	H = Activation('relu')(H)
 	# H = UpSampling2D(size=(2, 2))(H)
 	H = Conv2D(nch*8, (3, 3), padding='same', kernel_initializer='glorot_uniform')(H)
@@ -389,8 +389,8 @@ def build_imagenet_generative_model(args):
 	generator = Model(g_input, generation)
 	opt = RMSprop(lr=args.generator_learning_rate)		
 
-	#gloss = generator_loss(args, pre_logit)	
-	generator.compile(loss='binary_crossentropy', optimizer=opt)
+	gloss = generator_loss(args, pre_logit)	
+	generator.compile(loss=gloss, optimizer=opt)
 	generator.summary()
 	return generator
 
