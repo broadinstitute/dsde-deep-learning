@@ -67,7 +67,7 @@ ANNOTATIONS = {
 				'annotations' : ['Pair', 'Strand', 'Cycle', 'MappingQuality']
 			   }
 
-BQSR_LABELS = {'BAD_BASE':0, 'GOOD_BASE':1}
+BQSR_LABELS = {'GOOD_BASE':0, 'BAD_BASE':1}
 
 
 def run():
@@ -81,7 +81,7 @@ def run():
 	elif 'bqsr_lstm_train_tensor' == args.mode:
 		bqsr_lstm_train_tensor(args)
 	elif 'write_bqsr_tensors' == args.mode:
-		write_bqsr_tensors(args)			
+		write_base_recalibrate_tensors(args)				
 	else:
 		raise ValueError('unknown bqsr mode:', args.mode)
 
@@ -104,11 +104,11 @@ def parse_args():
 
 	# Tensor defining arguments
 	parser.add_argument('--labels', default=BQSR_LABELS, help='Dict mapping label names to their index within label tensors.')
-	parser.add_argument('--input_symbol_set', default='dna_indel', choices=INPUT_SYMBOLS.keys(), help='Key which maps to an input symbol to index mapping.')
+	parser.add_argument('--input_symbol_set', default='dna', choices=INPUT_SYMBOLS.keys(), help='Key which maps to an input symbol to index mapping.')
 	parser.add_argument('--input_symbols', help='Dict mapping input symbols to their index within input tensors, initialised via input_symbols_set argument')
 	parser.add_argument('--batch_size', default=32, type=int, help='Mini batch size for stochastic gradient descent algorithms.')
 	parser.add_argument('--read_limit', default=128, type=int, help='Maximum number of reads to load.')
-	parser.add_argument('--window_size', default=128, type=int, help='Size of sequence window to use as input, typically centered at a variant.')
+	parser.add_argument('--window_size', default=151, type=int, help='Size of sequence window to use as input, typically centered at a variant.')
 	parser.add_argument('--window_offset', default=2, type=int, help='Shift where in the window to predict. Positive numbers go further along the reading strand')
 	parser.add_argument('--channels_last', default=False, dest='channels_last', action='store_true', help='Store the channels in the last axis of tensors, tensorflow->true, theano->false')
 	parser.add_argument('--label_smoothing', default=0.0, type=float, help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
@@ -117,7 +117,7 @@ def parse_args():
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
-	parser.add_argument('--annotation_set', default='quick4', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
+	parser.add_argument('--annotation_set', default='_', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
 
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
@@ -140,7 +140,8 @@ def parse_args():
 
 
 	# Dataset generation related arguments
-	parser.add_argument('--downsample_snps', default=1.0, type=float, help='Rate of SNP examples that are kept must be in [0.0, 1.0].')	
+	parser.add_argument('--downsample_homref', default=1.0, type=float, 
+		help='Rate of reads that are all homozygous reference that are kept must be in [0.0, 1.0].')	
 	parser.add_argument('--valid_ratio', default=0.1, type=float,
 		help='Rate of training tensors to save for validation must be in [0.0, 1.0].')	
 	parser.add_argument('--test_ratio', default=0.2, type=float,
@@ -463,6 +464,121 @@ def bqsr_set_args_and_get_model_from_semantics(args, semantics_json):
 ################################################
 ###### Writing and Generating Tensors ##########
 ################################################
+def write_base_recalibrate_tensors(args, include_annotations=True):
+	"""Create tensors structured as tensor map of read quality.
+
+	Defines true bases as those not in args.db_snp, where read and reference agree.
+	False bases are sites thos not in args.db_snp where the read and the reference do NOT agree. 
+
+	Arguments
+		args.data_dir: directory where tensors will live. Created here and filled with
+			subdirectories of test, valid and train, each containing
+			subdirectories for each label with tensors stored as hd5 files.
+		args.bam_file: BAM or BAMout file where the aligned reads are stored
+		args.ignore_vcf: VCF file with sites of known variation, from NIST, DBSNP etc.
+		args.bed_file: Intervals of interest
+		args.window_size: Size of sequence window around variant (width of the tensor)
+		args.chrom: Only write tensors from this chromosome (optional, used for parallelization)
+		args.start_pos: Only write tensors after this position (optional, used for parallelization)
+		args.end_pos: Only write tensors before this position (optional, used for parallelization)
+	"""	
+	# NEED to label, set max size, go to only p-hot 4xwindow size, 
+	# eliminate any known variant covering read
+	# iterate over vcf
+	# check between variants for reads
+	print('Writing base recalibration tensors from tensor channel map.')
+	stats = Counter()
+
+	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
+	vcf_ram = vcf.Reader(open(args.ignore_vcf, 'r'))
+	
+	bed_dict = bqsr_bed_file_to_dict(args.bed_file)
+	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
+
+	margin = args.window_size/2
+	contig = record_dict[args.chrom]
+	for start,stop in zip(bed_dict[args.chrom][0], bed_dict[args.chrom][1]):
+		if stop - start < args.window_size:
+			stats['interval too small'] += 1
+			continue
+		last_variant = None
+		for v in vcf_ram.fetch(args.chrom, start, stop):
+			if last_variant is not None and (v.POS-last_variant.POS) > args.window_size:
+				write_reads_in_region_to_tensors(args, samfile, contig, args.chrom, last_variant.POS+margin, v.POS-margin, stats)
+			last_variant = v
+
+		if stats['count'] >= args.samples:
+			break
+
+	for k in stats.keys():
+		print('%s has %d' %(k, stats[k]))
+
+	print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf)
+
+def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
+	tensor_channel_map = bqsr_get_tensor_channel_map_from_args(args)
+	for read in samfile.fetch(chrom, start, stop):
+		if read.is_reverse:
+			continue
+		read_group = read.get_tag('RG')	
+		if 'artificial' in read_group.lower():
+			continue
+		if not read.is_proper_pair or not read.is_paired:
+			continue
+		if read.is_duplicate or read.is_secondary or read.is_supplementary or read.is_qcfail or read.is_unmapped:
+			continue
+
+		assert(len(read.query_sequence) <= args.window_size)
+		print('read len:', len(read.query_sequence))
+		got_bad_base = False
+		label_vector = np.zeros((args.window_size, len(BQSR_LABELS)))
+		for ref_pos, read_idx in zip(read.get_reference_positions(), range(len(read.query_sequence))):	
+			if chrom_seq[ref_pos] != read.query_sequence[read_idx]:
+				label_vector[read_idx, BQSR_LABELS['BAD_BASE']] = 1.0
+				got_bad_base = True
+				stats['bad bases'] += 1
+			else:
+				label_vector[read_idx, BQSR_LABELS['GOOD_BASE']] = 1.0 
+				stats['good bases'] += 1			
+
+		if not got_bad_base:
+			stats['perfect read'] += 1
+			continue
+
+		read_tensor = np.zeros((args.window_size, len(tensor_channel_map)))
+		read_tensor = bqsr_base_string_to_tensor(args, read.query_sequence, read.query_qualities.tolist())
+		
+		print(read_tensor)
+		print('label vector')
+		print(label_vector)
+		if len(args.annotations) > 0:
+			max_mq = 60.0
+			max_read_pos = 151.0
+			annotation_data = np.zeros(( len(args.annotations), ))
+			for i,a in enumerate(args.annotations):
+				if a.lower() == 'strand':
+					annotation_data[i] = float(read.is_reverse)
+				elif a.lower() == 'pair':
+					annotation_data[i] = float(read.is_read1)
+				elif a.lower() == 'mappingquality':
+					annotation_data[i] = float(read.mapping_quality) / max_mq
+				elif a.lower == 'cycle':
+					annotation_data[i] = float(read_idx) / max_read_pos	
+
+		tensor_path = bqsr_get_path_to_train_valid_or_test(args, args.chrom)	
+		tensor_prefix = bqsr_plain_name(args.bam_file) +'_'+ bqsr_plain_name(args.ignore_vcf)
+		tensor_path += tensor_prefix + '-' + read_group.replace(':', '')+ args.chrom +'_'+ str(read.reference_start) + '.hd5'
+		if not os.path.exists(os.path.dirname(tensor_path)):
+			os.makedirs(os.path.dirname(tensor_path))
+		with h5py.File(tensor_path, 'w') as hf:
+			hf.create_dataset(args.tensor_name, data=read_tensor)
+			if len(args.annotations) > 0:
+				hf.create_dataset(args.annotation_set, data=annotation_data)
+			hf.create_dataset('bqsr_labels', data=label_vector)
+		stats['count'] += 1
+		if stats['count']%400 == 0:
+			print('Wrote', stats['count'], 'tensors out of', args.samples)
+	
 
 def write_bqsr_tensors(args, include_annotations=True):
 	"""Create tensors structured as tensor map of read and reference organized by labels in the data directory.
@@ -487,7 +603,8 @@ def write_bqsr_tensors(args, include_annotations=True):
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
 	vcf_ram = vcf.Reader(open(args.ignore_vcf, 'r'))
-	#bed_dict = bqsr_bed_file_to_dict(args.bed_file)
+	
+	bed_dict = bqsr_bed_file_to_dict(args.bed_file)
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
 	contig = record_dict[args.chrom]
 
@@ -594,16 +711,13 @@ def bqsr_get_path_to_train_valid_or_test(args, contig):
 		return os.path.join(args.data_dir, 'train/')
 
 
-def bqsr_base_string_to_tensor(args, bases, qualities=None):
-	assert(len(bases) == args.window_size)
+def bqsr_base_string_to_tensor(args, bases, qualities):
+	assert(len(bases) <= args.window_size)
 	tensor = np.zeros( (args.window_size, len(args.input_symbols)) )
 
 	for i,b in enumerate(bases):
 		if b in args.input_symbols:
-			if b == INDEL_CHAR or qualities is None:
-				tensor[i, args.input_symbols[b]] = 1.0
-			else:
-				tensor[i, :4] = bqsr_quality_from_mode(args, qualities[i], b, args.input_symbols)
+			tensor[i, :4] = bqsr_quality_from_mode(args, qualities[i], b, args.input_symbols)
 		elif b in AMBIGUITY_CODES:
 			tensor[i, :4] = AMBIGUITY_CODES[b]
 		elif b == SKIP_CHAR:
@@ -1031,7 +1145,7 @@ def bqsr_get_tensor_channel_map_from_args(args):
 	elif 'reference' == args.tensor_name or '1d_dna' == args.tensor_name or '1d_annotations' == args.tensor_name:
 		return get_tensor_channel_map_1d_dna()
 	elif 'bqsr' == args.tensor_name:
-		return bqsr_tensor_channel_map()
+		return get_tensor_channel_map_1d_dna()
 	elif 'mlp' == args.tensor_name:
 		return annotations
 	elif 'deep_variant' == args.tensor_name:
