@@ -116,6 +116,7 @@ def parse_args():
 
 	# Tensor defining arguments
 	parser.add_argument('--labels', default=BQSR_LABELS, help='Dict mapping label names to their index within label tensors.')
+	parser.add_argument('--label_weights',  nargs='+', default=[0.5, 0.5], type=float, help='List of weights for each label.')
 	parser.add_argument('--input_symbol_set', default='dna_annotations', choices=INPUT_SYMBOLS.keys(), help='Key which maps to an input symbol to index mapping.')
 	parser.add_argument('--input_symbols', default=None, help='Dict mapping input symbols to their index within input tensors, initialised via input_symbols_set argument')
 	parser.add_argument('--batch_size', default=32, type=int, help='Mini batch size for stochastic gradient descent algorithms.')
@@ -133,13 +134,14 @@ def parse_args():
 
 
 	# Architecture defining arguments
-	parser.add_argument('--conv_width', default=5, type=int, help='Width of 1D convolutional kernels.')
 	parser.add_argument('--conv_dropout', default=0.0, type=float, 
 		help='Dropout rate in convolutional layers.')
 	parser.add_argument('--conv_batch_normalize', default=False, action='store_true',
 		help='Batch normalize convolutional layers.')
 	parser.add_argument('--conv_layers', nargs='+', default=[128, 96, 64, 48], type=int,
 		help='List of sizes for each convolutional filter layer')
+	parser.add_argument('--conv_widths', nargs='+', default=[5, 5, 5, 5], type=int, 
+		help='List of widths for each 1D convolutional kernels.')
 	parser.add_argument('--kernel_initializer', default='glorot_normal',
 		help='Kernel initializer for convolutional filter layers.')
 	parser.add_argument('--activation', default='relu',
@@ -465,15 +467,15 @@ def label_bases_model_from_args(args):
 	x = read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name=args.tensor_name)
 	
 	max_pool_diff = len(args.conv_layers)-len(args.max_pools)	
-	for  i,c in enumerate(args.conv_layers):
+	for i, (c, w) in enumerate(zip(args.conv_layers, args.conv_widths)):
 
 		if args.conv_batch_normalize:
-			x = Conv1D(filters=c, kernel_size=args.conv_width, activation='linear', 
+			x = Conv1D(filters=c, kernel_size=w, activation='linear', 
 						padding=args.padding, kernel_initializer=args.kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
 			x = Activation(args.activation)(x)
 		else:
-			x = Conv1D(filters=c, kernel_size=args.conv_width, activation=args.activation, 
+			x = Conv1D(filters=c, kernel_size=w, activation=args.activation, 
 						padding=args.padding, kernel_initializer=args.kernel_initializer)(x)
 
 		if args.conv_dropout > 0 and args.spatial_dropout:
@@ -489,7 +491,7 @@ def label_bases_model_from_args(args):
 
 	model = Model(inputs=read_tensor, outputs=conv_out)
 
-	weighted_loss = bqsr_weighted_categorical_crossentropy([0.04, 0.96])
+	weighted_loss = bqsr_weighted_categorical_crossentropy(args.label_weights)
 
 	model.compile(optimizer=Adam(lr=1e-4), loss=weighted_loss, metrics=bqsr_get_metrics(args.labels, dim=3))
 
