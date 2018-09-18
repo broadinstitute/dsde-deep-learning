@@ -15,12 +15,17 @@ import vcf
 import json
 import h5py
 import time
+import math
 import scipy
 import pysam
 import argparse
 import numpy as np
 from scipy import interpolate
-import matplotlib.pyplot as plt
+
+import matplotlib
+matplotlib.use('Agg') # Need this to write images from the GSA servers.  Order matters:
+import matplotlib.pyplot as plt # First import matplotlib, then use Agg, then import plt
+from sklearn.metrics import roc_curve, auc, roc_auc_score, precision_recall_curve, average_precision_score
 
 from Bio import Seq, SeqIO
 from collections import Counter, defaultdict
@@ -47,9 +52,11 @@ SKIP_CHAR = '~'
 INDEL_CHAR = '*'
 DNA_SYMBOLS = {'A':0, 'C':1, 'G':2, 'T':3}
 DNA_INDEL_SYMBOLS = {'A':0, 'C':1, 'G':2, 'T':3, INDEL_CHAR:4}
+DNA_AND_ANNOTATIONS = {'A':0, 'C':1, 'G':2, 'T':3, 'strand':4, 'pair':5, 'cycle':6, 'mq':7}
 INPUT_SYMBOLS = {
 	'dna' : DNA_SYMBOLS,
 	'dna_indel' : DNA_INDEL_SYMBOLS,
+	'dna_annotations' : DNA_AND_ANNOTATIONS
 }
 
 # Base calling ambiguities, See https://www.bioinformatics.org/sms/iupac.html
@@ -66,9 +73,14 @@ ANNOTATIONS = {
 				'best_practices' : ['Pair', 'Strand', 'Cycle', 'MappingQuality'],
 				'annotations' : ['Pair', 'Strand', 'Cycle', 'MappingQuality']
 			   }
+MAX_MQ=60.0
+
 
 BQSR_LABELS = {'GOOD_BASE':0, 'BAD_BASE':1}
-
+KEY_COLORS = {'GOOD_BASE':'green', 'BAD_BASE':'red'}
+precision_label = 'Precision | Positive Predictive Value | TP/(TP+FP)'
+recall_label = 'Recall | Sensitivity | True Positive Rate | TP/(TP+FN)'
+fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -104,8 +116,8 @@ def parse_args():
 
 	# Tensor defining arguments
 	parser.add_argument('--labels', default=BQSR_LABELS, help='Dict mapping label names to their index within label tensors.')
-	parser.add_argument('--input_symbol_set', default='dna', choices=INPUT_SYMBOLS.keys(), help='Key which maps to an input symbol to index mapping.')
-	parser.add_argument('--input_symbols', help='Dict mapping input symbols to their index within input tensors, initialised via input_symbols_set argument')
+	parser.add_argument('--input_symbol_set', default='dna_annotations', choices=INPUT_SYMBOLS.keys(), help='Key which maps to an input symbol to index mapping.')
+	parser.add_argument('--input_symbols', default=None, help='Dict mapping input symbols to their index within input tensors, initialised via input_symbols_set argument')
 	parser.add_argument('--batch_size', default=32, type=int, help='Mini batch size for stochastic gradient descent algorithms.')
 	parser.add_argument('--read_limit', default=128, type=int, help='Maximum number of reads to load.')
 	parser.add_argument('--window_size', default=151, type=int, help='Size of sequence window to use as input, typically centered at a variant.')
@@ -230,7 +242,22 @@ def bqsr_train_tensor(args):
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
 	
 	test = generate_test.next()
-	bqsr_plot_roc_per_class(model, test[0][args.tensor_name], test[1], args.labels, args.id)
+	bqsr_plot_roc_per_class(model, test[0][args.tensor_name], test[1], args.labels, args.id, melt=True)
+	test_tensors = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.input_symbols)))
+	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
+
+	for i in range(args.iterations):
+		next_batch = next(generate_test)
+		test_tensors[i*args.batch_size:(i+1)*args.batch_size,:,:] = next_batch[0][args.tensor_name]
+		test_labels[i*args.batch_size:(i+1)*args.batch_size,:,:] = next_batch[1]
+
+	predictions = model.predict(test_tensors)
+	print('prediction shape:', predictions.shape)
+
+	melt_shape = (predictions.shape[0]*predictions.shape[1], predictions.shape[2])
+	predictions = predictions.reshape(melt_shape)
+	test_truth = test_labels.reshape(melt_shape)	
+	bqsr_plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id)
 
 
 def bqsr_train_annotation_tensor(args):
@@ -617,10 +644,8 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf)
 
 def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
-	tensor_channel_map = bqsr_get_tensor_channel_map_from_args(args)
 	for read in samfile.fetch(chrom, start, stop):
-		if read.is_reverse:
-			continue
+
 		read_group = read.get_tag('RG')	
 		if 'artificial' in read_group.lower():
 			continue
@@ -630,8 +655,8 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			continue
 
 		assert(len(read.query_sequence) <= args.window_size)
-		print('read len:', len(read.query_sequence))
 		got_bad_base = False
+	
 		label_vector = np.zeros((args.window_size, len(BQSR_LABELS)))
 		for ref_pos, read_idx in zip(read.get_reference_positions(), range(len(read.query_sequence))):	
 			if chrom_seq[ref_pos] != read.query_sequence[read_idx]:
@@ -646,14 +671,19 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			stats['perfect read'] += 1
 			continue
 
-		bqsr_read_tensor = bqsr_base_string_to_tensor(args, read.query_sequence, read.query_qualities.tolist())
-		
-		print(bqsr_read_tensor.shape)
-		#print('label vector')
-		#print(label_vector)
+		bqsr_tensor = np.zeros((args.window_size, len(args.input_symbols)))
+		bqsr_tensor[:,:4] = bqsr_base_string_to_tensor(args, read.query_sequence, read.query_qualities.tolist())
+		for a in args.input_symbols:
+			if a.lower() == 'strand':
+				bqsr_tensor[:,args.input_symbols[a]] = float(read.is_reverse)
+			elif a.lower() == 'pair':
+				bqsr_tensor[:,args.input_symbols[a]] = float(read.is_read1)
+			elif a.lower() == 'mq':
+				bqsr_tensor[:,args.input_symbols[a]] = float(read.mapping_quality) / float(MAX_MQ)
+			elif a.lower() == 'cycle':
+				bqsr_tensor[:,args.input_symbols[a]] = np.arange(args.window_size) / float(args.window_size)
+
 		if len(args.annotations) > 0:
-			max_mq = 60.0
-			max_read_pos = 151.0
 			annotation_data = np.zeros(( len(args.annotations), ))
 			for i,a in enumerate(args.annotations):
 				if a.lower() == 'strand':
@@ -662,8 +692,8 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 					annotation_data[i] = float(read.is_read1)
 				elif a.lower() == 'mappingquality':
 					annotation_data[i] = float(read.mapping_quality) / max_mq
-				elif a.lower == 'cycle':
-					annotation_data[i] = float(read_idx) / max_read_pos	
+				elif a.lower() == 'cycle':
+					annotation_data[i] = float(read_idx) / args.window_size	
 
 		tensor_path = bqsr_get_path_to_train_valid_or_test(args, args.chrom)	
 		tensor_prefix = bqsr_plain_name(args.bam_file) +'_'+ bqsr_plain_name(args.ignore_vcf)
@@ -671,7 +701,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		if not os.path.exists(os.path.dirname(tensor_path)):
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
-			hf.create_dataset(args.tensor_name, data=bqsr_read_tensor)
+			hf.create_dataset(args.tensor_name, data=bqsr_tensor)
 			if len(args.annotations) > 0:
 				hf.create_dataset(args.annotation_set, data=annotation_data)
 			hf.create_dataset('bqsr_labels', data=label_vector)
@@ -813,13 +843,13 @@ def bqsr_get_path_to_train_valid_or_test(args, contig):
 
 def bqsr_base_string_to_tensor(args, bases, qualities):
 	assert(len(bases) <= args.window_size)
-	tensor = np.zeros( (args.window_size, len(args.input_symbols)) )
+	tensor = np.zeros( (args.window_size, len(DNA_SYMBOLS)) )
 
 	for i,b in enumerate(bases):
-		if b in args.input_symbols:
-			tensor[i] = bqsr_quality_from_mode(args, qualities[i], b, args.input_symbols)
+		if b in DNA_SYMBOLS:
+			tensor[i, :len(DNA_SYMBOLS)] = bqsr_quality_from_mode(args, qualities[i], b, args.input_symbols)
 		elif b in AMBIGUITY_CODES:
-			tensor[i] = AMBIGUITY_CODES[b]
+			tensor[i, :len(DNA_SYMBOLS)] = AMBIGUITY_CODES[b]
 		elif b == SKIP_CHAR:
 			continue
 		else:
@@ -835,7 +865,7 @@ def bqsr_base_quality_to_phred_array(base_quality, base, base_dict):
 	not_p = (1.0-p) / 3.0 # Error could be any of the other 3 bases
 	not_base_quality = -10 * np.log10(not_p) # Back to Phred
 	
-	for b in base_dict.keys():
+	for b in DNA_SYMBOLS:
 		if b == INDEL_CHAR:
 			continue
 		elif b == base:
@@ -851,7 +881,7 @@ def bqsr_base_quality_to_p_hot_array(base_quality, base, base_dict):
 	p = 1.0-(10.0**exponent)
 	not_p = (1.0-p)/3.0
 
-	for b in base_dict.keys():
+	for b in DNA_SYMBOLS:
 		if b == base:
 			phot[base_dict[b]] = p
 		elif b == INDEL_CHAR:
@@ -869,7 +899,7 @@ def bqsr_quality_from_mode(args, base_quality, base, base_dict):
 		return bqsr_base_quality_to_phred_array(base_quality, base, base_dict)
 	elif args.base_quality_mode == '1hot':
 		one_hot = np.zeros((4,))
-		one_hot[base_dict[base]] = 1.0
+		one_hot[DNA_SYMBOLS[base]] = 1.0
 		return one_hot
 	else:
 		raise ValueError('Error! Unknown base quality mode:', args.base_quality_mode)
@@ -1162,7 +1192,7 @@ def bqsr_train_model_from_generators(args, model, generate_train, generate_valid
 		validation_steps=args.validation_steps, validation_data=generate_valid,
 		callbacks=bqsr_get_callbacks(args, save_weight_hd5))
 
-	bqsr_plot_metric_history(history, weight_path_to_title(save_weight_hd5))
+	bqsr_plot_metric_history(history, bqsr_weight_path_to_title(save_weight_hd5))
 	print('Model weights saved at: %s' % save_weight_hd5)
 	
 	return model
@@ -1214,7 +1244,7 @@ def bqsr_plot_metric_history(history, title, prefix='./figures/'):
 					break
 
 	axes[0, 1].set_title(title)
-	figure_path = prefix+"metric_history_"+title+image_ext
+	figure_path = prefix+"metric_history_"+title+IMAGE_EXT
 	if not os.path.exists(os.path.dirname(figure_path)):
 		os.makedirs(os.path.dirname(figure_path))	
 	plt.savefig(figure_path)	
@@ -1228,8 +1258,8 @@ def bqsr_plot_roc_per_class(model, test_data, test_truth, labels, title, batch_s
 	
 
 	for key in labels.keys():
-		if key in key_colors:
-			color = key_colors[key]
+		if key in KEY_COLORS:
+			color = KEY_COLORS[key]
 		else:
 			color = np.random.choice(color_array)
 		plt.plot( fpr[labels[key]], tpr[labels[key]], color=color, lw=lw, label=str(key)+' area under ROC: %0.3f'%roc_auc[labels[key]]  )
@@ -1250,6 +1280,42 @@ def bqsr_plot_roc_per_class(model, test_data, test_truth, labels, title, batch_s
 	plt.savefig(figure_path)
 	print('Saved figure at:', figure_path)
 
+def bqsr_plot_precision_recall_per_class_predictions(predictions, truth, labels, title, prefix='./figures/'):
+	# Compute Precision-Recall and plot curve
+	precision = dict()
+	recall = dict()
+	average_precision = dict()
+	lw = 4.0
+	plt.figure(figsize=(22,18))
+	matplotlib.rcParams.update({'font.size': 34})	
+	
+	for k in labels.keys():
+		if k in KEY_COLORS:
+			c = KEY_COLORS[k]
+		else:
+			c = np.random.choice(color_array)
+		
+		precision[k], recall[k], _ = precision_recall_curve(truth[:, labels[k]], predictions[:, labels[k]])
+		average_precision[k] = average_precision_score(truth[:, labels[k]], predictions[:, labels[k]])
+		plt.plot(recall[k], precision[k], lw=lw, color=c, label=k+' area = %0.3f' % average_precision[k])
+
+	plt.ylim([-0.02, 1.03])
+	plt.xlim([0.0, 1.00])
+	
+	plt.xlabel(recall_label)
+	plt.ylabel(precision_label)
+	plt.title(title)
+
+	plt.legend(loc="lower left")
+	
+	plot_name = prefix+"precision_recall_"+title+IMAGE_EXT
+	if not os.path.exists(os.path.dirname(plot_name)):
+		os.makedirs(os.path.dirname(plot_name))		
+	plt.savefig(plot_name)
+	print('Saved plot at:%s' % plot_name)
+
+
+
 
 def bqsr_weight_path_to_title(wp):
 	return wp.split('/')[-1].replace('__', '-').split('.')[0]
@@ -1264,7 +1330,7 @@ def bqsr_get_fpr_tpr_roc(model, test_data, test_truth, labels, batch_size=32, me
 		y_pred = y_pred.reshape(melt_shape)
 		test_truth = test_truth.reshape(melt_shape)
 
-	return get_fpr_tpr_roc_pred(y_pred, test_truth, labels)
+	return bqsr_get_fpr_tpr_roc_pred(y_pred, test_truth, labels)
 
 
 def bqsr_get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
@@ -1314,14 +1380,6 @@ def get_tensor_channel_map_1d_dna():
 	
 	return tensor_map
 
-
-def get_tensor_channel_map_1d():
-	'''1D Reference tensor with 4 channel DNA encoding'''
-	tensor_map = {}
-	for k in DNA_SYMBOLS.keys():
-		tensor_map[k] = DNA_SYMBOLS[k]
-	
-	return tensor_map
 
 
 
