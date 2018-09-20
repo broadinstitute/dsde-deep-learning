@@ -36,6 +36,8 @@ def parse_args():
 	# Tensor defining arguments
 	parser.add_argument('--tensor_map', default='read_tensor',
 		help='Key which looks up the map from tensor channels to their meaning.')
+	parser.add_argument('--tensor_types', nargs='+', default=['read_tensor'],
+		help='List of keys which look up maps from tensor channels to their meaning. Only used when writing tensors.')	
 	parser.add_argument('--input_symbols', default=defines.inputs_indel,
 		help='Dict mapping input symbols to their index within input tensors.')
 	parser.add_argument('--batch_size', default=32, type=int,
@@ -177,10 +179,13 @@ def parse_args():
 		help='List of variant score keys for performance comparisons.')
 	parser.add_argument('--inspect_model', default=False, action='store_true',
 		help='Plot model architecture, measure inference and training speeds.')
+	parser.add_argument('--inspect_show_labels', default=False, action='store_true',
+		help='Plot model architecture with labels for each layer.')
 	parser.add_argument('--gnomad_compare', default=False, action='store_true',
 		help='Compare to gnomad random forest and VQSR.')
 	parser.add_argument('--hard_filter_compare', default=False, action='store_true',
 		help='Compare to GATK best practices hard filters and filter from CHM syndip paper.')
+	parser.add_argument('--baseline_key', help='String to identify baseline model to compare against.')	
 
 	# Run specific arguments
 	parser.add_argument('--id', default='no_id',

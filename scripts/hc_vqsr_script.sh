@@ -30,6 +30,10 @@ SCATTER=200
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
+VCF=/dsde/data/deep/vqsr/vcfs/g947u_o1d1v2_na24149_hc4_merged.vcf.gz
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+
 # The synthetic diploid replicate 1
 # BAM=/seq/picard_aggregation/G94794/CHMI_CHMI3_WGS1/v3/CHMI_CHMI3_WGS1.bam
 # BAMOUT=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs1_g94794_bamout_all_calls.bam
@@ -65,11 +69,11 @@ SCATTER=200
 # INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
 # Clinical project g947x NA12878 HG38
-BAM=/dsde/data/deep/vqsr/bams/NA12878_S1.bam
-BAMOUT=/dsde/data/deep/vqsr/bams/illumina_na12878_s1_bamout.bam
-VCF=/dsde/data/deep/vqsr/vcfs/illumina_na12878_s1.vcf.gz
-REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
+# BAM=/dsde/data/deep/vqsr/bams/NA12878_S1.bam
+# BAMOUT=/dsde/data/deep/vqsr/bams/illumina_na12878_s1_bamout.bam
+# VCF=/dsde/data/deep/vqsr/vcfs/illumina_na12878_s1.vcf.gz
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_regions.v1.interval_list 
 
 # NA12877 CEPH CEU Utah husband Solexa 269364
 # BAM=/seq/picard_aggregation/LCSET-6205/Solexa-269364,_PCR-Free_pool/v1/Solexa-269364,_PCR-Free_pool.bam
@@ -137,11 +141,22 @@ INTERVAL=/seq/references/Homo_sapiens_assembly38/v0/variant_calling/wgs_calling_
 # VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex1.vcf.gz
 # INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
 
-
 # Exome Project C1963, CHMI_CHMI3 Nex 2
 # BAM=/seq/picard_aggregation/C1963/CHMI_CHMI3_Nex2/v1/CHMI_CHMI3_Nex2.bam
 # BAMOUT=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex2_bamout.bam
 # VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex2.vcf.gz
+# INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
+
+# Exome Project C1963, CHMI_CHMI3 Nex 3
+# BAM=/seq/picard_aggregation/C1963/CHMI_CHMI3_Nex3/v1/CHMI_CHMI3_Nex3.bam
+# BAMOUT=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex3_bamout.bam
+# VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex3.vcf.gz
+# INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
+
+# Exome Project C1963, CHMI_CHMI3 Nex 4
+# BAM=/seq/picard_aggregation/C1963/CHMI_CHMI3_Nex4/v1/CHMI_CHMI3_Nex4.bam
+# BAMOUT=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex4_bamout.bam
+# VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex4.vcf.gz
 # INTERVAL=/seq/references/Homo_sapiens_assembly19/v1/variant_calling/exome_calling_regions.v1.interval_list
 
 

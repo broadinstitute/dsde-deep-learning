@@ -39,9 +39,9 @@ from keras.utils import plot_model, to_categorical
 from keras.utils.vis_utils import model_to_dot
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
+from keras.layers.convolutional import SeparableConv2D, MaxPooling1D, MaxPooling2D, AveragePooling2D
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
-from keras.layers.convolutional import Convolution1D, Convolution2D, Convolution3D, MaxPooling1D, MaxPooling2D, AveragePooling2D
-from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+from keras.layers import Add, Input, Dense, Dropout, AlphaDropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D, Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
 
 ResidualLayer = namedtuple("ResidualLayer", "identity filters strides")
 
@@ -99,7 +99,8 @@ def build_reference_model(args):
 def annotation_multilayer_perceptron_from_args(args,
 											fc_layers = [128, 128, 128, 128],
 											dropout = 0.3,
-											initializer='glorot_normal',
+											initializer = 'glorot_normal',
+											activation = 'relu',
 											batch_normalize_input = False,
 											batch_normalization = False,
 											skip_connection = False):
@@ -384,14 +385,16 @@ def build_reference_annotation_1d_model_from_args(args,
 													spatial_dropout = True,
 													max_pools = [],
 													padding='valid',
+													activation = 'relu',
 													annotation_units = 16,
 													annotation_shortcut = False,
 													annotation_batch_normalize = True,	
 													fc_layers = [64],
 													fc_dropout = 0.0,
 													fc_batch_normalize = False,
-													fc_initializer='glorot_normal',
-													kernel_initializer='glorot_normal'
+													fc_initializer = 'glorot_normal',
+													kernel_initializer = 'glorot_normal',
+													alpha_dropout = False
 												):
 	'''Build Reference 1d CNN model for classifying variants.
 
@@ -417,11 +420,13 @@ def build_reference_annotation_1d_model_from_args(args,
 		if conv_batch_normalize:
 			x = Conv1D(filters=c, kernel_size=conv_width, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Conv1D(filters=c, kernel_size=conv_width, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = Conv1D(filters=c, kernel_size=conv_width, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
-		if conv_dropout > 0 and spatial_dropout:
+		if conv_dropout > 0 and alpha_dropout:
+			x = AlphaDropout(conv_dropout)(x)
+		elif conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout1D(conv_dropout)(x)
 		elif conv_dropout > 0:
 			x = Dropout(conv_dropout)(x)
@@ -434,18 +439,20 @@ def build_reference_annotation_1d_model_from_args(args,
 	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	if annotation_batch_normalize:
 		annotations_in = BatchNormalization(axis=concat_axis)(annotations_in)
-	annotation_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_in)
+	annotation_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
 	
 	x = layers.concatenate([f, annotation_mlp], axis=1)
 	for fc in fc_layers:
 		if fc_batch_normalize:
 			x = Dense(units=fc, activation='linear', kernel_initializer=fc_initializer)(x)
 			x = BatchNormalization(axis=1)(x)
-			x = Activation('relu')(x)		
+			x = Activation(activation)(x)		
 		else:
-			x = Dense(units=fc, activation='relu', kernel_initializer=fc_initializer)(x)
+			x = Dense(units=fc, activation=activation, kernel_initializer=fc_initializer)(x)
 		
-		if fc_dropout > 0:
+		if fc_dropout > 0 and alpha_dropout:
+			x = AlphaDropout(fc_dropout)(x)
+		elif fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 	
 	if annotation_shortcut:
@@ -474,13 +481,14 @@ def read_tensor_2d_model_from_args(args,
 									conv_batch_normalize = False,
 									spatial_dropout = True,
 									max_pools = [(3,1), (3,1)],
-									padding='valid',
+									padding = 'valid',
+									activation = 'relu',
 									fc_layers = [64],
 									fc_dropout = 0.0,
 									fc_batch_normalize = False,
-									fc_initializer='glorot_normal',
-									kernel_initializer='glorot_normal',
-									kernel_single_channel=True,
+									fc_initializer = 'glorot_normal',
+									kernel_initializer = 'glorot_normal',
+									kernel_single_channel = True
 									):
 	'''Builds Read Tensor 2d CNN model for classifying variants.
 
@@ -524,9 +532,9 @@ def read_tensor_2d_model_from_args(args,
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
 		if conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout2D(conv_dropout)(x)
@@ -543,9 +551,9 @@ def read_tensor_2d_model_from_args(args,
 		if fc_batch_normalize:
 			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
 			x = BatchNormalization(axis=1)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
 
@@ -574,17 +582,19 @@ def read_tensor_2d_annotation_model_from_args(args,
 											conv_batch_normalize = False,
 											spatial_dropout = True,
 											max_pools = [(3,1), (3,3)],
-											padding='valid',
+											padding = 'valid',
 											annotation_units = 16,
 											annotation_shortcut = False,
 											annotation_batch_normalize = True,
 											fc_layers = [64],
 											fc_dropout = 0.0,
 											fc_batch_normalize = False,
-											kernel_initializer='glorot_normal',
-											kernel_single_channel=True,
-											freeze_bn=False,
-											fc_initializer='glorot_normal'):
+											fc_initializer = 'glorot_normal',
+											activation = 'relu',
+											kernel_initializer = 'glorot_normal',
+											kernel_single_channel = True,
+											freeze_bn = False
+											):
 	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
 
 	Arguments specify widths and depths of each layer.
@@ -627,9 +637,9 @@ def read_tensor_2d_annotation_model_from_args(args,
 		if conv_batch_normalize:
 			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
 			x = BatchNormalization(axis=concat_axis)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Conv2D(f, cur_kernel, activation='relu', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
 
 		if conv_dropout > 0 and spatial_dropout:
 			x = SpatialDropout2D(conv_dropout)(x)
@@ -646,7 +656,7 @@ def read_tensor_2d_annotation_model_from_args(args,
 	if annotation_batch_normalize:
 		annotations_in = BatchNormalization(axis=-1)(annotations)
 
-	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation='relu')(annotations_in)
+	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
 	x = layers.concatenate([x, annotations_mlp], axis=concat_axis)
 
 	# Fully connected layers
@@ -655,9 +665,9 @@ def read_tensor_2d_annotation_model_from_args(args,
 		if fc_batch_normalize:
 			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
 			x = BatchNormalization(axis=1)(x)
-			x = Activation('relu')(x)
+			x = Activation(activation)(x)
 		else:
-			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='relu')(x)		
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
 
 		if fc_dropout > 0:
 			x = Dropout(fc_dropout)(x)
@@ -680,6 +690,171 @@ def read_tensor_2d_annotation_model_from_args(args,
 		print('Loaded model weights from:', args.weights_hd5)
 
 	return model
+
+
+
+def separable_2d_annotation_model_from_args(args,
+											annotation_units = 16,
+											annotation_shortcut = False,
+											annotation_batch_normalize = True,
+											fc_layers = [64],
+											fc_dropout = 0.0,
+											fc_batch_normalize = False,
+											fc_initializer = 'glorot_normal',
+											activation = 'relu'
+											):
+	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
+
+	Arguments specify widths and depths of each layer.
+	Separable 2d Convolutions followed by dense connection mixed with annotation values.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API. Supports theano or tensorflow channel ordering.
+	Prints out model summary.
+
+	Arguments
+		args.window_size: Length in base-pairs of sequence centered at the variant to use as input.	
+		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
+		args.weights_hd5: An existing model file to load weights from
+		args.channels_last: Theano->False or Tensorflow->True channel ordering flag
+		conv_layers: list of number of convolutional filters in each layer
+		batch_normalization: Boolean whether to apply batch normalization or not
+	Returns
+		The keras model
+	'''			
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		concat_axis = -1
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		concat_axis = 1
+
+	read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
+
+	x = layers.Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(read_tensor_in)
+	x = layers.BatchNormalization(name='block1_conv1_bn')(x)
+	x = layers.Activation('relu', name='block1_conv1_act')(x)
+	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv2')(x)
+	x = layers.BatchNormalization(name='block1_conv2_bn')(x)
+	x = layers.Activation('relu', name='block1_conv2_act')(x)
+
+	residual = layers.Conv2D(128, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.BatchNormalization()(residual)
+
+	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
+	x = layers.BatchNormalization(name='block2_sepconv1_bn')(x)
+	x = layers.Activation('relu', name='block2_sepconv2_act')(x)
+	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
+	x = layers.BatchNormalization(name='block2_sepconv2_bn')(x)
+
+	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_pool')(x)
+	x = layers.add([x, residual])
+
+	residual = layers.Conv2D(728, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.BatchNormalization()(residual)
+
+	# x = layers.Activation('relu', name='block3_sepconv1_act')(x)
+	# x = layers.SeparableConv2D(256, (3, 3), padding='same', use_bias=False, name='block3_sepconv1')(x)
+	# x = layers.BatchNormalization(name='block3_sepconv1_bn')(x)
+	# x = layers.Activation('relu', name='block3_sepconv2_act')(x)
+	# x = layers.SeparableConv2D(256, (3, 3), padding='same', use_bias=False, name='block3_sepconv2')(x)
+	# x = layers.BatchNormalization(name='block3_sepconv2_bn')(x)
+
+	# x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block3_pool')(x)
+	# x = layers.add([x, residual])
+
+	# residual = layers.Conv2D(728, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	# residual = layers.BatchNormalization()(residual)
+
+	x = layers.Activation('relu', name='block4_sepconv1_act')(x)
+	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block4_sepconv1')(x)
+	x = layers.BatchNormalization(name='block4_sepconv1_bn')(x)
+	x = layers.Activation('relu', name='block4_sepconv2_act')(x)
+	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block4_sepconv2')(x)
+	x = layers.BatchNormalization(name='block4_sepconv2_bn')(x)
+
+	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block4_pool')(x)
+	x = layers.add([x, residual])
+
+	for i in range(3):
+		residual = x
+		prefix = 'block' + str(i + 5)
+
+		x = layers.Activation('relu', name=prefix + '_sepconv1_act')(x)
+		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv1')(x)
+		x = layers.BatchNormalization(name=prefix + '_sepconv1_bn')(x)
+		x = layers.Activation('relu', name=prefix + '_sepconv2_act')(x)
+		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv2')(x)
+		x = layers.BatchNormalization(name=prefix + '_sepconv2_bn')(x)
+		x = layers.Activation('relu', name=prefix + '_sepconv3_act')(x)
+		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv3')(x)
+		x = layers.BatchNormalization(name=prefix + '_sepconv3_bn')(x)
+
+		x = layers.add([x, residual])
+
+	residual = layers.Conv2D(1024, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.BatchNormalization()(residual)
+
+	x = layers.Activation('relu', name='block13_sepconv1_act')(x)
+	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block13_sepconv1')(x)
+	x = layers.BatchNormalization(name='block13_sepconv1_bn')(x)
+	x = layers.Activation('relu', name='block13_sepconv2_act')(x)
+	x = layers.SeparableConv2D(1024, (3, 3), padding='same', use_bias=False, name='block13_sepconv2')(x)
+	x = layers.BatchNormalization(name='block13_sepconv2_bn')(x)
+
+	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block13_pool')(x)
+	x = layers.add([x, residual])
+
+	x = layers.SeparableConv2D(1536, (3, 3), padding='same', use_bias=False,  name='block14_sepconv1')(x)
+	x = layers.BatchNormalization(name='block14_sepconv1_bn')(x)
+	x = layers.Activation('relu', name='block14_sepconv1_act')(x)
+
+	x = layers.SeparableConv2D(2048, (3, 3), padding='same', use_bias=False, name='block14_sepconv2')(x)
+	x = layers.BatchNormalization(name='block14_sepconv2_bn')(x)
+	x = layers.Activation('relu', name='block14_sepconv2_act')(x)
+
+	x = layers.GlobalAveragePooling2D(name='avg_pool')(x)
+
+	# Mix the variant annotations in
+	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	if annotation_batch_normalize:
+		annotations_in = BatchNormalization(axis=-1)(annotations)
+
+	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
+	x = layers.concatenate([x, annotations_mlp], axis=concat_axis)
+
+	# Fully connected layers
+	for fc_units in fc_layers:
+		
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
+
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	if annotation_shortcut:
+		x = layers.concatenate([x, annotations_in], axis=concat_axis)
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
+	
+	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model
+
 
 
 def build_read_tensor_2d_model(args):
@@ -754,8 +929,6 @@ def build_read_tensor_2d_and_annotations_model(args):
 	Returns
 		The keras model
 	'''		
-	#print('IN MODEL K.image_data_format:', K.image_data_format())
-	#K.set_image_data_format('channels_first')
 	in_channels = defines.total_input_channels_from_args(args)
 	if args.channels_last:
 		in_shape = (args.read_limit, args.window_size, in_channels)
@@ -1694,78 +1867,6 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	return model
 
 
-# def convert_theano_model_to_tensorflow(args):
-# 	from keras.utils.conv_utils import convert_kernel
-# 	from keras.utils.layer_utils import convert_all_kernels_in_model
-# 	import tensorflow as tf
-	
-# 	semantics_json = args.architectures[0]
-# 	model = set_args_and_get_model_from_semantics(args, semantics_json)
-# 	args.channels_last = True
-# 	K.set_image_data_format('channels_last')
-
-# 	ops = []
-# 	for layer in model.layers:
-# 		if layer.__class__.__name__ in ['Conv1D', 'Conv2D', 'Conv3D']:
-# 			original_w = K.get_value(layer.kernel)
-# 			converted_w = convert_kernel(original_w)
-# 			ops.append(tf.assign(layer.kernel, converted_w).op)
-
-# 	K.get_session().run(ops)
-# 	model.summary()
-# 	args.output_dir = os.path.dirname(semantics_json) + '/'
-# 	args.id = os.path.basename(semantics_json).replace('.json', '_tf_convert')
-# 	tf_model_hd5 = semantics_json.replace('.json', '_tf_convert.hd5')
-# 	print('Saving weights to:', tf_model_hd5)
-# 	model.save(tf_model_hd5)
-# 	serialize_model_semantics(args, tf_model_hd5)
-
-def convert_theano_model_to_tensorflow(args, model_name='small'):
-	args.channels_last = True
-	K.set_image_data_format('channels_last')
-	
-	if model_name == 'rrab':
-		tf_dim_model = read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 3,
-									conv_height = 11,
-									conv_layers = [128, 96, 64, 48],
-									conv_dropout = 0.2,
-									conv_batch_normalize = False,
-									spatial_dropout = True,
-									kernel_single_channel = False,
-									max_pools = [(3,1),(3,1),(3,1)],
-									padding='same',
-									annotation_units = 16,
-									annotation_shortcut = True,
-									fc_layers = [24],
-									fc_dropout = 0.3,
-									fc_batch_normalize = False)
-	elif model_name == 'small':
-		tf_dim_model = read_tensor_2d_annotation_model_from_args(args, 
-									conv_width = 25,
-									conv_height = 25,
-									conv_layers = [64, 48, 32, 24],
-									conv_dropout = 0.1,
-									conv_batch_normalize = False,
-									spatial_dropout = True,
-									kernel_single_channel = True,
-									max_pools = [(3,1),(3,1)],
-									padding='valid',
-									annotation_units = 64,
-									annotation_shortcut = False,
-									fc_layers = [24],
-									fc_dropout = 0.3,
-									fc_batch_normalize = False)
-
-
-	args.output_dir = os.path.dirname(args.weights_hd5) + '/'
-	args.id = os.path.basename(args.weights_hd5).replace('.hd5', '_tf_convert')
-	tf_model_hd5 = args.weights_hd5.replace('.hd5', '_tf_convert.hd5')
-	print('Saving weights to:', tf_model_hd5)
-	tf_dim_model.save(tf_model_hd5)
-	serialize_model_semantics(args, tf_model_hd5)
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Inspections ~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1784,7 +1885,7 @@ def inspect_model(args, model, generate_train, generate_valid, image_path=None):
 		The slightly optimized keras model
 	'''
 	if image_path:
-		plot_dot_model_in_color(model_to_dot(model, show_shapes=True), image_path)
+		plot_dot_model_in_color(args, model_to_dot(model, show_shapes=args.inspect_show_labels), image_path)
 
 	t0 = time.time()
 	history = model.fit_generator(generate_train, steps_per_epoch=args.training_steps, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
@@ -1801,7 +1902,7 @@ def inspect_model(args, model, generate_train, generate_valid, image_path=None):
 	return model
 
 
-def plot_dot_model_in_color(dot, image_path):
+def plot_dot_model_in_color(args, dot, image_path):
 	for n in dot.get_nodes():
 		if n.get_label():
 			if 'Conv1' in n.get_label():
@@ -1829,6 +1930,9 @@ def plot_dot_model_in_color(dot, image_path):
 			elif 'Dropout' in n.get_label():
 				n.set_fillcolor("tomato")
 		n.set_style("filled")
+		if not args.inspect_show_labels:
+			n.set_label('\n')
+
 	print('Saving architecture diagram to:',image_path)
 	dot.write_png(image_path)
 
@@ -1964,7 +2068,6 @@ def write_filters_1d(args, model):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
 				hf.create_dataset('reference', data=input_tensor[0])
-
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2181,7 +2284,7 @@ def predictions_to_snp_scores(args, predictions, positions):
 	eps = 1e-7	
 	snp = predictions[:, args.labels['SNP']]
 	not_snp = predictions[:, args.labels['NOT_SNP']]
-	snp_scores = np.log(eps + snp / (not_snp + eps))
+	snp_scores = np.log(eps + (snp / (not_snp + eps)))
 	return dict(zip(positions, snp_scores))
 
 
@@ -2189,7 +2292,7 @@ def predictions_to_indel_scores(args, predictions, positions):
 	eps = 1e-7
 	indel = predictions[:, args.labels['INDEL']]
 	not_indel = predictions[:, args.labels['NOT_INDEL']]
-	indel_scores = np.log(eps + indel / (not_indel + eps))
+	indel_scores = np.log(eps + (indel / (not_indel + eps)))
 	return dict(zip(positions, indel_scores))
 
 

@@ -5,6 +5,7 @@ MODE=write_tensors
 
 # Tensor definition
 TENSOR_MAP=read_tensor
+TENSOR_TYPES=read_tensor
 READ_LIMIT=128
 WINDOW_SIZE=128
 BASE_QUALITY_MODE=phot
@@ -14,8 +15,8 @@ SAMPLE_NAME=NA12878
 LABEL_TYPE=label_sites
 
 # Downsample certain types of variant
-DOWNSAMPLE_SNPS=0.05
-DOWNSAMPLE_INDELS=0.5
+DOWNSAMPLE_SNPS=0.015
+DOWNSAMPLE_INDELS=0.1
 DOWNSAMPLE_NOT_SNPS=1.0
 DOWNSAMPLE_NOT_INDELS=1.0
 DOWNSAMPLE_HOMOZYGOUS=1.0
@@ -34,7 +35,6 @@ REFERENCE=/seq/references/Homo_sapiens_assembly19/v1/Homo_sapiens_assembly19.fas
 SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 #SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 
-
 # Genomes in a Bottle Project NA24385 Ashkenazi son
 #DOWNSAMPLE_SNPS=0.001
 #DOWNSAMPLE_INDELS=0.01
@@ -44,25 +44,12 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/hg002_na24385_nist_150bp_50x_all_calls.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GIAB_highconf_IllFB-IllGATKHC-CG-Ion-Solid_CHROM1-22_v3.2.2_highconf.bed
 
-# 10X NA24385 Ashkenazi son
-# DOWNSAMPLE_SNPS=0.001
-# DOWNSAMPLE_INDELS=0.01
-# DOWNSAMPLE_NOT_SNPS=1.0
-# DOWNSAMPLE_NOT_INDELS=0.1
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94882_na24385_10x/
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385.vcf.gz
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na24385_10x_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na24385_10x.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GIAB_highconf_IllFB-IllGATKHC-CG-Ion-Solid_CHROM1-22_v3.2.2_highconf.bed
-
 # Clinical NA24385 Ashkenazi son
-#DOWNSAMPLE_SNPS=0.02
-#DOWNSAMPLE_INDELS=0.1
-#CHANNEL_ORDER=channels_last
-# WINDOW_SIZE=256
+# DOWNSAMPLE_SNPS=0.004
+# DOWNSAMPLE_INDELS=0.025
+# CHANNEL_ORDER=channels_last
 # SAMPLE_NAME=SM-G947H
-# MODE=write_paired_read_tensors
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947h_na24385/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947h_na24385_channels_last/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947h_o1d1v1_na24385_bamout.bam
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385_hg38_v3_3_2.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947h_o1d1v1_na24385_hc4_merged.vcf.gz
@@ -81,11 +68,30 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
+# NovaSeq NA24385 Ashkenazi son
+# SAMPLE_NAME=SM-G947T
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_g947t_na24385_hg38_new/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947t_na24385_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385_hg38_v3_3_2.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947t_na24385_cnn_scored.vcf.gz 
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
+# Clinical NA24385 Ashkenazi son
+# SAMPLE_NAME=SM-G9486
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g9486_na24385_hg38/
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g9486_na24385_o1d2v1_cnn_scored.vcf.gz 
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g9486_na24385_o1d2v1_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385_hg38_v3_3_2.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 
 # Clinical 24149 Ashkenazi Father HG003
 # SAMPLE_NAME=SM-G947I
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947i_o2d1v1_na24149_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947i_o2d1v1_na24149_hc4_merged.vcf.gz
@@ -93,8 +99,21 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
+# Nova 24149 Ashkenazi Father HG003
+# SAMPLE_NAME=SM-G947I
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947i_na24149_bamout.bam 
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947i_na24149_cnn_scored.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
+# DOWNSAMPLE_SNPS=0.004
+# DOWNSAMPLE_INDELS=0.025
+# CHANNEL_ORDER=channels_last
 # SAMPLE_NAME=SM-G947U
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947u_o1d1v2_na24149_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947u_o1d1v2_na24149_hc4_merged.vcf.gz
@@ -104,10 +123,20 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 # Clinical 24149 Ashkenazi Father HG003
 # SAMPLE_NAME=SM-G947J
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947j_o1d2v1_na24149_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947j_o1d2v1_na24149_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
+# NovaSeq Clinical 24149 Ashkenazi Father HG003
+# SAMPLE_NAME=SM-G947J
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947j_na24149_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24149_hg38_v3_3_2.vcf.gz 
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947j_na24149_cnn_scored.vcf.gz
 # SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG003_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
@@ -125,7 +154,7 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 # Clinical 24143 Ashkenazi Mother HG004
 # SAMPLE_NAME=SM-G947K
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947k_o2d1v1_na24143_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24143_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947k_o2d1v1_na24143_hc4_merged.vcf.gz
@@ -134,8 +163,18 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG004_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 # Clinical 24143 Ashkenazi Mother HG004
+# SAMPLE_NAME=SM-G947K
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947k_na24143_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24143_hg38_v3_3_2.vcf.gz 
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947k_na24143_filtered.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG004_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
+
+# Clinical 24143 Ashkenazi Mother HG004
 # SAMPLE_NAME=SM-G947W
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947w_o1d2v4_na24143_bamout.bam 
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24143_hg38_v3_3_2.vcf.gz 
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947w_o1d2v4_na24143_hc4_merged.vcf.gz
@@ -144,39 +183,17 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG004_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 
-
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, replicate 1
 # DOWNSAMPLE_SNPS=0.005
-# DOWNSAMPLE_INDELS=0.02
-# DOWNSAMPLE_NOT_SNPS=0.1
-# DOWNSAMPLE_NOT_INDELS=0.05
-# TRAIN_VCF=/dsde/data/hybrid.m37m.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
+# DOWNSAMPLE_INDELS=0.05
+# DOWNSAMPLE_NOT_SNPS=0.25
+# DOWNSAMPLE_NOT_INDELS=0.4
+# SAMPLE_NAME=CHMI_CHMI3_WGS1
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg19/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs1_g94794_bamout_all_calls.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs1_g94794_all_calls.vcf.gz
-
-# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex1
-# DOWNSAMPLE_SNPS=1.0
-# DOWNSAMPLE_INDELS=1.0
-# SAMPLE_NAME=CHMI_CHMI3_Nex1
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_c1963_chmi_chmi3_nex1/
-# TRAIN_VCF=/dsde/data/hybrid.m37m.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
-# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex1_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex1.vcf.gz
-
-# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex2
-# DOWNSAMPLE_SNPS=0.1
-# DOWNSAMPLE_INDELS=1.0
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last/
-# TRAIN_VCF=/dsde/data/hybrid.m37m.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
-# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex2_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex2.vcf.gz
-
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, replicate 4
 # DOWNSAMPLE_SNPS=0.05 #0.005
@@ -187,22 +204,83 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/hybrid.m37m.bed
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs4_g94794_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz.recalibrated.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz
+
+# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, replicate 4
+# DOWNSAMPLE_SNPS=0.15
+# MODE=write_tensors_gnomad_annotations_1d
+# TENSOR_MAP=reference
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/syndip_wgs4_hg19_gnomad_anno/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs4_g94794_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs4_g94794.vcf.gz~.
+
+# DOWNSAMPLE_SNPS=0.75
+# DOWNSAMPLE_NOT_SNPS=0.45
+# MODE=write_tensors_gnomad_annotations_1d
+# TENSOR_MAP=reference
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/syndip_hg19_gnomad_anno_rf_labels_chrom1/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/chmi_chmi3_wgs1_g94794_bamout_all_calls.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/chmi_chmi3_wgs1_g94794_all_calls.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/chrom1_10m_split.interval_list
+
+# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex1
+# DOWNSAMPLE_SNPS=0.2
+# DOWNSAMPLE_INDELS=1.0
+# SAMPLE_NAME=CHMI_CHMI3_Nex1
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_syndip_mix2/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex1_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex1.vcf.gz
+
+# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex2
+# DOWNSAMPLE_SNPS=0.2
+# DOWNSAMPLE_INDELS=1.0
+# SAMPLE_NAME=CHMI_CHMI3_Nex2
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_syndip_mix2/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex2_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex2.vcf.gz
+
+# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex3
+# DOWNSAMPLE_SNPS=0.2
+# DOWNSAMPLE_INDELS=1.0
+# SAMPLE_NAME=CHMI_CHMI3_Nex3
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_syndip_mix2/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex3_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex3.vcf.gz
+
+# The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, exome nex4
+# DOWNSAMPLE_SNPS=0.2
+# DOWNSAMPLE_INDELS=1.0
+# SAMPLE_NAME=CHMI_CHMI3_Nex4
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_syndip_mix2/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.37m.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.37m.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_c1963_chmi_chmi3_nex4_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_c1963_chmi_chmi3_nex4.vcf.gz
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, WGS1 HG38
-DOWNSAMPLE_SNPS=0.02 #0.005
-DOWNSAMPLE_INDELS=0.2 #0.03
+#DOWNSAMPLE_SNPS=0.02 #0.005
+#DOWNSAMPLE_INDELS=0.2 #0.03
 #DOWNSAMPLE_NOT_SNPS=0.3
 #DOWNSAMPLE_NOT_INDELS=0.15
 #CHANNEL_ORDER=channels_last
-SAMPLE_NAME=CHMI_CHMI3_WGS1
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94794_wgs1_hg38_full_new/
-TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.38.vcf.gz
-BED_FILE=/dsde/working/sam/CHM-eval.kit/full.38.bed
-BAM_FILE=/dsde/data/deep/vqsr/bams/g94794_chm_wgs1_hg38_bamout.bam
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
-SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# SAMPLE_NAME=CHMI_CHMI3_WGS1
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# TRAIN_VCF=/dsde/working/sam/CHM-eval.kit/full.38.vcf.gz
+# BED_FILE=/dsde/working/sam/CHM-eval.kit/full.38.bed
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g94794_chm_wgs1_hg38_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94794_chm_wgs1_hg38_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 
 # The Haploid Mix, Synthetic Diploid, CHMI and CHMI3, WGS2 HG38
 # DOWNSAMPLE_INDELS=0.25
@@ -238,30 +316,50 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 
 
-
 # From Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x150, 30x coverage target
-# MODE=write_tensors
-# DOWNSAMPLE_SNPS=0.0075
-# DOWNSAMPLE_INDELS=0.075
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated.vcf.gz
+# DOWNSAMPLE_SNPS=0.01
+# DOWNSAMPLE_INDELS=0.2
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_solexa_269365_bamout.raw.snps.indels.vcf.gz
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_solexa_269365_bamout_no_trim.bam
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
-# Project G94982 snapshot NA12878 with Mapping Quality
+# Project G94982 snapshot NA12878
 # DOWNSAMPLE_SNPS=0.01
 # DOWNSAMPLE_INDELS=0.2
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_all_anno/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
-# Project G76270 NA12878 
+# Project G94982 snapshot NA12878 Platinum Genomes 2017 as truth
 # DOWNSAMPLE_SNPS=0.02
-# DOWNSAMPLE_INDELS=0.25
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g76270_na12878_pcrplus/
+# DOWNSAMPLE_INDELS=0.1
+# DOWNSAMPLE_NOT_SNPS=0.2
+# DOWNSAMPLE_NOT_INDELS=0.15
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_na12878.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_confident_regions.bed
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+
+# Project G94982 snapshot NA12878 Platinum Genomes GiaB hybrid 2017 as truth
+# DOWNSAMPLE_SNPS=0.015
+# DOWNSAMPLE_INDELS=0.1
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_giab_hybrid.bed
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_giab_hybrid_na12878.vcf.gz
+
+# Project G76270 NA12878 
+# DOWNSAMPLE_SNPS=0.01
+# DOWNSAMPLE_INDELS=0.2
+# DOWNSAMPLE_NOT_SNPS=1.0
+# DOWNSAMPLE_NOT_INDELS=0.4
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/mix_hg19_na12878/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g76270_na12878_pcrplus.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g76270_na12878_pcrplus_bamout.bam
@@ -290,13 +388,12 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 # Clinical NA12878 100ng
-# SAMPLE_NAME=SM-G947Q
 # DOWNSAMPLE_SNPS=0.003
 # DOWNSAMPLE_INDELS=0.025
 # DOWNSAMPLE_NOT_SNPS=0.5
 # CHANNEL_ORDER=channels_last
-# MODE=write_paired_read_tensors
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# SAMPLE_NAME=SM-G947Q
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947q_lod_100ng_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947q_lod_100ng_na12878_hc4_merged.vcf.gz
@@ -304,9 +401,23 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
+# Clinical NA12878 g947p 250ng DNA
+# SAMPLE_NAME=SM-G947P
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947p_na12878_250ng_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947p_na12878_250ng_cnn_scored.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
 # Clinical NA12878 500ng DNA
+# DOWNSAMPLE_SNPS=0.003
+# DOWNSAMPLE_INDELS=0.025
+# DOWNSAMPLE_NOT_SNPS=0.5
+# CHANNEL_ORDER=channels_last
 # SAMPLE_NAME=SM-G9482
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g9482_lod_500ng_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g9482_lod_500ng_na12878_hc4_merged.vcf.gz
@@ -316,7 +427,7 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 
 # Clinical NA12878 750ng DNA
 # SAMPLE_NAME=SM-G9483
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g9483_lod_750ng_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g9483_lod_750ng_na12878_hc4_merged.vcf.gz
@@ -326,13 +437,12 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 
 # Clinical NA12878 1ug
 # WINDOW_SIZE=256
-# SAMPLE_NAME=SM-G9481
 # DOWNSAMPLE_SNPS=0.003
 # DOWNSAMPLE_INDELS=0.025
 # DOWNSAMPLE_NOT_SNPS=0.5
 # CHANNEL_ORDER=channels_last
-# MODE=write_paired_read_tensors
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# SAMPLE_NAME=SM-G9481
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g94781_lod_1ug_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94781_lod_1ug_na12878_hc4_merged.vcf.gz
@@ -350,26 +460,55 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
+# Nova NA12878 g947l
+# SAMPLE_NAME=SM-G947L
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_mix/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947l_na12878_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947l_na12878_cnn_scored.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 # Clinical NA12878 g947m
-# WINDOW_SIZE=256
-# SAMPLE_NAME=SM-G947M
 # DOWNSAMPLE_SNPS=0.003
 # DOWNSAMPLE_INDELS=0.025
 # DOWNSAMPLE_NOT_SNPS=0.5
-# MODE=write_paired_read_tensors
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# SAMPLE_NAME=SM-G947M
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947m_na12878/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
-# BAM_FILE=/dsde/data/deep/vqsr/bams/g947x_o2d1v1_na12878_bamout.bam
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947x_o2d1v1_na12878_cnn_scored.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/g947m_o1d2v1_na12878_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947m_o1d2v1_na12878_hc4_merged.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
+# Novaseq NA12878 g947m
+# SAMPLE_NAME=SM-G947M
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947m_na12878_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947m_na12878_cnn_scored.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
+# Nova NA12878 g947n
+# SAMPLE_NAME=SM-G947N
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947n_na12878_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947n_na12878_cnn_scored.vcf.gz
 # SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 # Clinical NA12878 g947o
+# DOWNSAMPLE_SNPS=0.005
+# DOWNSAMPLE_INDELS=0.025
+# CHANNEL_ORDER=channels_last
 # SAMPLE_NAME=SM-G947O
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947o_intrarun4_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947o_intrarun4_na12878_hc4_merged.vcf.gz
@@ -377,11 +516,14 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
+
 # Clinical NA12878 g947x
-# WINDOW_SIZE=256
+# DOWNSAMPLE_SNPS=0.005
+# DOWNSAMPLE_INDELS=0.025
+# CHANNEL_ORDER=channels_last
 # SAMPLE_NAME=SM-G947X
-# MODE=write_paired_read_tensors
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+#TENSOR_TYPES="read_tensor paired_reads"
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947x_o2d1v1_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947x_o2d1v1_na12878_cnn_scored.vcf.gz
@@ -389,22 +531,48 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
+# Nova NA12878 g947x
+# DOWNSAMPLE_SNPS=0.01 #0.003
+# DOWNSAMPLE_INDELS=0.05 #0.025
+# # DOWNSAMPLE_NOT_SNPS=0.5
+# SAMPLE_NAME=SM-G947X
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_mix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947x_na12878_bamout.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947x_na12878_cnn_scored.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 # Clinical NA12878 g947z
 # WINDOW_SIZE=256
-# SAMPLE_NAME=SM-G947Z
 # DOWNSAMPLE_SNPS=0.003
 # DOWNSAMPLE_INDELS=0.025
 # DOWNSAMPLE_NOT_SNPS=0.5
-# CHANNEL_ORDER=channels_last
-# MODE=write_paired_read_tensors
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_mix_site_labelled/
+# SAMPLE_NAME=SM-G947Z
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g947z_intrarun3_na12878_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947z_intrarun3_na12878_hc4_merged.vcf.gz
 # SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
 # REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
+# Clinical NA12878 g947z
+# DOWNSAMPLE_SNPS=0.003
+# DOWNSAMPLE_INDELS=0.025
+# DOWNSAMPLE_NOT_SNPS=0.5
+# CHANNEL_ORDER=channels_last
+# SAMPLE_NAME=SM-G947Z
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947z_na12878_bamout.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947z_na12878_filtered.vcf.gz
+# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+
+
 
 # Illumina Made NA12878 S1
 #DOWNSAMPLE_SNPS=0.008
@@ -435,7 +603,7 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # DOWNSAMPLE_INDELS=0.075
 # DOWNSAMPLE_NOT_SNPS=0.8
 # DOWNSAMPLE_NOT_INDELS=1.0
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/big_mix_channels_last/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_hg38_na12878/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g94982_hg38_na12878.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/g94982_hg38_na12878_bamout.bam
@@ -450,9 +618,9 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # DOWNSAMPLE_HOMOZYGOUS=0.2
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_calling_channels_last/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
 # Project G94982 calling tensors 1D
 # MODE=write_calling_tensors
@@ -461,53 +629,43 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # DOWNSAMPLE_HOMOZYGOUS=0.03
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_channels_first_calling_small/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
-
-# Project G94982 pileup tensors
-# MODE=write_pileup_filter_tensors
-# TENSOR_MAP=2d_mapping_quality
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_pileup_filter/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
 
 # Project G94982 1D gnomAD tensors
 # MODE=write_tensors_gnomad_annotations_per_allele_1d
 # TENSOR_MAP=reference
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_gnomad_normed_hail_1d4/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
-
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
 # Project G94982 1D gnomAD tensors
 # MODE=write_tensors_gnomad_annotations_1d
 # TENSOR_MAP=reference
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_gnomad_annos_rf_negatives/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
-
-
-# Project G94982 snapshot from Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x151
-# TENSOR_MAP=paired_reads
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_platinum_paired_reads/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_na12878.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_gnomad_annos_rf_negatives/
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
+
+# Project G94982 1D gnomAD tensors
+# MODE=write_tensors_gnomad_annotations_1d
+# TENSOR_MAP=reference
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_gnomad_annos_rf_negatives/
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_solexa_269365_bamout.raw.snps.indels.vcf.gz
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_solexa_269365_bamout_no_trim.bam
 
 # Project G94982 snapshot from Palantir Wiki gold standard datasets: NA12878, PCRfree, 2x151, Raw BAM
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_bam_test/
 # BAM_FILE=/seq/picard_aggregation/G94982/NA12878/current/NA12878.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
 # Project G76270 NA12878
 # TENSOR_MAP=2d_mapping_quality
@@ -518,16 +676,16 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # NEGATIVE_VCF=/dsde/working/mduran/STR_calling_model/vcf_files/PCRplus_WGS_CONSERVATIVE.vcf.gz
 
 # Project G71602 sample NA12877 The Husband from Utah CEPH CEU
-# DOWNSAMPLE_SNPS=0.015
+# DOWNSAMPLE_SNPS=0.01
 # DOWNSAMPLE_INDELS=0.1
-# DOWNSAMPLE_NOT_SNPS=0.5
+# DOWNSAMPLE_NOT_SNPS=0.2
 # DOWNSAMPLE_NOT_INDELS=0.15
+# SAMPLE_NAME=NA12877
 # BAM_FILE=/dsde/data/deep/vqsr/bams/na12877_bamout.bam 
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g71602_na12877_recalibrated.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes_NA12877.genome.vcf.gz
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g71602_na12877_balanced_channels_last/
-
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g71602_na12877_hg19.vcf.gz
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g71602_hg19_na12877_platinum2/
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_na12877.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_confident_regions.bed
 
 
 # Project D5800 exome sample NA12877 The Husband from Utah CEPH CEU
@@ -563,120 +721,41 @@ REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fas
 # BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes_NA12877.genome.vcf.gz
 
-# Project G71602 sample NA12877 The Husband from Utah CEPH CEU 1D
-# MODE=write_dna_tensors
-# DOWNSAMPLE_INDELS=0.3
-# TENSOR_MAP=1d_annotations
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/mix_id/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na12877_bamout.bam 
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g71602_na12877_recalibrated.vcf.gz
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes_NA12877.genome.vcf.gz
-
-
-
-# Project G100862 NA12892 Mother of NA12878, Utah CEPH CEU
-# TENSOR_MAP=2d_mapping_quality
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g100862_na12892_gzip_mq/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/g100862_na12892_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes_na12892.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g100862_na12892.vcf.gz
-
-# Project G100862 NA12891 Father of NA12878, Utah CEPH CEU
-# TENSOR_MAP=2d_mapping_quality
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g100862_na12891_gzip_mq/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/g100862_na12891_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes_na12891.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g100862_na12891.vcf.gz
-
-# DOWNSAMPLE_SNPS=0.02
-# DOWNSAMPLE_INDELS=0.25
-# TENSOR_MAP=2d_mapping_quality
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g100862_na12891_het_sort_no_soft/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/g100862_na12891_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes_confident_regions.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes_na12891.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g100862_na12891.vcf.gz
-
-# Project G94882 NA12878, 10X chemistry, Truth VCF from NIST
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_10x_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_10x.vcf.gz
-
-# Project G94882 Ashkenazim Trio Father NA24149, 10X chemistry, Truth VCF from NIST
-# TENSOR_MAP=2d_mapping_quality
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94882_na24149_10x_gzip_mq/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/NA24149_10X_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/hg003_intersect_hg001.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/hg003_na24149.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/NA24149_10X.bam.raw.vcf.gz
-
-# Project G94882 Ashkenazim Trio Mother NA24143, 10X chemistry, Truth VCF from NIST
-# DOWNSAMPLE_SNPS=0.2
-# DOWNSAMPLE_INDELS=0.25
-# TENSOR_MAP=2d_mapping_quality
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94882_na24143_10x_het_sort/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/NA24143_10X_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/HG004_GRCh37_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/hg004_na24143.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/NA24143_10X.bam.raw.recalibrated.vcf.gz
-
-
 # Project D5800 NA12878 Exome long reads
 # DOWNSAMPLE_SNPS=0.4
 # DOWNSAMPLE_INDELS=1.0
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last2/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_na12878_mix_hg19/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_d5800_na12878.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_d5800_na12878_bamout.bam
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
-
 # Project D5301 NA12878 Exome short reads
 # DOWNSAMPLE_SNPS=0.4
 # DOWNSAMPLE_INDELS=1.0
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last2/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_na12878_mix_hg19/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_d5301_na12878.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_d5301_na12878_bamout.bam
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
-
 # Project D5227 NA12878 Exome control well
 # DOWNSAMPLE_SNPS=0.4
 # DOWNSAMPLE_INDELS=1.0
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_mix_channels_last2/
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_na12878_mix_hg19/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_392292.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_392292_all_calls.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
-
 # Project D5227 NA12878 Exome control well
-#DOWNSAMPLE_SNPS=0.4
-#DOWNSAMPLE_INDELS=1.0
-# CHANNEL_ORDER=channels_last
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_na12878_nexpond_560386_channels_last/
+# DOWNSAMPLE_SNPS=0.4
+# DOWNSAMPLE_INDELS=1.0
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_na12878_mix_hg19/
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 # BAM_FILE=/dsde/data/deep/vqsr/bams/exome_na12878_nexpond_560386_bamout.bam
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_na12878_nexpond_560386.vcf.gz
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-
-
-# PrecisionFDA Hidden Treasure Challenge
-# DOWNSAMPLE_SNPS=1.0
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/exome_precision_fda_na12878_channels_first/
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/exome_hidden_treasure_na12878.vcf.gz
-# BAM_FILE=/dsde/data/deep/vqsr/bams/exome_hidden_treasure_na12878_bamout.bam
-# BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
-
 
 # Maddy Exome Tests
 # READ_LIMIT=256
@@ -726,12 +805,13 @@ while read line; do
             --data_dir $DATA_DIR \
             --bam_file $BAM_FILE \
             --train_vcf $TRAIN_VCF \
-            --tensor_map $TENSOR_MAP \
             --read_limit $READ_LIMIT \
             --test_ratio $TEST_RATIO \
+            --tensor_map $TENSOR_MAP \
             --valid_ratio $VALID_RATIO \
             --window_size $WINDOW_SIZE \
             --sample_name $SAMPLE_NAME \
+            --tensor_types $TENSOR_TYPES \
             --reference_fasta $REFERENCE \
             --negative_vcf $NEGATIVE_VCF \
             --test_contigs $TEST_CONTIGS \

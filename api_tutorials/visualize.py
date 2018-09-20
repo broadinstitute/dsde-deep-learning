@@ -60,7 +60,9 @@ def run():
 	elif 'journey' == args.mode:
 		image_journey(args, model)	
 	elif 'write_video' == args.mode:
-		write_dream_video(args, model)		
+		write_dream_video(args, model)
+	elif 'frame_journey' == args.mode:
+		image_frame_journey(args, model)	
 	else:
 		print('unknown visualize mode:', args.mode)
 
@@ -73,6 +75,7 @@ def parse_args():
 
 	parser.add_argument('--weights', default='')
 	parser.add_argument('--model', default='inception')
+	parser.add_argument('--id', default='run_id')
 	parser.add_argument('--labels', default=1000, type=int)
 	parser.add_argument('--width', default=299, type=int)
 	parser.add_argument('--height', default=299, type=int)
@@ -98,6 +101,9 @@ def parse_args():
 	parser.add_argument('--alpha_norm', default=0.0, type=float)
 	parser.add_argument('--neuron', default=58, type=int)
 	parser.add_argument('--convert_kernels', default=False, action='store_true')
+	parser.add_argument('--layers', nargs='+', default=['conv', 'dense'], type=str, help='List of layer name to investigate.')
+	parser.add_argument('--images', nargs='+', default=[], type=str, help='List of image paths to load.')
+	parser.add_argument('--frames', help='Directory of video frames saved as images.')
 
 	args = parser.parse_args()
 	print('Arguments are', args)	
@@ -118,9 +124,16 @@ def model_from_args(args):
 	if os.path.exists(args.weights):
 		model = load_model(args.weights)
 	elif 'inception' == args.model:
-		model = inception_v3.InceptionV3(weights='imagenet', input_shape=args.input_shape, include_top=True)
+		if args.height == 299 and args.width == 299:
+			model = inception_v3.InceptionV3(input_tensor=input_image, input_shape=args.input_shape, include_top=True)
+		else:
+			model = inception_v3.InceptionV3(input_tensor=input_image, input_shape=args.input_shape, include_top=False, pooling='max')
+
 	elif 'vgg' == args.model:
-		model = vgg16.VGG16(input_shape=args.input_shape)
+		if args.height == 224 and args.width == 224:
+			model = vgg16.VGG16(input_tensor=input_image, include_top=True)
+		else:
+			model = vgg16.VGG16(input_tensor=input_image, input_shape=args.input_shape, include_top=False, pooling='max')
 	else:
 		print('\n\nError: unknown model architecture:', args.model)
 
@@ -160,18 +173,16 @@ def draw_loop(args, model):
 ################################################
 
 def write_filters(args, model): 
-	exclude = ['mixed', 'conv', 'input','zero','fc','flatten',
-	'activation', 'batch_normalization', 'concatenate', 'pool' ]
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
 
 	for layer in model.layers:
-		if any([ex in layer.name for ex in exclude]):
+		if not any([l in layer.name for l in args.layers]):
 			continue
 		
 		for filter_index in range(num_layer_channels(layer)):
 			print("Layer name:", layer.name, "filter index:", filter_index)
 
-			if 'dense' in layer.name or 'softmax' in layer.name or 'predictions' in layer.name:
+			if not any([l in layer.name for l in ['global', 'dense', 'softmax', 'predictions']]):
 				iterate = iterate_softmax(args, model, layer_dict, layer.name, filter_index)
 			else:
 				iterate = iterate_channel(args, model, layer_dict, layer.name, filter_index)
@@ -330,49 +341,97 @@ def recover_image(args, model):
 
 def image_journey(args, model):
 	layer_dict = dict([(layer.name, layer) for layer in model.layers])
-	target_layer_name = ['conv2d_27', 'conv2d_42', 'conv2d_88']
 	
-	im = cv2_image_load(args, args.image_path)
-	im2 = cv2_image_load(args, args.image_path_2)
-	input_img_data = im2
-
-	iterate_in = grad_towards_input(args, model, im, layer_dict, target_layer_name[0])
-	iterate_in2 = grad_towards_input(args, model, im2, layer_dict, target_layer_name[0])
-	iterate_dream = iterate_layer(args, model, layer_dict, target_layer_name[0])
-	iterate_dream2 = iterate_layer(args, model, layer_dict, target_layer_name[1])
-	iterate_dream3 = iterate_layer(args, model, layer_dict, target_layer_name[2])
-
 	# run gradient ascent
-	outer_loops = 12
 	objective_switch = 20 
 	counter = 0
-	for loop in range(outer_loops):
-		for i in range(args.iterations):
-			random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
-			input_img_data += random_jitter
+	
+	if K.image_data_format()== 'channels_first':
+		input_img_data = np.random.random((1, 3, args.width, args.height))
+	else:
+		input_img_data = np.random.random((1, args.width, args.height, 3)) 
+	
+	for img in args.images:
+		cur_img = cv2_image_load(args, img)
+		img_fxn = grad_towards_input(args, model, cur_img, layer_dict)
+
+		for layer in model.layers:
+			if not any([l in layer.name for l in args.layers]):
+				continue			
+			layer_fxn = iterate_layer(args, model, layer_dict, layer.name)
 			
-			if loop % objective_switch == 0:
-				loss_value, grads_value = iterate_dream2([im, 1])
-			elif loop % objective_switch == 1:
-				loss_value, grads_value = iterate_in([input_img_data])
-			elif loop % objective_switch == 2:
-				loss_value, grads_value = iterate_in2([input_img_data])
-			elif loop % objective_switch == 3:
-				loss_value, grads_value = iterate_dream([im2])
-			else:
-				loss_value, grads_value = iterate_dream3([im])
+			for i in range(args.iterations):
 
-			input_img_data -= random_jitter
-			input_img_data += args.learning_rate * grads_value
+				if i < args.iterations/3:
+					loss_value, grads_value = img_fxn([input_img_data])
+					lr = args.learning_rate 
+				elif i < 2*args.iterations/3:
+					random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
+					input_img_data += random_jitter
+					loss_value, grads_value = layer_fxn([input_img_data])
+					lr = args.learning_rate / 10
+					input_img_data -= random_jitter
+				else:
+					loss_value, grads_value = img_fxn([input_img_data])
+					lr = args.learning_rate 
+				
+				input_img_data += lr * grads_value
 
-			if i % args.fps == args.fps-1:
-				img = deprocess_image(args, input_img_data.copy())
-				out_file = args.save_path + '%s/%s/%s/recover/loop%d_counter_%d.png' % (plain_name(args.weights), plain_name(args.image_path), target_layer_name[0], loop, counter)
-				if not os.path.exists(os.path.dirname(out_file)):
-					os.makedirs(os.path.dirname(out_file))
-				imsave(out_file, img)
-				print("Iteration:", i, "loss:", loss_value, "frames:", counter, 'saved_at:', out_file)
+				if i % args.fps == args.fps-1:
+					img = deprocess_image(args, input_img_data.copy())
+					out_file = args.save_path + '/image_journey/%s/_counter_%d.png' % (args.id, counter)
+					if not os.path.exists(os.path.dirname(out_file)):
+						os.makedirs(os.path.dirname(out_file))
+					imsave(out_file, img)
+					print("Iteration:", i, "loss:", loss_value, "frames:", counter, 'saved_at:', out_file)
+					counter += 1
+	
+def image_frame_journey(args, model):
+	layer_dict = dict([(layer.name, layer) for layer in model.layers])
+	
+	frame = 0
+	counter = 0
+	dream_step = True
+	dream_steps = 600
+	image_exts = ['.png', '.jpg']
+	images = [os.path.join(args.frames, img) for img in sorted(os.listdir(args.frames)) if os.path.splitext(img)[1] in image_exts]
+	input_img_data = cv2_image_load(args, images[0])
+	
+	for img in images[1:]:
+		cur_img = cv2_image_load(args, img)
+		img_fxn = grad_towards_input(args, model, cur_img, layer_dict)
+
+		for layer in model.layers:
+			if not any([l in layer.name for l in args.layers]):
+				continue			
+			layer_fxn = iterate_layer(args, model, layer_dict, layer.name)
+			
+			for i in range(args.iterations):
+
+				if counter%dream_steps == 0:
+					dream_step = not dream_step
+
+				if dream_step:
+					random_jitter = args.jitter * (np.random.random(args.input_shape) - 0.5)
+					input_img_data += random_jitter
+					loss_value, grads_value = layer_fxn([input_img_data])
+					lr = args.learning_rate / 8
+					input_img_data -= random_jitter
+				else:
+					loss_value, grads_value = img_fxn([input_img_data])
+					lr = args.learning_rate 
+				
+				input_img_data += lr * grads_value
+
 				counter += 1
+				if counter % args.fps == 0:
+					frame_img = deprocess_image(args, input_img_data.copy())
+					out_file = args.save_path + '/image_frame_journey/%s/counter_%d.png' % (args.id, counter)
+					if not os.path.exists(os.path.dirname(out_file)):
+						os.makedirs(os.path.dirname(out_file))
+					imsave(out_file, frame_img)
+					print("Loss:", loss_value, "frame:", frame, 'counter', counter, 'saved_at:', out_file, '\nimg:', img)
+					frame += 1
 	
 
 def deep_dream(args, model):
@@ -474,19 +533,20 @@ def iterate_channel(args, model, layer_dict, layer_name='conv5_1', channel=0):
 		x = layer_dict[layer_name].output[:,channel,:,:]
 	else:
 		x = layer_dict[layer_name].output[:,:,:,channel]
-
-	shape = layer_dict[layer_name].output_shape
+	
 	w = x.shape[1]
 	h = x.shape[2]
+	shape = layer_dict[layer_name].output_shape
+
 
 	objective = K.variable(0.)
 
 	objective += args.activity_weight* K.sum(K.square(x[:, 2: w-2, 2:h-2])) / np.prod(shape[1:])
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	objective -= args.total_variation * total_variation_norm(input_tensor) #/ np.prod(x.shape[1:])
+	objective -= args.total_variation * total_variation_norm(input_tensor) / np.prod(x.shape[1:])
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	objective -= args.l2 * K.sum(K.square(input_tensor))# / np.prod(x.shape[1:])
+	objective -= args.l2 * K.sum(K.square(input_tensor)) / np.prod(x.shape[1:])
 	
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(objective, input_tensor)[0]
@@ -541,20 +601,25 @@ def iterate_layer(args, model, layer_dict, layer_name):
 
 	# build a loss function that maximizes the activation
 	# of the nth filter of the layer considered
-
 	x = layer_dict[layer_name].output
-	w = x.shape[1]
-	h = x.shape[2]
+
 	shape = layer_dict[layer_name].output_shape
 
 	objective = K.variable(0.)
-
-	objective += args.activity_weight* K.sum(K.square(x[:, 2: w-2, 2:h-2])) / np.prod(shape[1:])
-
+	
+	if K.image_data_format()== 'channels_first':
+		w = x.shape[2]
+		h = x.shape[3]
+		objective += args.activity_weight* K.sum(K.square(x[:, :, 2: w-2, 2:h-2])) / np.prod(shape[1:])
+	else:
+		w = x.shape[1]
+		h = x.shape[2]		
+		objective += args.activity_weight* K.sum(K.square(x[:, 2: w-2, 2:h-2, :])) / np.prod(shape[1:])
+		
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	objective -= args.total_variation * total_variation_norm(input_tensor)
+	objective -= args.total_variation * total_variation_norm(input_tensor) / np.prod(shape[1:])
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	objective -= args.l2 * K.sum(K.square(input_tensor))
+	objective -= args.l2 * K.sum(K.square(input_tensor)) / np.prod(shape[1:])
 
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(objective, input_tensor)[0]
@@ -593,24 +658,17 @@ def iterate_softmax(args, model, layer_dict, layer_name, neuron):
 	return iterate
 
 
-def grad_towards_input(args, model, desired_input, layer_dict, layer_name='conv5_1'):
+def grad_towards_input(args, model, desired_input, layer_dict):
 	input_tensor = model.input
-
-	# this is a placeholder tensor that will contain our generated images
-
-	# build a loss function that maximizes the activation
-	# of the nth filter of the layer considered
-	x = layer_dict[layer_name].output
-	shape = layer_dict[layer_name].output_shape
 
 	objective = K.variable(0.)
 
-	objective -= args.activity_weight*K.sum(K.square(desired_input-input_tensor)) / np.prod(shape[1:])
+	objective -= args.activity_weight*K.sum(K.square(desired_input-input_tensor)) / np.prod(args.input_shape)
 
 	# add continuity loss (gives image local coherence, can result in an artful blur)
-	objective -= args.total_variation * total_variation_norm(input_tensor) / np.prod(shape[1:])
+	objective -= args.total_variation * total_variation_norm(input_tensor) / np.prod(args.input_shape)
 	# add image L2 norm to loss (prevents pixels from taking very high values, makes image darker)
-	objective -= args.l2 * (K.sum(K.square(input_tensor)) / np.prod(shape[1:]))
+	objective -= args.l2 * (K.sum(K.square(input_tensor)) / np.prod(args.input_shape))
 	# compute the gradient of the input picture wrt this loss
 	grads = K.gradients(objective, input_tensor)[0]
 

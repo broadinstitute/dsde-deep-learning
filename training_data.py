@@ -53,8 +53,6 @@ def run_training_data():
 	# Writing tensor datasets for training
 	if 'write_tensors' == args.mode:
 		tensors_from_tensor_map(args)
-	elif 'write_paired_read_tensors' == args.mode:
-		paired_read_tensors_from_map(args)
 	elif 'write_tensors_2bit' == args.mode:
 		tensors_from_tensor_map_2channel(args, include_annotations=True)
 	elif 'write_tensors_no_annotations' == args.mode:
@@ -99,7 +97,10 @@ def run_training_data():
 		raise ValueError('Unknown recipe mode:', args.mode)
 
 
-def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine'], pileup=False, reference_map='reference'):
+def tensors_from_tensor_map(args, 
+							annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
+							pileup=False, 
+							reference_map='reference'):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -120,7 +121,7 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 		args.start_pos: Only write tensors after this position (optional, used for parallelization)
 		args.end_pos: Only write tensors before this position (optional, used for parallelization)
 	'''	
-	print('Writing tensors with:', args.tensor_map, 'channel map.')
+	print('Writing tensors with tensor type(s):', args.tensor_types, 'channel map.')
 	stats = Counter()
 	debug = False
 
@@ -179,12 +180,15 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 					continue # Require at least 1 annotation...
 				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
 
-			if "read_tensor" == args.tensor_map:	
-				read_tensor = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
-			elif "paired_reads" == args.tensor_map:	
-				read_tensor = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
-			else:
-				raise ValueError("Unknown read tensor function.")
+			read_tensors = {}
+			for tt in args.tensor_types:
+				args.tensor_map = tt
+				if "read_tensor" == tt:
+					read_tensors[tt] = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
+				elif "paired_reads" == tt:	
+					read_tensors[tt] = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
+				else:
+					raise ValueError("Unknown read tensor mapping."+tt)
 
 			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
 			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
@@ -194,7 +198,8 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
-				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
+				for rt in read_tensors:
+					hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
 				for a_set in annotation_sets:
 					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
 				if reference_map is not None:
@@ -213,116 +218,6 @@ def tensors_from_tensor_map(args, annotation_sets=['best_practices', 'm2', 'no_h
 		print(s, 'has:', stats[s])
 	if variant:
 		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
-
-
-def paired_read_tensors_from_map(args, annotation_sets=['best_practices', 'm2', 'no_het0', 'mix', 'combine'], reference_map='reference'):
-	'''Create tensors structured as tensor map of paired reads organized by labels in the data directory.
-
-	Defines true variants as those in the args.train_vcf, defines false variants as 
-	those called in args.negative_vcf and in the args.bed_file high confidence intervals, 
-	but not in args.train_vcf.
-
-	Arguments
-		args.data_dir: directory where tensors will live. Created here and filled with
-			subdirectories of test, valid and train, each containing
-			subdirectories for each label with tensors stored as hd5 files.
-		args.bam_file: BAM or BAMout file where the aligned reads are stored
-		args.negative_vcf: VCF file with annotation values from Haplotype caller or VQSR
-		args.train_vcf: VCF file with true variant (from NIST or Platinum genomes, etc.)
-		args.bed_file: High confidence intervals for the calls in args.train_vcf
-		args.window_size: Size of sequence window around variant (width of the tensor)
-		args.read_limit: Maximum number of reads to include (height of the tensor)
-		args.chrom: Only write tensors from this chromosome (optional, used for parallelization)
-		args.start_pos: Only write tensors after this position (optional, used for parallelization)
-		args.end_pos: Only write tensors before this position (optional, used for parallelization)
-	'''	
-	print('Writing paired read tensors from', args.tensor_map, 'channel map.')
-	stats = Counter()
-	debug = False
-
-	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
-	bed_dict = bed_file_to_dict(args.bed_file)
-	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
-	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
-	
-	tensor_channel_map = defines.get_tensor_channel_map_from_args(args)
-
-	if args.chrom:
-		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
-	else:
-		variants = vcf_reader
-
-	for variant in variants:
-		for allele_idx, allele in enumerate(variant.ALT):
-			idx_offset, ref_start, ref_end = get_variant_window(args, variant)
-			contig = record_dict[variant.CHROM]	
-			record = contig[ ref_start : ref_end ]
-
-			if args.label_sites:
-				cur_label_key = get_true_site_label(variant, bed_dict, vcf_ram, stats)
-			else:
-				cur_label_key = get_true_allele_label(allele, variant, bed_dict, vcf_ram, stats)
-
-			if not cur_label_key or downsample(args, cur_label_key, stats):
-				continue
-
-			annotation_data = {}
-			for a_set in annotation_sets:
-				annos = defines.annotations[a_set]
-				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
-					stats['Missing ALL annotations'] += 1
-					continue # Require at least 1 annotation...
-				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-
-			good_reads, insert_dict, pairs = get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant)	
-			reference_seq = record.seq
-			if reference_map is not None:
-				reference_tensor = np.zeros( (args.window_size, len(defines.inputs)) )
-				for i,b in enumerate(reference_seq):						
-					b = b.upper()
-					if b in defines.inputs:
-						reference_tensor[i, defines.inputs[b]] = 1.0
-					elif b in defines.ambiguity_codes:
-						reference_tensor[i] = defines.ambiguity_codes[b]
-					elif b == '\x00':
-						break
-					else:
-						raise ValueError('Error! Unknown code:', b)
-
-			for i in sorted(insert_dict.keys(), key=int, reverse=True):
-				reference_seq = reference_seq[:i] + defines.indel_char*insert_dict[i] + reference_seq[i:]
-
-			read_tensor = good_reads_and_mates_to_tensor(args, variant, good_reads, ref_start, insert_dict, pairs)
-			reference_sequence_into_tensor(args, reference_seq, read_tensor)
-			tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)
-			tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '_allele_' + str(allele_idx) + '-' + cur_label_key 
-			tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
-			stats[cur_label_key] += 1
-
-			if not os.path.exists(os.path.dirname(tensor_path)):
-				os.makedirs(os.path.dirname(tensor_path))
-			with h5py.File(tensor_path, 'w') as hf:
-				hf.create_dataset(args.tensor_map, data=read_tensor, compression='gzip')
-				for a_set in annotation_sets:
-					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
-				if reference_map is not None:
-					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
-
-			if debug:
-				print('Reads:', len(good_reads), 'count:', stats['count'],  'Variant:', variant.CHROM, variant.POS, variant.REF, variant.ALT, '\n')
-				print(str(reference_seq)+'<- reference sequence\n\n')
-
-			stats['count'] += 1
-			if stats['count']%400 == 0:
-				print('Wrote', stats['count'], 'tensors out of', args.samples, ' last variant:', str(variant))
-			if stats['count'] >= args.samples:
-				break
-
-	for s in stats.keys():
-		print(s, 'has:', stats[s])
-	if stats['count'] > 0:
-		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
 
 
 def calling_tensors_from_tensor_map(args, pileup=False):
@@ -508,18 +403,15 @@ def tensors_from_tensor_map_gnomad_annos(args):
 
 	gnomads = gnomads_to_dict(args)
 
-	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
-	bed_dict = bed_file_to_dict(args.bed_file)
+	#bed_dict = bed_file_to_dict(args.bed_file)
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
-	vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
+	#vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
 	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
-
+	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
+	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
 	tensor_channel_map = defines.get_tensor_channel_map() 
 
-	if args.chrom:
-		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
-	else:
-		variants = vcf_reader
+	variants = gnomads[args.chrom].fetch(args.chrom, args.start_pos, args.end_pos)
 
 	for variant in variants:
 		idx_offset, ref_start, ref_end = get_variant_window(args, variant)
@@ -527,15 +419,16 @@ def tensors_from_tensor_map_gnomad_annos(args):
 		contig = record_dict[variant.CHROM]	
 		record = contig[variant.POS-idx_offset: variant.POS+idx_offset]
 
-		annotation_variant = variant_in_vcf(variant, gnomads[variant.CHROM])
-		if not annotation_variant:
-			stats['Variants not in annotation_vcf'] += 1
-			continue
+		# annotation_variant = variant_in_vcf(variant, gnomads[variant.CHROM])
+		# if not annotation_variant:
+		# 	stats['Variants not in annotation_vcf'] += 1
+		# 	continue
 
-		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
-		if variant_in_vcf(variant, vcf_ram) and in_bed:
+		# in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
+		#if variant_in_vcf(variant, vcf_ram) and in_bed:
+		if variant_in_vcf(variant, vcf_mills) or variant_in_vcf(variant, vcf_omni):
 			class_prefix = ''
-		elif is_rf_hard_filter_negative(args, annotation_variant, stats):
+		elif is_rf_hard_filter_negative(args, variant, stats):
 			class_prefix = 'NOT_'
 		else:
 			stats['Unassigned truth status for variant'] += 1
@@ -555,18 +448,13 @@ def tensors_from_tensor_map_gnomad_annos(args):
 				stats['Downsampled SNPs'] += 1
 				continue
 
-		if all(map(lambda x: x not in annotation_variant.INFO and x != "QUAL", args.annotations)):
+		if all(map(lambda x: x not in variant.INFO and x != "QUAL", args.annotations)):
 			stats['Missing ALL annotations'] += 1
 			continue # Require at least 1 annotation...
 
-		annotation_data = np.zeros(( len(args.annotations), ))
+		annotation_data = get_annotation_data(args, variant, stats)
 		qual_and_dp_normalizer = 1000000.0
 		for i,a in enumerate(args.annotations):
-			if a == "QUAL":
-				annotation_data[i] = float(annotation_variant.QUAL)
-			else:
-				annotation_data[i] = annotation_variant.INFO[a]
-			
 			if a == "DP" or a == "QUAL":
 				 annotation_data[i] /= qual_and_dp_normalizer
 
@@ -580,7 +468,7 @@ def tensors_from_tensor_map_gnomad_annos(args):
 				raise ValueError('Error! Unknown code:', b)
 
 		tensor_path = get_path_to_train_valid_or_test(args, variant.CHROM)	
-		tensor_prefix = plain_name(args.negative_vcf) +'_'+ plain_name(args.train_vcf) + '-' + cur_label_key 
+		tensor_prefix = plain_name(defines.omni_vcf) + '-' + cur_label_key 
 		tensor_path += cur_label_key + '/' + tensor_prefix + '-' + variant.CHROM + '_' + str(variant.POS) + '.hd5'
 		stats[cur_label_key] += 1
 
@@ -598,7 +486,7 @@ def tensors_from_tensor_map_gnomad_annos(args):
 
 	for s in stats.keys():
 		print(s, 'has:', stats[s])
-	print('Done generating gnomAD annotated tensors. Last variant:', str(variant), 'from vcf:', args.negative_vcf, 'count is:', stats['count'])
+	print('Done generating gnomAD annotated tensors. Last variant:', str(variant), 'count is:', stats['count'])
 	print('Tensors saved at: ', args.data_dir)
 
 
@@ -904,17 +792,11 @@ def bqsr_tensors_from_tensor_map(args, include_annotations=False):
 			if read_idx-args.window_size < 0:
 				read_string = defines.skip_char * (args.window_size-read_idx) + read_string
 				read_qualities = [0] * (args.window_size-read_idx) + read_qualities
-
-			# print (cur_label_key,contig[ref_pos], read.query_sequence[read_idx] )
-			# print ('read Qualzz:%s'%str(read_qualities))
-			# print ('read string:%s'%read_string)
-			# print ('refr string:%s'%ref_string)
 			
 			read_tensor = np.zeros((args.window_size, len(tensor_channel_map)))
 			read_tensor[:, 0:len(args.input_symbols)] = base_string_to_tensor(args, read_string, read_qualities)
 			read_tensor[:, len(args.input_symbols):(2*len(args.input_symbols))] = base_string_to_tensor(args, ref_string)
 			
-			#print (read_tensor)
 			if include_annotations:
 				max_mq = 60.0
 				max_read_pos = 151.0
@@ -1222,7 +1104,8 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 		args.annotations: List of variant annotations to use
 		annotation_variant: the variant with annotation
 		stats: Counter of run statistics
-		allele_index: The allele index used by allele specific annotations
+		allele_index: The allele index used by allele specific annotations 
+			(0 is first allele so we need +1 when ref is included)
 		override_annotations: optional array of annotations to prevent using arg's annotations 
 
 	Returns:
@@ -1249,7 +1132,7 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 					annotation_data[i] = call.data.MBQ[allele_index]
 				else:
 					annotation_data[i] = call.data.MBQ
-			elif a == 'MBQ' and hasattr(call.data, a):
+			elif a == 'MPOS' and hasattr(call.data, a):
 				if len(annotation_variant.ALT) > 1:
 					annotation_data[i] = call.data.MPOS[allele_index]
 				else:
@@ -1264,9 +1147,15 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 			elif a == 'MFRL_1' and hasattr(call.data, 'MFRL'):
 				annotation_data[i] = call.data.MFRL[allele_index+1] 
 			elif a == 'AD_0' and hasattr(call.data, 'AD'):
-				annotation_data[i] = call.data.AD[0] 
+				annotation_data[i] = call.data.AD[0]
 			elif a == 'AD_1' and hasattr(call.data, 'AD'):
-				annotation_data[i] = call.data.AD[allele_index+1]
+				annotation_data[i] = call.data.AD[allele_index+1]				
+			elif a == 'MBQ_0' and hasattr(call.data, 'MBQ') and isinstance(call.data.MBQ, list):
+				annotation_data[i] = call.data.MBQ[0]
+			elif a == 'MBQ_0' and hasattr(call.data, 'MBQ') and not isinstance(call.data.MBQ, list):
+				annotation_data[i] = call.data.MBQ	
+			elif a == 'MBQ_1' and hasattr(call.data, 'MBQ') and isinstance(call.data.MBQ, list) and len(call.data.MBQ) > allele_index+1:
+				annotation_data[i] = call.data.MBQ[allele_index+1]	
 			else:
 				stats['Could not handle genotyped annotation:'+a] += 1
 		elif len(annotation_variant.samples) == 0 and genotype_annotation(a):
@@ -1457,10 +1346,7 @@ def make_paired_read_tensor(args, variant, samfile, ref_seq, ref_start, ref_end,
 
 
 def make_calling_tensor(args, samfile, reference_seq, reference_start, stats):
-	print('Try to get reads.')
-
 	good_reads, insert_dict = get_good_reads_in_window(args, samfile, reference_start, reference_start+args.window_size)
-	print('Got reads:', len(good_reads))
 	if len(good_reads) >= args.read_limit:
 		stats['More reads than read_limit'] += 1
 	if len(good_reads) == 0:
@@ -2053,16 +1939,6 @@ def image_as_matrix(image_path, expand_dims=False, shape=(224,224), channels_las
 	return img
 
 
-def train_valid_test_generators_from_args(args, with_positions=False):
-	train_paths, valid_paths, test_paths = get_train_valid_test_paths(args)
-
-	train_generator = tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions)
-	valid_generator = tensor_generator_from_label_dirs_and_args(args, valid_paths, with_positions)
-	test_generator = tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions)
-
-	return train_generator, valid_generator, test_generator
-
-
 def image_generator(args, train_paths, shape=(224,224)):
 	"""Data generator of PNGs for DeepVariant.
 
@@ -2122,77 +1998,6 @@ def image_generator(args, train_paths, shape=(224,224)):
 			print('Image counts are:', image_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
 
 		yield (image_matrix, label_matrix)
-
-
-def dna_annotation_generator(args, train_paths):
-	"""Data generator of DNA and annotation tensors.
-
-	Assumes train paths contains example in labelled directories.
-	Loops over all examples sampling args.batch_size examples
-	uniformly from each label.
-
-	Arguments:
-		args: args object needed for batch_size, labels, and annotations
-		train_paths: array of label directories with hd5 tensors within each
-
-	Returns:
-		A tuple with a dict of the input tensors 
-		and a 1-Hot matrix (2D numpy array) of the labels.
-	"""		
-	debug = False
-	per_batch_per_label = (args.batch_size // len(args.labels)) 
-	tensor_counts = Counter()
-	tensors = {}
-
-	if args.window_size > 0:
-		channel_map = defines.get_tensor_channel_map_from_args(args)
-		tensor = np.zeros((args.batch_size, args.window_size, len(channel_map)))
-
-	annotation_data = np.zeros((args.batch_size, len(args.annotations)))
-	label_matrix = np.zeros((args.batch_size, len(args.labels)))
-
-	for tp in train_paths:
-		label_key = os.path.basename(tp)
-		if label_key not in args.labels:
-			print('Skipping label directory:', label_key, ' which is not in args label set:', args.labels.keys())
-			continue
-		label = args.labels[label_key] 
-
-		tensors[label] = [os.path.join(tp, t) for t in os.listdir(tp) if os.path.splitext(t)[1] in tensor_exts]
-		tensor_counts[label] = 0
-		
-	while True:
-		cur_example = 0
-		for label in tensors.keys():
-			for i in range(per_batch_per_label):
-				tensor_path = tensors[label][tensor_counts[label]]
-				label_matrix[cur_example, label] = 1.0
-				with h5py.File(tensor_path,'r') as hf:
-					annotation_data[cur_example,:] = np.array(hf.get(args.annotation_set))
-					if args.window_size > 0:
-						tensor[cur_example,:,:] = np.array(hf.get(args.tensor_map))
-				
-				tensor_counts[label] += 1
-				if tensor_counts[label] == len(tensors[label]):
-					np.random.shuffle(tensors[label])
-					print('\n\nGenerator shuffled & looped over:', tensor_counts[label], 'examples of label:', label, '\n\nLast tensor was:', tensor_path)
-					tensor_counts[label] = 0
-				cur_example += 1
-				if cur_example == args.batch_size:
-					if args.normalize_annotations:
-						for i,a in enumerate(args.annotations):
-							annotation_data[:,i] -= defines.anno_norms_g947i[a][0]
-							annotation_data[:,i] /= defines.anno_norms_g947i[a][1]
-					break
-
-		if debug:
-			print('Tensor counts are:', tensor_counts, ' cur example:', cur_example, ' per b per label:', per_batch_per_label)
-
-		if args.window_size > 0:
-			yield ({args.tensor_map:tensor, args.annotation_set:annotation_data}, label_matrix)
-		else:
-			yield (annotation_data, label_matrix)
-
 
 
 def pileup_tensor_generator(args, train_paths, include_annotations=False):
@@ -2626,6 +2431,16 @@ def tensor_annotation_generator(args, train_paths, tensor_shape):
 		annotations = np.zeros((args.batch_size,len(args.annotations)))
 
 
+def train_valid_test_generators_from_args(args, with_positions=False):
+	train_paths, valid_paths, test_paths = get_train_valid_test_paths(args)
+
+	train_generator = tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions)
+	valid_generator = tensor_generator_from_label_dirs_and_args(args, valid_paths, with_positions)
+	test_generator = tensor_generator_from_label_dirs_and_args(args, test_paths, with_positions)
+
+	return train_generator, valid_generator, test_generator
+
+
 def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=False):
 	"""Data generator of tensors with reads, and annotations.
 
@@ -2647,6 +2462,7 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 
 	batch = {}
 	tensors = {}
+	stats = Counter()
 	tensor_counts = Counter()
 	per_batch_per_label = (args.batch_size // len(args.labels) ) 
 
@@ -2682,14 +2498,12 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 						for key in batch.keys():
 							hf_tensor = hf.get(key)
 							if hf_tensor:
-								#REMOVE THISSSSSSSSS
-								#if key == args.tensor_map:
-								#	batch[key][cur_example] = np.rollaxis(np.array(hf_tensor), 0, 3	)
-								#else:
-								#	batch[key][cur_example] = np.array(hf_tensor)
 								batch[key][cur_example] = np.array(hf_tensor)
 							else:
-								raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+								#raise ValueError('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path) 
+								print('Could not find tensor with key:'+key+ '\nAt hd5 path:'+tensor_path)
+								del tensors[label][tensor_counts[label]]
+								continue
 				except IOError as e:
 					print('\n\nSkipping corrupt tensor at:', tensor_path, '\n ')
 					del tensors[label][tensor_counts[label]]
@@ -2701,7 +2515,8 @@ def tensor_generator_from_label_dirs_and_args(args, train_paths, with_positions=
 				tensor_counts[label] += 1
 				if tensor_counts[label] == len(tensors[label]):
 					np.random.shuffle(tensors[label])
-					print('\n\nGenerator looped over:', tensor_counts[label], 'examples of label:', label, '\n\nShuffled them. Last tensor was:', tensor_path)
+					stats['label'+str(label)+'epochs'] += 1
+					print('\n\nGenerator looped over:', tensor_counts[label], 'examples of label:', label, 'epochs:',stats['label'+str(label)+'epochs'],'\n\nShuffled them. Last tensor was:', tensor_path)
 					tensor_counts[label] = 0
 				
 				if with_positions:
@@ -2961,53 +2776,6 @@ def load_bqsr_tensors_annotations_from_class_dirs(args, train_paths, per_class_m
 			labels.append(y_vector)
 
 	return (np.asarray(tensors), np.asarray(annotations), np.asarray(labels))
-
-
-def load_dna_annotations_positions_from_class_dirs(args, train_paths, per_class_max=4000, include_dna=True, include_annotations=True):
-	count = 0
-
-	annotation_data = []
-	reference_data = []
-	labels_data = []
-	positions = []
-	
-	for tp in train_paths:
-		label_key = os.path.basename(tp)
-		if label_key not in args.labels:
-			print('Skipping label directory:', label_key, ' which is not in args label set:', args.labels.keys())
-			continue
-		label = args.labels[label_key]		
-		imgs = os.listdir(tp)
-		count += 1
-		print(count, " dir out of:", len(train_paths), tp, "has:", len(imgs))
-		this_t = 0
-		for t in imgs:	
-			this_t += 1
-			if this_t > per_class_max:
-				print('Per class max reached. bailing at', this_t)
-				break
-
-			fn, file_extension = os.path.splitext(t)
-			if not file_extension.lower() in tensor_exts:
-				continue
-
-			with h5py.File(tp+'/'+t, 'r') as hf:
-				if include_annotations:
-					annotation_data.append(np.array(hf.get(args.annotation_set)))
-				if include_dna:
-					reference_data.append(np.array(hf.get(args.tensor_map)))
-				
-			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
-			y_vector[label] = 1.0
-			labels_data.append(y_vector)
-			positions.append(position_string_from_tensor_name(t))
-
-	if include_dna and include_annotations:
-		return (np.asarray(reference_data), np.asarray(annotation_data), np.asarray(labels_data), np.asarray(positions))
-	elif include_annotations:
-		return (np.asarray(annotation_data), np.asarray(labels_data), np.asarray(positions))
-	elif include_dna:
-		return (np.asarray(reference_data), np.asarray(labels_data), np.asarray(positions))
 
 
 def position_string_from_tensor_name(tensor_name):
@@ -3730,6 +3498,11 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 	for p in positions:
 		gpos_parts = p.split('_')
 		chrom = gpos_parts[0]
+
+		# if chrom not in args.test_contigs:
+		# 	stats[chrom+' is not in test contigs:'+str(args.test_contigs)] += 1
+		# 	continue
+
 		pos = int(gpos_parts[1])
 		allele_idx = None if len(gpos_parts) < 3 else int(gpos_parts[2])
 		variants = vcf_ram.fetch(chrom, pos-1, pos+1)
@@ -3738,6 +3511,8 @@ def scores_from_positions(args, positions, score_key='VQSLOD', override_vcf=None
 		for v in variants:
 			if v.POS == pos and v.CHROM == chrom:
 				variant = v
+
+
 
 		if not variant:
 			stats['Not in negative vcf'] += 1
@@ -3830,14 +3605,14 @@ def scores_from_vcf(args, score_keys=['VQSLOD'], override_vcf=None):
 	allele_specific_score_keys = ['AS_RF']
 
 	bed_dict = bed_file_to_dict(args.bed_file)
-	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
-	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
-	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
+	vcf_nist = vcf.Reader(open(args.train_vcf, 'rb'))
+	#vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
+	#vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
 
 	if override_vcf:
-		vcf_reader = vcf.Reader(open(override_vcf, 'r'))
+		vcf_reader = vcf.Reader(open(override_vcf, 'rb'))
 	else:
-		vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
+		vcf_reader = vcf.Reader(open(args.negative_vcf, 'rb'))
 	
 	if args.ignore_vcf:
 		vcf_ignore = vcf.Reader(open(args.ignore_vcf, 'r'))
@@ -3947,103 +3722,6 @@ def scores_from_vcf(args, score_keys=['VQSLOD'], override_vcf=None):
 	return snp_scores, snp_truth, indel_scores, indel_truth
 
 
-def concordance_scores_from_vcf(args, score_key='VQSLOD', override_vcf=None):
-
-
-	bed_dict = bed_file_to_dict(args.bed_file)
-	vcf_nist = vcf.Reader(open(args.train_vcf, 'r'))
-	vcf_omni = vcf.Reader(open(defines.omni_vcf, 'r'))
-	vcf_mills = vcf.Reader(open(defines.mills_vcf, 'r')) 
-
-	vcf_1 = vcf.Reader(open(args.negative_vcf, 'r')) 
-	snp_data = {'scores':[], 'truth':[]}
-	indel_data = {'scores':[], 'truth':[]}
-
-	vcf_2 = vcf.Reader(open(args.negative_vcf_2, 'r'))
-	snp_data_2 = {'scores':[], 'truth':[]}
-	indel_data_2 = {'scores':[], 'truth':[]}
-
-	vcf_3 = vcf.Reader(open(args.negative_vcf_3, 'r')) 
-	snp_data_3 = {'scores':[], 'truth':[]}
-	indel_data_3 = {'scores':[], 'truth':[]}
-
-	vcf_writer = vcf.Writer(open('/dsde/working/mduran/modelFP.vcf', 'w'), vcf_1)
-	
-	for variant in vcf_1:
-
-		#is this variant in the other two?
-		v2 = variant_in_vcf(variant, vcf_2)
-		v3 = variant_in_vcf(variant, vcf_3)
-
-		if not (v2 and v3): #if its not in both of the others, continue
-			continue
-
-		score1 = float(variant.INFO[score_key])
-		score2 = float(v2.INFO[score_key])
-		score3 = float(v3.INFO[score_key])
-
-		#get the truth status of each 
-
-		in_bed = in_bed_file(bed_dict, variant.CHROM, variant.POS)
-		in_bed_2 = in_bed_file(bed_dict, v2.CHROM, v2.POS)
-		in_bed_3 = in_bed_file(bed_dict, v3.CHROM, v3.POS)
-
-		if variant_in_vcf(variant, vcf_nist) and in_bed:
-			v1_truth = 1
-		elif in_bed:
-			v1_truth = 0
-		else:
-			continue
-
-		if variant_in_vcf(v2, vcf_nist) and in_bed_2:
-			v2_truth = 1
-		elif in_bed:
-			v2_truth = 0
-		else:
-			continue
-
-		if variant_in_vcf(v3, vcf_nist) and in_bed_3:
-			v3_truth = 1
-		elif in_bed:
-			v3_truth = 0
-		else:
-			continue
-
-		if score1 > score2 and score1 > score3 and v1_truth==0:
-			#print(score1, score2, score3, variant.POS)
-			vcf_writer.write_record(variant)
-
-
-
-		if variant.is_snp and v2.is_snp and v3.is_snp:
-
-			snp_data['scores'].append(score1)
-			snp_data['truth'].append(v1_truth)
-
-			snp_data_2['scores'].append(score2)
-			snp_data_2['truth'].append(v2_truth)
-
-			snp_data_3['scores'].append(score3)
-			snp_data_3['truth'].append(v3_truth)
-
-
-		elif variant.is_indel and v2.is_indel and v3.is_indel:
-
-
-			indel_data['scores'].append(score1)
-			indel_data['truth'].append(v1_truth)
-
-			indel_data_2['scores'].append(score2)
-			indel_data_2['truth'].append(v2_truth)
-
-			indel_data_3['scores'].append(score3)
-			indel_data_3['truth'].append(v3_truth)
-
-	vcf_writer.close()
-		
-	return snp_data, indel_data, snp_data_2, indel_data_2, snp_data_3, indel_data_3
-
-
 def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	'''Get score and truth status for given vcf.
 
@@ -4079,7 +3757,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 	indel_truth = []
 
 	for variant in vcf_reader:
-
+		
 		if args.ignore_vcf and variant_in_vcf(variant, vcf_ignore):
 			stats['In ignore vcf'] += 1
 			continue	
@@ -4117,7 +3795,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 				if 'VQSLOD' not in variant.INFO:
 					stats['No single sample vqslod'] += 1
 					missing_key = True
-			elif score_key not in gnomad_variant.INFO:
+			elif score_key not in gnomad_variant.INFO and score_key not in variant.INFO:
 				stats['No score key:'+score_key] += 1
 				missing_key = True
 		if missing_key:
@@ -4127,13 +3805,16 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 		for score_key in score_keys:
 			if score_key == 'VQSLOD':
 				scores[score_key] = gnomad_variant.INFO[score_key]
-			elif score_key == 'VQSR Single Sample':
-				scores[score_key] = variant.INFO['VQSLOD']
 			elif score_key == 'AS_RF':
 				scores[score_key] = score_from_gnomad_site(args, gnomad_variant, variant, vcf_mills, vcf_omni, stats)
 				if scores[score_key] is None:
 					missing_key = True
 					stats["Missing AS_RF"] += 1
+			elif score_key == 'VQSR Single Sample':
+				scores[score_key] = variant.INFO['VQSLOD']
+			else:
+				scores[score_key] = variant.INFO[score_key]
+
 		if missing_key:		
 			continue
 
@@ -4150,7 +3831,7 @@ def scores_from_gnomad_vcf(args, score_keys=['VQSLOD']):
 		else:
 			stats['Not SNP or INDEL'] += 1
 
-		if len(snp_truth)%1000 == 0:
+		if len(snp_truth)%100 == 0:
 			for k in stats.keys():
 				print(k, 'has:', stats[k])			
 			print('last variant was:', str(variant))
@@ -4380,13 +4061,13 @@ def score_from_gnomad_site(args, variant, v_negative, vcf_mills, vcf_omni, stats
 
 def is_rf_hard_filter_negative(args, variant, stats):
 	is_training_site = False
-	if variant.INFO['QD'] < 2:
+	if 'QD' in variant.INFO and variant.INFO['QD'] < 2:
 		stats[args.random_forest_training_sites+' rf negative training example, QD'] += 1
 		is_training_site = True
-	if variant.INFO['FS'] > 60:
+	if 'FS' in variant.INFO and variant.INFO['FS'] > 60:
 		stats[args.random_forest_training_sites+' rf negative training example, FS'] += 1
 		is_training_site = True			
-	if variant.INFO['MQ'] < 30:
+	if 'MQ' in variant.INFO and variant.INFO['MQ'] < 30:
 		stats[args.random_forest_training_sites+' rf negative training example, MQ'] += 1
 		is_training_site = True
 	return is_training_site
