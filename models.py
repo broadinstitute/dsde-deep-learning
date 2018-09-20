@@ -1885,7 +1885,7 @@ def inspect_model(args, model, generate_train, generate_valid, image_path=None):
 		The slightly optimized keras model
 	'''
 	if image_path:
-		plot_dot_model_in_color(model_to_dot(model, show_shapes=True), image_path)
+		plot_dot_model_in_color(args, model_to_dot(model, show_shapes=args.inspect_show_labels), image_path)
 
 	t0 = time.time()
 	history = model.fit_generator(generate_train, steps_per_epoch=args.training_steps, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
@@ -1902,7 +1902,7 @@ def inspect_model(args, model, generate_train, generate_valid, image_path=None):
 	return model
 
 
-def plot_dot_model_in_color(dot, image_path):
+def plot_dot_model_in_color(args, dot, image_path):
 	for n in dot.get_nodes():
 		if n.get_label():
 			if 'Conv1' in n.get_label():
@@ -1930,6 +1930,9 @@ def plot_dot_model_in_color(dot, image_path):
 			elif 'Dropout' in n.get_label():
 				n.set_fillcolor("tomato")
 		n.set_style("filled")
+		if not args.inspect_show_labels:
+			n.set_label('\n')
+
 	print('Saving architecture diagram to:',image_path)
 	dot.write_png(image_path)
 

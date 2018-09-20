@@ -179,6 +179,8 @@ def parse_args():
 		help='List of variant score keys for performance comparisons.')
 	parser.add_argument('--inspect_model', default=False, action='store_true',
 		help='Plot model architecture, measure inference and training speeds.')
+	parser.add_argument('--inspect_show_labels', default=False, action='store_true',
+		help='Plot model architecture with labels for each layer.')
 	parser.add_argument('--gnomad_compare', default=False, action='store_true',
 		help='Compare to gnomad random forest and VQSR.')
 	parser.add_argument('--hard_filter_compare', default=False, action='store_true',
