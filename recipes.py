@@ -1063,7 +1063,7 @@ def train_ref_read_anno_small(args):
 
 
 def load_and_save_model(args):
-	model = models.load_model(args.weights_hd5)
+	model = models.load_model(args.weights_hd5, custom_objects=models.get_metric_dict(args.labels))
 	weight_path = arguments.weight_path_from_args(args)
 	model.save(weight_path)
 	if not os.path.exists(os.path.dirname(weight_path)):
