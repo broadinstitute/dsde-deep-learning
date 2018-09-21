@@ -731,10 +731,10 @@ def separable_2d_annotation_model_from_args(args,
 
 	read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
-	x = layers.Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(read_tensor_in)
+	x = layers.Conv2D(128, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(read_tensor_in)
 	x = layers.BatchNormalization(name='block1_conv1_bn')(x)
 	x = layers.Activation('relu', name='block1_conv1_act')(x)
-	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv2')(x)
+	x = layers.Conv2D(128, (3, 3), use_bias=False, name='block1_conv2')(x)
 	x = layers.BatchNormalization(name='block1_conv2_bn')(x)
 	x = layers.Activation('relu', name='block1_conv2_act')(x)
 
