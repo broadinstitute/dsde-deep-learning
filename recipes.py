@@ -1062,6 +1062,15 @@ def train_ref_read_anno_small(args):
 	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
 
+def load_and_save_model(args):
+	model = models.load_model(args.weights_hd5)
+	weight_path = arguments.weight_path_from_args(args)
+	model.save(weight_path)
+	if not os.path.exists(os.path.dirname(weight_path)):
+		os.makedirs(os.path.dirname(weight_path))	
+	models.serialize_model_semantics(args, weight_path)
+
+
 def bqsr_train_tensor(args):
 	'''Trains the bqsr tensor architecture on tensors at the supplied data directory.
 
