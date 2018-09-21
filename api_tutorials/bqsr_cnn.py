@@ -31,6 +31,7 @@ from Bio import Seq, SeqIO
 from collections import Counter, defaultdict
 
 # Keras Imports
+import keras
 from keras import layers
 from keras import metrics
 import keras.backend as K
@@ -156,6 +157,8 @@ def parse_args():
 		help='Batch normalize fully connected layers.')
 	parser.add_argument('--fc_initializer', default='glorot_normal',
 		help='Initializer for fully connected (dense) layers.')
+	parser.add_argument('--resnet', default=False, action='store_true',
+		help='Add residual connections around hidden layers.') 
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
 	parser.add_argument('--semantics_json', default='')
@@ -202,7 +205,10 @@ def parse_args():
 	parser.add_argument('--id', default='no_id', help='Identifier for this run, user-defined string to keep experiments organized.')
 	parser.add_argument('--random_seed', default=12878, type=int, help='Random seed to use throughout run.  Always use np.random.')
 	parser.add_argument('--samples', default=500, type=int)
-
+	parser.add_argument('--inspect_model', default=False, action='store_true',
+		help='Plot model architecture, measure inference and training speeds.')
+	parser.add_argument('--inspect_show_labels', default=False, action='store_true',
+		help='Plot model architecture with labels for each layer.')
 
 	args = parser.parse_args()
 	args.annotations = ANNOTATIONS[args.annotation_set]
@@ -235,6 +241,8 @@ def bqsr_train_tensor(args):
 	generate_test = bqsr_label_tensors_generator(args, test_paths)
 
 	model = label_bases_model_from_args(args)
+	if args.inspect_model:
+		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
 	
 	test = generate_test.next()
@@ -277,7 +285,7 @@ def label_bases_model_from_args(args):
 	
 	max_pool_diff = len(args.conv_layers)-len(args.max_pools)	
 	for i, (c, w) in enumerate(zip(args.conv_layers, args.conv_widths)):
-
+		in_x = x
 		if args.conv_batch_normalize:
 			x = Conv1D(filters=c, kernel_size=w, activation='linear', 
 						padding=args.padding, kernel_initializer=args.kernel_initializer)(x)
@@ -294,6 +302,13 @@ def label_bases_model_from_args(args):
 
 		if i >= max_pool_diff:
 			x = MaxPooling1D(args.max_pools[i-max_pool_diff])(x)
+
+		if args.resnet and in_x != read_tensor:
+			shortcut = in_x
+			#shortcut = Conv1D(c, 1, kernel_initializer=args.kernel_initializer)(in_x)
+			if args.conv_batch_normalize:
+				shortcut = BatchNormalization(axis=concat_axis)(shortcut)
+			x = keras.layers.add([x, shortcut])   
 
 	conv_label = Conv1D(len(args.labels), 1, activation='linear', padding='same')(x)
 	conv_out = Activation('softmax', name='bqsr_labels')(conv_label)
@@ -840,6 +855,70 @@ def bqsr_plot_precision_recall_per_class_predictions(predictions, truth, labels,
 		os.makedirs(os.path.dirname(plot_name))		
 	plt.savefig(plot_name)
 	print('Saved plot at:%s' % plot_name)
+
+
+
+def bqsr_inspect_model(args, model, generate_train, generate_valid, image_path=None):
+	'''Collect statistics on model inference and training times.
+
+	Arguments
+		args.samples: number of optimization steps to take
+		args.batch_size: size of the mini-batches
+		model: the model to inspect
+		generate_train: training data generator function	
+		generate_valid: Validation data generator function
+
+	Returns
+		The slightly optimized keras model
+	'''
+	if image_path:
+		bqsr_plot_dot_model_in_color(model_to_dot(model, show_shapes=True), image_path)
+
+	t0 = time.time()
+	history = model.fit_generator(generate_train, steps_per_epoch=args.training_steps, epochs=1, verbose=1, validation_steps=5, validation_data=generate_valid)
+	t1 = time.time()
+	train_speed = (t1-t0)/(args.batch_size*args.training_steps)
+	print('Spent: ', t1-t0, ' seconds training, batch_size:', args.batch_size, 'steps:', args.training_steps, ' Per example training speed:', train_speed)
+
+	t0 = time.time()
+	predictions = model.predict_generator(generate_valid, steps=args.training_steps, verbose=1)
+	t1 = time.time()
+	inference_speed = (t1-t0)/(args.batch_size*args.training_steps)
+	print('Spent: ', t1-t0, ' seconds predicting. Per tensor inference speed:', inference_speed)
+	
+	return model
+
+
+def bqsr_plot_dot_model_in_color(dot, image_path):
+	for n in dot.get_nodes():
+		if n.get_label():
+			if 'Conv1' in n.get_label():
+				n.set_fillcolor("cyan")
+			elif 'Conv2' in n.get_label():
+				n.set_fillcolor("deepskyblue1")				
+			elif 'BatchNormalization' in n.get_label():
+				n.set_fillcolor("goldenrod1")		
+			elif 'softmax' in n.get_label():
+				n.set_fillcolor("chartreuse")										
+			elif 'Activation' in n.get_label():
+				n.set_fillcolor("yellow")	
+			elif 'MaxPooling' in n.get_label():
+				n.set_fillcolor("aquamarine")
+			elif 'Dense' in n.get_label():
+				n.set_fillcolor("gold")
+			elif 'Flatten' in n.get_label():
+				n.set_fillcolor("coral3")
+			elif 'Reshape' in n.get_label():
+				n.set_fillcolor("coral")			
+			elif 'Input' in n.get_label():
+				n.set_fillcolor("darkolivegreen1")
+			elif 'Concatenate' in n.get_label():
+				n.set_fillcolor("darkorange")
+			elif 'Dropout' in n.get_label():
+				n.set_fillcolor("tomato")
+		n.set_style("filled")
+	print('Saving architecture diagram to:',image_path)
+	dot.write_png(image_path)
 
 
 def bqsr_weight_path_to_title(wp):

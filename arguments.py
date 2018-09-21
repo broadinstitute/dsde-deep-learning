@@ -27,6 +27,8 @@ if not is_broad_cluster():
 	import keras.backend as K
 
 def parse_args():
+	import sys
+	print(sys.argv)
 	parser = argparse.ArgumentParser()
 
 	# Required mode argument: what would you like to do?
