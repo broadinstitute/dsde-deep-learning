@@ -80,7 +80,7 @@ def build_reference_model(args):
 	#x = Dense(units=32, activation='relu')(x)
 	#x = Dropout(0.5)(x)	
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
@@ -731,26 +731,26 @@ def separable_2d_annotation_model_from_args(args,
 
 	read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
-	x = layers.Conv2D(128, (3, 3), use_bias=False, name='block1_conv1')(read_tensor_in)
+	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv1')(read_tensor_in)
 	x = layers.BatchNormalization(name='block1_conv1_bn')(x)
 	x = layers.Activation('relu', name='block1_conv1_act')(x)
-	x = layers.Conv2D(128, (3, 3), use_bias=False, name='block1_conv2')(x)
+	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv2')(x)
 	x = layers.BatchNormalization(name='block1_conv2_bn')(x)
 	x = layers.Activation('relu', name='block1_conv2_act')(x)
 
-	residual = layers.Conv2D(128, (1, 1), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(64, (1, 1), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
-	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
+	x = layers.SeparableConv2D(64, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
 	x = layers.BatchNormalization(name='block2_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block2_sepconv2_act')(x)
-	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
+	x = layers.SeparableConv2D(64, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
 	x = layers.BatchNormalization(name='block2_sepconv2_bn')(x)
 
 	#x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_pool')(x)
 	x = layers.add([x, residual])
 
-	residual = layers.Conv2D(128, (1, 1), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(64, (1, 1), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
 	# x = layers.Activation('relu', name='block3_sepconv1_act')(x)
