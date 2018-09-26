@@ -1302,6 +1302,43 @@ def test_score_consistency():
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Testing Recipes ~~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def find_architecture_discordance(args):
+	'''Evaluate architectures defined by architecture configuration files
+
+	Compares against VQSR, gnomAD VQSR and Random Forest, and deep variant.
+
+	Arguments:
+			args.architectures: list of architecture semantics config files
+	'''
+	cnn_snp_dicts = {}
+	cnn_indel_dicts = {}
+	number_of_sites = 10
+	for a in args.architectures:	
+		print('Processing architecture:', a)
+		model = models.set_args_and_get_model_from_semantics(args, a)
+		_, _, test_generator = td.train_valid_test_generators_from_args(args, with_positions=True)
+		test, labels, positions = td.big_batch_from_minibatch_generator(args, test_generator)
+		cnn_predictions = model.predict(test, batch_size=args.batch_size)
+		cnn_snp_dicts[a], cnn_indel_dicts[a] = models.predictions_to_snp_indel_scores(args, cnn_predictions, positions)
+
+	for a in args.architectures:
+		for b in args.architectures:
+			if a == b:
+				continue
+			print('Comparing architectures:', a, 'to:', b)
+			diff_list =	[(p, abs(cnn_snp_dicts[a][p]-cnn_snp_dicts[b][p]), l) for l,p in zip(labels, positions) if l[0] or l[2]]
+			sorted_cnn = sorted(diff_list, key=lambda s: -s[1])
+			for i in range(min(number_of_sites, len(sorted_cnn))):	
+				p = sorted_cnn[i][0]
+				print('Discordant CNN SNP:', sorted_cnn[i], 'a, then b:', cnn_snp_dicts[a][p], cnn_snp_dicts[b][p])
+			
+			diff_list =	[(p, abs(cnn_indel_dicts[a][p]-cnn_indel_dicts[b][p]), l) for l,p in zip(labels, positions) if l[1] or l[3]]
+			sorted_cnn = sorted(diff_list, key=lambda s: -s[1])
+			for i in range(min(number_of_sites, len(sorted_cnn))):	
+				p = sorted_cnn[i][0]
+				print('Discordant CNN Indel:', sorted_cnn[i], 'a, then b:', cnn_indel_dicts[a][p], cnn_indel_dicts[b][p])
+
+
 def test_architectures(args):
 	'''Evaluate architectures defined by architecture configuration files
 

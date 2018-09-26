@@ -44,6 +44,8 @@ def parse_args():
 		help='Mini batch size for stochastic gradient descent algorithms.')
 	parser.add_argument('--read_limit', default=128, type=int,
 		help='Maximum number of reads to load.')
+	parser.add_argument('--read_sort', default='base', choices=['base', 'reference_start'],
+		help='How to sort the reads in the tensor.')	
 	parser.add_argument('--window_size', default=128, type=int,
 		help='Size of sequence window to use as input, typically centered at a variant.')
 	parser.add_argument('--channels_last', default=True, dest='channels_last', action='store_true',

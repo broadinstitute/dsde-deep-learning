@@ -111,9 +111,6 @@ cigar_code = {'M':0, 'I':1, 'D':2, 'N':3, 'S':4}
 code2cigar = 'MIDNSHP=XB'
 cigar2code = dict([y, x] for x, y in enumerate(code2cigar))
 
-reference_tensor_maps = ['reference']
-read_tensor_maps = ['read_tensor', '2d_mapping_quality']
-
 def annotations_from_args(args):
 	if args.annotation_set and args.annotation_set in annotations and args.annotation_set != '_':
 		return annotations[args.annotation_set]
