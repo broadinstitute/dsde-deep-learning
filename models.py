@@ -1835,7 +1835,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	Returns:
 		The Keras model
 	'''
-	with open(semantics_json, 'r') as infile:
+	with open(semantics_json, 'rb') as infile:
 		semantics = json.load(infile)
 
 	if 'input_tensor_map' in semantics:
