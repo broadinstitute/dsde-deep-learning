@@ -82,6 +82,7 @@ KEY_COLORS = {'GOOD_BASE':'green', 'BAD_BASE':'red'}
 precision_label = 'Precision | Positive Predictive Value | TP/(TP+FP)'
 recall_label = 'Recall | Sensitivity | True Positive Rate | TP/(TP+FN)'
 fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
+bad_bases_key, perfect_read_key, good_bases_key = 'bad bases', 'perfect read', 'good bases'
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -90,7 +91,9 @@ def run():
 	if 'bqsr_train_tensor' == args.mode:
 		bqsr_train_tensor(args)
 	elif 'write_bqsr_tensors' == args.mode:
-		write_base_recalibrate_tensors(args)				
+		write_base_recalibrate_tensors(args)
+	elif 'recalibrate' == args.mode:
+		recalibrate(args)
 	else:
 		raise ValueError('unknown bqsr mode:', args.mode)
 
@@ -170,6 +173,8 @@ def parse_args():
 	parser.add_argument('--data_dir', help='Directory of tensors, must be split into test/valid/train sets with directories for each label within.')
 	parser.add_argument('--output_dir', default='./weights/', help='Directory to write models or other data out.')
 	parser.add_argument('--reference_fasta', default=reference_fasta, help='The reference FASTA file (e.g. HG19 or HG38).')
+	parser.add_argument('--out', default='recalibrated.bam', help='Path to the recalibrated BAM file')
+	parser.add_argument('--model', help='Path to the trained model hd5 file')
 
 	# Training and optimization related arguments
 	parser.add_argument('--epochs', default=25, type=int, help='Number of epochs, typically passes through the entire dataset, not always well-defined.')
@@ -406,7 +411,7 @@ def bqsr_set_args_and_get_model_from_semantics(args, semantics_json):
 	args.labels = semantics['output_labels']
 
 	weight_path_hd5 = os.path.join(os.path.dirname(semantics_json),semantics['architecture'])
-	model = load_model(weight_path_hd5, custom_objects=bqsr_get_metric_dict(args.labels))
+	model = load_model(weight_path_hd5, custom_objects=bqsr_get_metric_dict(args.labels, args.label_weights))
 	model.summary()
 	return model
 
@@ -418,7 +423,7 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	"""Create tensors structured as tensor map of read quality.
 
 	Defines true bases as those not in args.db_snp, where read and reference agree.
-	False bases are sites thos not in args.db_snp where the read and the reference do NOT agree. 
+	False bases are sites those not in args.db_snp where the read and the reference do NOT agree.
 
 	Arguments
 		args.data_dir: directory where tensors will live. Created here and filled with
@@ -440,12 +445,12 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	stats = Counter()
 
 	samfile = pysam.AlignmentFile(args.bam_file, "rb")	
-	vcf_ram = vcf.Reader(open(args.ignore_vcf, 'r'))
+	vcf_ram = vcf.Reader(open(args.ignore_vcf, 'rb'))
 	
 	bed_dict = bqsr_bed_file_to_dict(args.bed_file)
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
 
-	margin = args.window_size/2
+	margin = args.window_size
 	contig = record_dict[args.chrom]
 	for start,stop in zip(bed_dict[args.chrom][0], bed_dict[args.chrom][1]):
 		if stop - start < args.window_size:
@@ -453,7 +458,7 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 			continue
 		last_variant = None
 		for v in vcf_ram.fetch(args.chrom, start, stop):
-			if last_variant is not None and (v.POS-last_variant.POS) > args.window_size:
+			if last_variant is not None and (v.POS-last_variant.POS) > 2*args.window_size:
 				write_reads_in_region_to_tensors(args, samfile, contig, args.chrom, last_variant.POS+margin, v.POS-margin, stats)
 			last_variant = v
 
@@ -463,7 +468,14 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	for k in stats.keys():
 		print('%s has %d' %(k, stats[k]))
 
+	print(stats_to_empirical_quality(stats, args))
 	print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf)
+
+
+def stats_to_empirical_quality(stats, args):
+	num_bad_bases = stats[bad_bases_key]
+	num_good_bases = stats[good_bases_key] + stats[perfect_read_key] * args.window_size
+	return num_bad_bases / (num_bad_bases + num_good_bases)
 
 
 def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
@@ -475,6 +487,8 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		if not read.is_proper_pair or not read.is_paired:
 			continue
 		if read.is_duplicate or read.is_secondary or read.is_supplementary or read.is_qcfail or read.is_unmapped:
+			continue
+		if "S" in read.cigarstring:
 			continue
 
 		assert(len(read.query_sequence) <= args.window_size)
@@ -494,17 +508,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			stats['perfect read'] += 1
 			continue
 
-		bqsr_tensor = np.zeros((args.window_size, len(args.input_symbols)))
-		bqsr_tensor[:,:4] = bqsr_base_string_to_tensor(args, read.query_sequence, read.query_qualities.tolist())
-		for a in args.input_symbols:
-			if a.lower() == 'strand':
-				bqsr_tensor[:,args.input_symbols[a]] = float(read.is_reverse)
-			elif a.lower() == 'pair':
-				bqsr_tensor[:,args.input_symbols[a]] = float(read.is_read1)
-			elif a.lower() == 'mq':
-				bqsr_tensor[:,args.input_symbols[a]] = float(read.mapping_quality) / float(MAX_MQ)
-			elif a.lower() == 'cycle':
-				bqsr_tensor[:,args.input_symbols[a]] = np.arange(args.window_size) / float(args.window_size)
+		bqsr_tensor = read_to_bqsr_tensor(read, args)
 
 		if len(args.annotations) > 0:
 			annotation_data = np.zeros(( len(args.annotations), ))
@@ -532,6 +536,19 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		if stats['count']%400 == 0:
 			print('Wrote', stats['count'], 'tensors out of', args.samples)
 	
+def read_to_bqsr_tensor(read, args):
+	bqsr_tensor = np.zeros((args.window_size, len(args.input_symbols)))
+	bqsr_tensor[:, :4] = bqsr_base_string_to_tensor(args, read.query_sequence, read.query_qualities.tolist())
+	for a in args.input_symbols:
+		if a.lower() == 'strand':
+			bqsr_tensor[:, args.input_symbols[a]] = float(read.is_reverse)
+		elif a.lower() == 'pair':
+			bqsr_tensor[:, args.input_symbols[a]] = float(read.is_read1)
+		elif a.lower() == 'mq':
+			bqsr_tensor[:, args.input_symbols[a]] = float(read.mapping_quality) / float(MAX_MQ)
+		elif a.lower() == 'cycle':
+			bqsr_tensor[:, args.input_symbols[a]] = np.arange(args.window_size) / float(args.window_size)
+	return bqsr_tensor
 
 def bqsr_get_path_to_train_valid_or_test(args, contig):
 	if any(x == contig for x in args.valid_contigs):
@@ -628,7 +645,7 @@ def bqsr_label_tensors_generator(args, train_paths):
 
 	Returns:
 		A tuple with a dict of the input tensors 
-		and a 1-Hot matrix (2D numpy array) of the labels.
+		and a 1-Hot matrix (2D numpy array) of the labels
 	'''	
 	tensors = {}
 	stats = Counter()
@@ -954,15 +971,15 @@ def bqsr_get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def bqsr_get_metric_dict(labels=BQSR_LABELS):
-    metrics = {'precision':precision, 'recall':recall}
-    precision_fxns = per_class_recall_3d(labels)
-    recall_fxns = per_class_recall_3d(labels)
-    for i,label_key in enumerate(labels.keys()):
-        metrics[label_key+'_precision'] = precision_fxns[i]
-        metrics[label_key+'_recall'] = recall_fxns[i]
-
-    return metrics
+def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
+	metrics = {}
+	precision_fxns = per_class_recall_3d(labels)
+	recall_fxns = per_class_recall_3d(labels)
+	for i,label_key in enumerate(labels.keys()):
+		metrics[label_key+'_precision'] = precision_fxns[i]
+		metrics[label_key+'_recall'] = recall_fxns[i]
+	metrics['loss'] = bqsr_weighted_categorical_crossentropy(label_weights)
+	return metrics
 
 
 def per_class_recall_3d(labels):
@@ -1057,7 +1074,7 @@ def bqsr_bed_file_to_dict(bed_file, shift1=1):
 		for line in f:
 			parts = line.split()
 			contig = parts[0]
-			lower = int(parts[1])+shift1
+			lower = int(parts[1])+shift1 # nice1
 			upper = int(parts[2])+shift1
 
 			if contig not in bed:
@@ -1070,6 +1087,25 @@ def bqsr_bed_file_to_dict(bed_file, shift1=1):
 		bed[k] = (np.array(bed[k][0]), np.array(bed[k][1]))		
 
 	return bed
+
+def recalibrate(args):
+	samfile = pysam.AlignmentFile(args.bam_file, "rb")
+
+	# convert to tensor
+	# load model
+	for read in samfile.fetch(args.chrom):
+		tensor = read_to_bqsr_tensor(read, args)
+
+		model = load_model(args.model, custom_objects=bqsr_get_metric_dict(args.labels, args.label_weights))
+		# model = load_model('/dsde/working/sam/dsde-deep-learning/weights/bqsr_anno_try_128_160_192_224_256x_lw07.hd5',
+		# 				   custom_objects=bqsr_get_metric_dict(args.labels))
+		recalibrated_tensor = model.predict(read)
+		recalibrated_read = bqsr_tensor_to_read(tensor, args)
+
+		# apply the model to tensor
+
+	def bqsr_tensor_to_read(tensor, args):
+
 
 
 if __name__ == '__main__':
