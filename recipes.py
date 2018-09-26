@@ -1067,7 +1067,8 @@ def load_and_save_model(args):
 	weight_path = arguments.weight_path_from_args(args)
 	model.save(weight_path)
 	if not os.path.exists(os.path.dirname(weight_path)):
-		os.makedirs(os.path.dirname(weight_path))	
+		os.makedirs(os.path.dirname(weight_path))
+	model.summary()
 	models.serialize_model_semantics(args, weight_path)
 
 
