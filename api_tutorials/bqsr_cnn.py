@@ -53,7 +53,7 @@ SKIP_CHAR = '~'
 INDEL_CHAR = '*'
 DNA_SYMBOLS = {'A':0, 'C':1, 'G':2, 'T':3}
 DNA_INDEL_SYMBOLS = {'A':0, 'C':1, 'G':2, 'T':3, INDEL_CHAR:4}
-DNA_AND_ANNOTATIONS = {'A':0, 'C':1, 'G':2, 'T':3, 'strand':4, 'pair':5, 'cycle':6, 'mq':7}
+DNA_AND_ANNOTATIONS = {'A':0, 'C':1, 'G':2, 'T':3, 'pair':4, 'cycle':5, 'mq':6}
 INPUT_SYMBOLS = {
 	'dna' : DNA_SYMBOLS,
 	'dna_indel' : DNA_INDEL_SYMBOLS,
@@ -113,7 +113,6 @@ def parse_args():
 	parser.add_argument('--activity_weight', default=1.0, type=float)
 	parser.add_argument('--total_variation', default=0.00001, type=float)
 
-
 	# Tensor defining arguments
 	parser.add_argument('--labels', default=BQSR_LABELS, help='Dict mapping label names to their index within label tensors.')
 	parser.add_argument('--label_weights',  nargs='+', default=[0.5, 0.5], type=float, help='List of weights for each label.')
@@ -131,7 +130,6 @@ def parse_args():
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
 	parser.add_argument('--annotation_set', default='_', choices=ANNOTATIONS.keys(), help='Key which maps to an annotations list (or None for architectures that do not take annotations).')
-
 
 	# Architecture defining arguments
 	parser.add_argument('--conv_dropout', default=0.0, type=float, 
@@ -183,10 +181,9 @@ def parse_args():
 	parser.add_argument('--training_steps', default=80, type=int, help='Number of training batches to examine in an epoch.')
 	parser.add_argument('--validation_steps', default=40, type=int, help='Number of validation batches to examine in an epoch validation.')
 
-
 	# Dataset generation related arguments
-	parser.add_argument('--downsample_homref', default=1.0, type=float, 
-		help='Rate of reads that are all homozygous reference that are kept must be in [0.0, 1.0].')	
+	parser.add_argument('--downsample_perfect_reads', default=0.0, type=float, 
+		help='Rate of perfect reads that are downsampled must be in [0.0, 1.0].')	
 	parser.add_argument('--valid_ratio', default=0.1, type=float,
 		help='Rate of training tensors to save for validation must be in [0.0, 1.0].')	
 	parser.add_argument('--test_ratio', default=0.2, type=float,
@@ -468,7 +465,9 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	for k in stats.keys():
 		print('%s has %d' %(k, stats[k]))
 
-	print(stats_to_empirical_quality(stats, args))
+	p = stats_to_empirical_quality(stats, args)
+	q = -10.0 * np.log10(p) 
+	print('empirical p:', p, ' and quality:', q)
 	print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf)
 
 
@@ -505,8 +504,11 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 				stats['good bases'] += 1			
 
 		if not got_bad_base:
-			stats['perfect read'] += 1
-			continue
+			stats[perfect_read_key] += 1
+			dice = np.random.rand()
+			if dice < args.downsample_perfect_reads:
+				stats['downsampled perfect reads'] += 1
+				continue
 
 		bqsr_tensor = read_to_bqsr_tensor(read, args)
 
@@ -538,7 +540,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 	
 def read_to_bqsr_tensor(read, args):
 	bqsr_tensor = np.zeros((args.window_size, len(args.input_symbols)))
-	bqsr_tensor[:, :4] = bqsr_base_string_to_tensor(args, read.query_sequence, read.query_qualities.tolist())
+	bqsr_tensor[:, :4] = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
 	for a in args.input_symbols:
 		if a.lower() == 'strand':
 			bqsr_tensor[:, args.input_symbols[a]] = float(read.is_reverse)
@@ -1104,7 +1106,7 @@ def recalibrate(args):
 
 		# apply the model to tensor
 
-	def bqsr_tensor_to_read(tensor, args):
+	#def bqsr_tensor_to_read(tensor, args):
 
 
 
