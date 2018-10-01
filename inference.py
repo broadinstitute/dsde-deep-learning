@@ -50,7 +50,7 @@ def annotate_vcf_with_inference(args):
 		if defines.annotations_from_args(args) is not None:
 			input_tensors[args.annotation_set] = (len(args.annotations),)
 		input_tensors[args.tensor_map] = defines.tensor_shape_from_args(args)
-
+	input_tensors['annotations'] = (7,)
 	vcf_writer = pysam.VariantFile(args.output_vcf, 'w', header=vcf_reader.header)
 	print('got vcfs. input tensor shape mapping:', input_tensors)
 
@@ -88,6 +88,8 @@ def annotate_vcf_with_inference(args):
 				args.annotation_set = tm
 				annotation_data = td.get_annotation_data(args, v, stats)
 				batch[tm][stats[batch_key]] = annotation_data
+				# hack for backward compatibility
+				batch['annotations'][stats[batch_key]] = annotation_data
 				stats[batch_key] += 1
 
 			if 'read' in tm:

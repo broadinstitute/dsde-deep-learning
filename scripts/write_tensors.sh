@@ -59,10 +59,11 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG002_GRCh38_GIAB_highconf_CG-Illfb-IllsentieonHC-Ion-10XsentieonHC-SOLIDgatkHC_CHROM1-22_v.3.3.2_highconf_noinconsistent.bed
 
 # Clinical NA24385 Ashkenazi son
-# DOWNSAMPLE_SNPS=0.008
-# DOWNSAMPLE_INDELS=0.03
+# DOWNSAMPLE_SNPS=0.01
+# DOWNSAMPLE_INDELS=0.04
 # SAMPLE_NAME=SM-G947H
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_g947h_na24385_raw_bam/
+# TENSOR_TYPES="read_tensor paired_reads"
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_g947h_na24385_rt_and_paired_read_tensors/
 # BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947h_na24385.bam
 # TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/giab_na24385_hg38_v3_3_2.vcf.gz
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947h_na24385_cnn_scored.vcf.gz
@@ -84,7 +85,6 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 
 
 # Clinical NA24385 Ashkenazi son
-# MODE=write_paired_read_tensors
 # SAMPLE_NAME=SM-G947T
 # DATA_DIR=/dsde/data/deep/vqsr/tensors/g947_paired_read2/
 # NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/g947t_o2d1v1_na24385_merged.vcf.gz 
@@ -381,24 +381,24 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/union13callableMQonlymerged_addcert_nouncert_excludesimplerep_excludesegdups_excludedecoy_excludeRepSeqSTRs_noCNVs_v2.18_2mindatasets_5minYesNoRatio.bed
 
 # Project G94982 snapshot NA12878 Platinum Genomes 2017 as truth
-DOWNSAMPLE_SNPS=0.02
-DOWNSAMPLE_INDELS=0.1
-DOWNSAMPLE_NOT_SNPS=0.2
-DOWNSAMPLE_NOT_INDELS=0.15
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum_fix/
-BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_na12878.vcf.gz
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
-BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/ConfidentRegions_pg_b37_2017.bed
+# DOWNSAMPLE_SNPS=0.02
+# DOWNSAMPLE_INDELS=0.1
+# DOWNSAMPLE_NOT_SNPS=0.2
+# DOWNSAMPLE_NOT_INDELS=0.15
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum_fix/
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_na12878.vcf.gz
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/ConfidentRegions_pg_b37_2017.bed
 
 # Project G94982 snapshot NA12878 Platinum Genomes GiaB hybrid 2017 as truth
-# DOWNSAMPLE_SNPS=0.015
-# DOWNSAMPLE_INDELS=0.1
-# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_hiseq_mix/
-# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_giab_hybrid.bed
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_giab_hybrid_na12878.vcf.gz
+DOWNSAMPLE_SNPS=0.02
+DOWNSAMPLE_INDELS=0.15
+BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum_giab_hybrid_fix/
+BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_giab_hybrid.bed
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_giab_hybrid_na12878.vcf.gz
 
 # Project G76270 NA12878 
 # DOWNSAMPLE_SNPS=0.01

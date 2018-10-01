@@ -264,7 +264,7 @@ def build_reference_annotation_skip_model(args):
 		channel_axis = 1
 
 	channel_map = defines.get_tensor_channel_map_from_args(args)	
-	reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	conv_width = 12
 	conv_dropout = 0.1
 	fc_dropout = 0.2
@@ -275,7 +275,7 @@ def build_reference_annotation_skip_model(args):
 	x = Dropout(conv_dropout)(x)	
 	x = Flatten()(x)
 
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	annos_normed = BatchNormalization(axis=channel_axis)(annotations)
 	annos_normed_x = Dense(units=40, kernel_initializer='normal', activation='relu')(annos_normed)
 

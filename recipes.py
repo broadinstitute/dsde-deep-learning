@@ -440,7 +440,8 @@ def train_reference_annotation(args):
 	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 
 	weight_path = arguments.weight_path_from_args(args)
-	model = models.build_reference_plus_model(args)
+	#model = models.build_reference_plus_model(args)
+	model = models.build_reference_annotation_skip_model(args)
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
 	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
@@ -1062,14 +1063,14 @@ def train_ref_read_anno_small(args):
 	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
 
-def load_and_save_model(args):
-	model = models.load_model(args.weights_hd5, custom_objects=models.get_metric_dict(args.labels))
-	weight_path = arguments.weight_path_from_args(args)
-	model.save(weight_path)
-	if not os.path.exists(os.path.dirname(weight_path)):
-		os.makedirs(os.path.dirname(weight_path))
-	model.summary()
-	models.serialize_model_semantics(args, weight_path)
+# def load_and_save_model(args):
+# 	model = models.load_model(args.weights_hd5, custom_objects=models.get_metric_dict(args.labels))
+# 	weight_path = arguments.weight_path_from_args(args)
+# 	model.save(weight_path)
+# 	if not os.path.exists(os.path.dirname(weight_path)):
+# 		os.makedirs(os.path.dirname(weight_path))
+# 	model.summary()
+# 	models.serialize_model_semantics(args, weight_path)
 
 
 def bqsr_train_tensor(args):
