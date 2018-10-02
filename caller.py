@@ -178,7 +178,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
-					ref = str(contig[ref_offset+(indel_start-1)])
+					ref = str(contig[ref_offset+indel_start])
 					if ref == 'N':
 						continue
 				else:
@@ -195,7 +195,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				indel_start = -1	
 			elif index2labels[guess[j]] == 'HET_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
-					ref = str(contig[ref_offset+(indel_start-1)])
+					ref = str(contig[ref_offset+indel_start])
 					if ref == 'N':
 						continue
 				else:
