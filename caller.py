@@ -158,7 +158,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  qual=predictions[i][j][guess[j]])
 			elif index2labels[guess[j]] == 'HET_DELETION' and variant_edge(index2labels, guess, j):
 				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2].seq)
-				if d[0] == 'N':
+				if len(d) < 2 or d[0] == 'N':
 					continue
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
@@ -168,7 +168,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_DELETION' and variant_edge(index2labels, guess, j):
 				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2].seq)
-				if d[0] == 'N':
+				if len(d) < 2 or d[0] == 'N':
 					continue
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
