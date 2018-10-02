@@ -178,9 +178,9 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
-					ref = str(contig[ref_offset+indel_start])
-					# if ref == 'N':
-					# 	continue
+					ref = str(contig[ref_start+indel_start])
+					if ref == 'N':
+						continue
 				else:
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
@@ -195,9 +195,9 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				indel_start = -1	
 			elif index2labels[guess[j]] == 'HET_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
-					ref = str(contig[ref_offset+indel_start])
-					# if ref == 'N':
-					# 	continue
+					ref = str(contig[ref_start+indel_start])
+					if ref == 'N':
+						continue
 				else:
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
