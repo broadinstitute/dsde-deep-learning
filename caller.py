@@ -137,7 +137,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 			else:
 				ref_allele = reference_base_from_tensor(args, cur_tensor, j)
 			alt = strongest_alt_allele_from_tensor(args, cur_tensor, j, ref_allele)
-
+			qual = str(predictions[i][j][guess[j]])
 			is_indel = 'DELETION' in index2labels[guess[j]] or 'INSERTION' in index2labels[guess[j]]
 			if is_indel and indel_start == -1:
 				indel_start = j	
@@ -147,20 +147,20 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  start=ref_start+j,
 									  stop=ref_start+j+1,
 									  alleles=[ref_allele, alt],
-									  qual=predictions[i][j][guess[j]])
+									  qual=qual)
 			elif index2labels[guess[j]] == 'HOM_SNP':
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+j,
 									  stop=ref_start+j+1,
 									  alleles=[ref_allele, alt],
-									  qual=predictions[i][j][guess[j]])
+									  qual=qual)
 			elif index2labels[guess[j]] == 'HET_DELETION' and variant_edge(index2labels, guess, j):
 				d = contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2]
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
 									  alleles=[d, d[0]],
-									  qual=predictions[i][j][guess[j]])
+									  qual=qual)
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_DELETION' and variant_edge(index2labels, guess, j):
 				d = contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2]
@@ -168,7 +168,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
 									  alleles=[d, d[0]],
-									  qual=predictions[i][j][guess[j]])
+									  qual=qual)
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
@@ -182,7 +182,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  start=ref_start+indel_start,
 									  stop=ref_start+indel_start+1,
 									  alleles=[ref, insert],
-									  qual=predictions[i][j][guess[j]])
+									  qual=qual)
 				ref_offset += j-indel_start
 				indel_start = -1	
 			elif index2labels[guess[j]] == 'HET_INSERTION' and variant_edge(index2labels, guess, j):
@@ -198,7 +198,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  start=ref_start+indel_start,
 									  stop=ref_start+indel_start+1,
 									  alleles=[ref, insert],
-									  qual=predictions[i][j][guess[j]])
+									  qual=qual)
 				ref_offset += j-indel_start
 				indel_start = -1
 			else:
