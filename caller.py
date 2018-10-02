@@ -134,6 +134,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 			# Does NOT properly handle multiallelics
 			if contig is not None:
 				ref_allele = str(contig[ref_start+j])
+				if ref_allele == 'N':
+					continue
 			else:
 				ref_allele = reference_base_from_tensor(args, cur_tensor, j)
 			alt = strongest_alt_allele_from_tensor(args, cur_tensor, j, ref_allele)
