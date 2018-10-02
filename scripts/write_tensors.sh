@@ -1,5 +1,5 @@
 #!/bin/bash
-ECHO=
+ECHO=echo
 
 MODE=write_tensors
 

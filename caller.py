@@ -58,6 +58,7 @@ def infer_tensor(args):
 				stats['cur_tensor'] = 0
 				gpos_batch = []
 
+
 def infer_vcf(args):
 	stats = Counter()
 	model = models.load_model(args.weights_hd5, custom_objects=models.get_all_custom_objects(args.labels))
@@ -100,7 +101,7 @@ def infer_vcf(args):
 
 				if stats['cur_tensor'] == args.batch_size:
 					predictions = model.predict(tensor_batch) # predictions is a numpy arra
-					predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, record)
+					predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, contig)
 					tensor_batch = np.zeros((args.batch_size,)+defines.tensor_shape_from_args(args))
 					stats['cur_tensor'] = 0
 					stats['batches_processed'] += 1
@@ -117,7 +118,7 @@ def infer_vcf(args):
 		print(s, 'has:', stats[s])	
 
 
-def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, record=None):
+def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_writer, contig=None):
 	index2labels = {v:k for k,v in defines.calling_labels.items()}
 	indel_start = -1
 	ref_offset = 0
@@ -131,8 +132,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 
 			ref_start = int(gpos[1])-ref_offset
 			# Does NOT properly handle multiallelics
-			if record and j < len(record):
-				ref_allele = record[j]
+			if contig:
+				ref_allele = contig[ref_start+j]
 			else:
 				ref_allele = reference_base_from_tensor(args, cur_tensor, j)
 			alt = strongest_alt_allele_from_tensor(args, cur_tensor, j, ref_allele)
@@ -147,60 +148,50 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  stop=ref_start+j+1,
 									  alleles=[ref_allele, alt],
 									  qual=predictions[i][j][guess[j]])
-				vcf_writer.write(v)
 			elif index2labels[guess[j]] == 'HOM_SNP':
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+j,
 									  stop=ref_start+j+1,
 									  alleles=[ref_allele, alt],
 									  qual=predictions[i][j][guess[j]])
-				vcf_writer.write(v)
 			elif index2labels[guess[j]] == 'HET_DELETION' and variant_edge(index2labels, guess, j):
-				d = get_deleted(args, cur_tensor, indel_start, j)
+				d = contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2]
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
 									  alleles=[d, d[0]],
 									  qual=predictions[i][j][guess[j]])
-				vcf_writer.write(v)
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_DELETION' and variant_edge(index2labels, guess, j):
-				d = get_deleted(args, cur_tensor, indel_start, j)
+				d = contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2]
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
 									  alleles=[d, d[0]],
 									  qual=predictions[i][j][guess[j]])
-				vcf_writer.write(v)
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_INSERTION' and variant_edge(index2labels, guess, j):
-				if record and ref_offset+(indel_start-1) < len(record):
-					ref = record[ref_offset+(indel_start-1)]
+				if contig:
+					ref = contig[ref_offset+(indel_start-1)]
 				else:
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
 						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
-						#if (ref_offset+(indel_start-1))  > 0:
-						#	print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
-
 				insert = get_inserted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start,
 									  stop=ref_start+indel_start+1,
 									  alleles=[ref, insert],
 									  qual=predictions[i][j][guess[j]])
-				vcf_writer.write(v)
 				ref_offset += j-indel_start
 				indel_start = -1	
 			elif index2labels[guess[j]] == 'HET_INSERTION' and variant_edge(index2labels, guess, j):
-				if record and ref_offset+(indel_start-1) < len(record):
-					ref = record[ref_offset+(indel_start-1)]
+				if contig:
+					ref = contig[ref_offset+(indel_start-1)]
 				else:
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
 						print('Looked for reference but found only insertions at:', (ref_offset+(indel_start-1)))
-						#if (ref_offset+(indel_start-1)) > 0:
-						#	print('at t-1 we have:', reference_base_from_tensor(args, cur_tensor, ref_offset+(indel_start-2)))
 
 				insert = get_inserted(args, cur_tensor, indel_start, j)
 				v = vcf_writer.new_record(contig=gpos[0],
@@ -208,9 +199,11 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  stop=ref_start+indel_start+1,
 									  alleles=[ref, insert],
 									  qual=predictions[i][j][guess[j]])
-				vcf_writer.write(v)
 				ref_offset += j-indel_start
 				indel_start = -1
+			else:
+				continue
+			vcf_writer.write(v)
 
 
 def variant_edge(index2labels, guess, j):
@@ -238,6 +231,19 @@ def reference_base_from_tensor(args, tensor, tensor_site):
 
 	return defines.indel_char # No evidence of reference, insertion perhaps 
 
+
+def reference_base_from_tensor(args, tensor, tensor_site):
+	channels = defines.get_tensor_channel_map_from_args(args)
+	for c in channels:
+		if c[-1] != defines.indel_char and 'reference' in c:
+			if args.channels_last and tensor[0, tensor_site, channels[c]] > 0:
+				return c[-1].upper() # reference channels are strings like reference_A or reference_C
+				# Here we want just the nucleic acid. 
+			elif not args.channels_last and tensor[channels[c], 0, tensor_site] > 0:
+				return c[-1].upper()
+
+
+	return defines.indel_char # No evidence of reference, insertion perhaps 
 
 def strongest_allele_from_tensor(args, tensor, tensor_site):
 	channels = defines.get_tensor_channel_map_from_args(args)
