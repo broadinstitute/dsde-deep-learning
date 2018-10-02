@@ -158,6 +158,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  qual=predictions[i][j][guess[j]])
 			elif index2labels[guess[j]] == 'HET_DELETION' and variant_edge(index2labels, guess, j):
 				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2].seq)
+				if d[0] == 'N':
+					continue
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
@@ -166,6 +168,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_DELETION' and variant_edge(index2labels, guess, j):
 				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2].seq)
+				if d[0] == 'N':
+					continue
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
@@ -175,6 +179,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 			elif index2labels[guess[j]] == 'HOM_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
 					ref = str(contig[ref_offset+(indel_start-1)])
+					if ref == 'N':
+						continue
 				else:
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
@@ -190,6 +196,8 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 			elif index2labels[guess[j]] == 'HET_INSERTION' and variant_edge(index2labels, guess, j):
 				if contig:
 					ref = str(contig[ref_offset+(indel_start-1)])
+					if ref == 'N':
+						continue
 				else:
 					ref = reference_base_from_tensor(args, cur_tensor, j)
 					if ref == defines.indel_char:
