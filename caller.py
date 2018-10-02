@@ -137,7 +137,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 			else:
 				ref_allele = reference_base_from_tensor(args, cur_tensor, j)
 			alt = strongest_alt_allele_from_tensor(args, cur_tensor, j, ref_allele)
-			qual = str(predictions[i][j][guess[j]])
+			qual = float(predictions[i][j][guess[j]])
 			is_indel = 'DELETION' in index2labels[guess[j]] or 'INSERTION' in index2labels[guess[j]]
 			if is_indel and indel_start == -1:
 				indel_start = j	
