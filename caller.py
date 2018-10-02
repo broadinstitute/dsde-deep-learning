@@ -132,7 +132,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 
 			ref_start = int(gpos[1])-ref_offset
 			# Does NOT properly handle multiallelics
-			if contig:
+			if contig is not None:
 				ref_allele = str(contig[ref_start+j])
 			else:
 				ref_allele = reference_base_from_tensor(args, cur_tensor, j)
@@ -155,7 +155,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  alleles=[ref_allele, alt],
 									  qual=predictions[i][j][guess[j]])
 			elif index2labels[guess[j]] == 'HET_DELETION' and variant_edge(index2labels, guess, j):
-				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2])
+				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2].seq)
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
@@ -163,7 +163,7 @@ def predictions_to_variants(args, predictions, gpos_batch, tensor_batch, vcf_wri
 									  qual=predictions[i][j][guess[j]])
 				indel_start = -1
 			elif index2labels[guess[j]] == 'HOM_DELETION' and variant_edge(index2labels, guess, j):
-				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2])
+				d = str(contig[ref_start+indel_start-1:ref_start+indel_start+(j-indel_start)+2].seq)
 				v = vcf_writer.new_record(contig=gpos[0], 
 									  start=ref_start+indel_start-1,
 									  stop=ref_start+indel_start+(j-indel_start)+2,
