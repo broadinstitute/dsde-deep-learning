@@ -220,7 +220,7 @@ class HyperparameterOptimizer(object):
 		space = {
 			'conv_width' : hp.quniform('conv_width', 3, 25, 2),
 			'conv_height' : hp.quniform('conv_height', 3, 25, 2),
-			#'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
 			'kernel_single_channel' : hp.choice('kernel_single_channel', [0, 1]),
 			'fc' : hp.choice('fc',self.fc_layer_sets),
 			'valid_padding' : hp.choice('valid_padding', [0, 1]),
@@ -233,7 +233,7 @@ class HyperparameterOptimizer(object):
 				model = models.read_tensor_2d_model_from_args(args, 
 										conv_width = int(x['conv_width']),
 										conv_height = int(x['conv_height']),
-										#conv_layers = x['conv_layers'],
+										conv_layers = x['conv_layers'],
 										max_pools = x['max_pools_2d'],
 										padding = 'valid' if bool(x['valid_padding']) else 'same',
 										fc_layers = x['fc']

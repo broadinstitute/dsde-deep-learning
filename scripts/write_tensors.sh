@@ -392,13 +392,13 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/ConfidentRegions_pg_b37_2017.bed
 
 # Project G94982 snapshot NA12878 Platinum Genomes GiaB hybrid 2017 as truth
-DOWNSAMPLE_SNPS=0.02
-DOWNSAMPLE_INDELS=0.15
-BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum_giab_hybrid_fix/
-BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_giab_hybrid.bed
-NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
-TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_giab_hybrid_na12878.vcf.gz
+# DOWNSAMPLE_SNPS=0.02
+# DOWNSAMPLE_INDELS=0.15
+# BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
+# DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum_giab_hybrid_fix/
+# BED_FILE=/dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_giab_hybrid.bed
+# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
+# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_giab_hybrid_na12878.vcf.gz
 
 # Project G76270 NA12878 
 # DOWNSAMPLE_SNPS=0.01
@@ -578,17 +578,17 @@ TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_giab_hybrid_na12878
 # BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 # Nova NA12878 g947x
-# DOWNSAMPLE_SNPS=0.01 #0.003
-# DOWNSAMPLE_INDELS=0.05 #0.025
-# # DOWNSAMPLE_NOT_SNPS=0.5
-# SAMPLE_NAME=SM-G947X
-# DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_mix/
-# BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947x_na12878_bamout.bam
-# TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
-# NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947x_na12878_cnn_scored.vcf.gz
-# SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
-# REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
-# BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
+DOWNSAMPLE_SNPS=0.01 
+DOWNSAMPLE_INDELS=0.1
+SAMPLE_NAME=SM-G947X
+WINDOW_SIZE=32
+DATA_DIR=/dsde/data/deep/vqsr/tensors/nova_g947x_na12878_hg38_ws32_try/
+BAM_FILE=/dsde/data/deep/vqsr/bams/nova_g947x_na12878_bamout.bam
+TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_giab_hg38.vcf.gz
+NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/nova_g947x_na12878_cnn_scored.vcf.gz
+SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome_hg38.interval_list
+REFERENCE=/seq/references/Homo_sapiens_assembly38/v0/Homo_sapiens_assembly38.fasta
+BED_FILE=/dsde/data/deep/vqsr/beds/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_nosomaticdel_noCENorHET7.bed
 
 # Clinical NA12878 g947z
 # WINDOW_SIZE=256
