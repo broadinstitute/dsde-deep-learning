@@ -254,8 +254,8 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
-				if stats['count']%4 == 0:
-					limit_mem()
+				#limit_mem()
+				
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
@@ -331,8 +331,7 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				if stats['count']%4 == 0:
-					limit_mem()
+				#limit_mem()
 
 				return loss_and_metrics[0]
 			
