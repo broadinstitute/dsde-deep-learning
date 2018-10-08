@@ -234,7 +234,6 @@ class HyperparameterOptimizer(object):
 		}
 		
 		def hp_loss_from_params_2d(x):
-			max_loss = 99
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
 										conv_width = int(x['conv_width']),
@@ -248,10 +247,10 @@ class HyperparameterOptimizer(object):
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return max_loss 
+					return self.max_loss 
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				print('Loss ', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
@@ -261,13 +260,12 @@ class HyperparameterOptimizer(object):
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
 				del model
-				#limit_mem()
 
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
-				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return max_loss
+				print(str(e) + '\n Impossible architecture perhaps? return max loss')
+				return self.max_loss
 
 		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2) ]
 		print(samples)
@@ -312,7 +310,6 @@ class HyperparameterOptimizer(object):
 		}
 		
 		def hp_loss_from_params_2d_anno(x):
-			max_loss = 99
 			try:
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
 										conv_width = int(x['conv_width']),
@@ -327,10 +324,10 @@ class HyperparameterOptimizer(object):
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return max_loss
+					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
@@ -345,7 +342,7 @@ class HyperparameterOptimizer(object):
 			
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps?')
-				return max_loss
+				return self.max_loss
 
 		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2) ]
 		print(samples)
@@ -401,7 +398,7 @@ class HyperparameterOptimizer(object):
 					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
@@ -475,7 +472,7 @@ class HyperparameterOptimizer(object):
 					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
@@ -540,7 +537,7 @@ class HyperparameterOptimizer(object):
 					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
 				print('Current architecture: ', self.string_from_arch_dict(x))
 				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
