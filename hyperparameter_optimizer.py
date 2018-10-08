@@ -259,7 +259,8 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
-				limit_mem()
+				del model
+				#limit_mem()
 
 				return loss_and_metrics[0]
 			
@@ -337,7 +338,7 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				limit_mem()
+				del model
 
 				return loss_and_metrics[0]
 			
