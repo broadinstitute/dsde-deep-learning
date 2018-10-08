@@ -271,7 +271,7 @@ class HyperparameterOptimizer(object):
 		print('trial dicts', trials.trials)
 		print('trials.losses', trials.losses())
 		print('best is:', best)
-		print('best str is:', self.string_from_best_trials(best, trials.trials))
+		print('best str is:', self.string_from_best_trials(best, trials))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
@@ -645,12 +645,12 @@ class HyperparameterOptimizer(object):
 
 
 
-	def string_from_best_trials(self, best, trials):
+	def string_from_best_trials(self, trials):
 		
 		s = ''
 
 		best_trial_idx = np.argmin(trials.losses())
-		x = trials[best_trial_idx]['misc']['vals']
+		x = trials.trials[best_trial_idx]['misc']['vals']
 
 		for k in x:
 			
