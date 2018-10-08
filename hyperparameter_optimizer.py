@@ -254,7 +254,7 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
-				#limit_mem()
+				limit_mem()
 
 				return loss_and_metrics[0]
 			
@@ -332,7 +332,7 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				#limit_mem()
+				limit_mem()
 
 				return loss_and_metrics[0]
 			
@@ -854,7 +854,7 @@ class HyperparameterOptimizer(object):
 
 def limit_mem():
 	try:
-		K.clear_session()
+		#K.clear_session()
 		K.get_session().close()
 		cfg = K.tf.ConfigProto()
 		cfg.gpu_options.allow_growth = True
