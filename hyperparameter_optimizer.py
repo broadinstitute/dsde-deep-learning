@@ -576,7 +576,7 @@ class HyperparameterOptimizer(object):
 
 		best_trial_idx = np.argmin(trials.losses())
 		x = trials.trials[best_trial_idx]['misc']['vals']
-
+		print('lowest loss was:', trials.losses()[best_trial_idx], ' at trial:', best_trial_idx)
 		for k in x:
 			
 			s += '\n' + k + ' = '
