@@ -299,7 +299,7 @@ class HyperparameterOptimizer(object):
 			'kernel_single_channel' : hp.choice('kernel_single_channel', [0, 1]),
 			'fc' : hp.choice('fc',self.fc_layer_sets),
 			'valid_padding' : hp.choice('valid_padding', [0, 1]),
-			'annotation_units' : hp.quniform('conv_height', 16, 128, 16),
+			'annotation_units' : hp.quniform('annotation_units', 16, 128, 16),
 			'annotation_shortcut' : hp.choice('annotation_shortcut', [0, 1]),
 			'max_pools_2d' : hp.choice('max_pools_2d', self.max_pool_sets_2d),
 		}
@@ -333,7 +333,7 @@ class HyperparameterOptimizer(object):
 
 				if stats['count']%4 == 0:
 					limit_mem()
-					
+
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
