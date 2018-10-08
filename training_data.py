@@ -1054,7 +1054,7 @@ def nist_samples_to_png(args):
 				continue
 
 			stats[cur_label_key] += 1
-			good_reads, insert_dict = get_good_reads(args, samfile, variant, sort_by='reference_start')
+			good_reads, insert_dict = get_good_reads(args, samfile, variant)
 			reference_seq = record.seq
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
 				if i < 0:

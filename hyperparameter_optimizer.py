@@ -263,7 +263,11 @@ class HyperparameterOptimizer(object):
 		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2) ]
 		print(samples)
 		trials = hyperopt.Trials()
-		best = fmin(hp_loss_from_params_2d, space=space, algo=tpe.suggest, max_evals=args.iterations, trials=trials)
+		best = fmin(hp_loss_from_params_2d, 
+			space=space, 
+			algo=tpe.suggest, 
+			max_evals=args.iterations, 
+			trials=trials)
 		print('trial dicts', trials.trials)
 		print('trials.losses', trials.losses())
 		print('best is:', best)
@@ -645,7 +649,7 @@ class HyperparameterOptimizer(object):
 		
 		s = ''
 
-		best_trial_idx = np.argmin(best)
+		best_trial_idx = np.argmin(trials.losses())
 		x = trials[best_trial_idx]['misc']['vals']
 
 		for k in x:
