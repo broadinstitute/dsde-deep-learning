@@ -271,7 +271,7 @@ class HyperparameterOptimizer(object):
 		print('trial dicts', trials.trials)
 		print('trials.losses', trials.losses())
 		print('best is:', best)
-		print('best str is:', self.string_from_best_trials(best, trials))
+		print('best str is:', self.string_from_best_trials(trials))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
