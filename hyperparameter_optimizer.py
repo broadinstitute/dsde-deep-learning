@@ -38,7 +38,12 @@ bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'val
 				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
 
 def run():
-	args = arguments.parse_args()	
+	args = arguments.parse_args()
+
+	cfg = K.tf.ConfigProto()
+	cfg.gpu_options.allow_growth = True
+	K.set_session(K.tf.Session(config=cfg))	
+
 	if '2d' == args.mode:
 		ho = HyperparameterOptimizer()
 		ho.bayesian_search_2d(args, args.iterations)
@@ -856,9 +861,9 @@ def limit_mem():
 	try:
 		K.clear_session()
 		#K.get_session().close()
-		cfg = K.tf.ConfigProto()
-		cfg.gpu_options.allow_growth = True
-		K.set_session(K.tf.Session(config=cfg))
+		# cfg = K.tf.ConfigProto()
+		# cfg.gpu_options.allow_growth = True
+		# K.set_session(K.tf.Session(config=cfg))
 	except AttributeError as e:
 		print('Could not clear session. Maybe you are using Theano backend?')
 
