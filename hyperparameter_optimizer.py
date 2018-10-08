@@ -248,13 +248,14 @@ class HyperparameterOptimizer(object):
 				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
 				stats['count'] += 1
 				print('Current architecture: ', self.string_from_arch_dict(x))
-				print('Loss ', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print('Loss ', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
-				#limit_mem()
+				if stats['count']%4 == 0:
+					limit_mem()
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
@@ -303,7 +304,6 @@ class HyperparameterOptimizer(object):
 			'max_pools_2d' : hp.choice('max_pools_2d', self.max_pool_sets_2d),
 		}
 		
-
 		def hp_loss_from_params_2d_anno(x):
 			try:
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
@@ -331,7 +331,9 @@ class HyperparameterOptimizer(object):
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				limit_mem()
+				if stats['count']%4 == 0:
+					limit_mem()
+					
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
