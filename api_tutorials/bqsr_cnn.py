@@ -247,7 +247,7 @@ def bqsr_train_tensor(args):
 		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
 	
-	test = generate_test.next()
+	test = next(generate_test)
 	bqsr_plot_roc_per_class(model, test[0][args.tensor_name], test[1], args.labels, args.id, melt=True)
 	test_tensors = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.input_symbols)))
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
