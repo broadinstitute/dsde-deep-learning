@@ -366,9 +366,9 @@ SPLIT_INTERVALS=/dsde/data/deep/vqsr/beds/wgs_10m_split_genome.interval_list
 # Project G94982 snapshot NA12878
 DOWNSAMPLE_SNPS=0.01
 DOWNSAMPLE_INDELS=0.2
-BASE_QUALITY_MODE=1hot
+READ_SORT=reference_start
 TENSOR_TYPES="read_tensor paired_reads"
-DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_rtpr_1hot/
+DATA_DIR=/dsde/data/deep/vqsr/tensors/g94982_na12878_rtpr_ws128_sort_ref_start/
 TRAIN_VCF=/dsde/data/deep/vqsr/vcfs/nist_na12878_minimal.vcf.gz
 BAM_FILE=/dsde/data/deep/vqsr/bams/na12878_g94982_bamout_no_trim.bam
 NEGATIVE_VCF=/dsde/data/deep/vqsr/vcfs/na12878_g94982_bamout.raw.snps.indels.vcf.gz
