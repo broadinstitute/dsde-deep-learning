@@ -247,7 +247,7 @@ def bqsr_train_tensor(args):
 		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
 	
-	test = next(generate_test)
+	test = generate_test.next()
 	bqsr_plot_roc_per_class(model, test[0][args.tensor_name], test[1], args.labels, args.id, melt=True)
 	test_tensors = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.input_symbols)))
 	test_labels = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.labels)))
@@ -985,33 +985,37 @@ def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
 
 
 def per_class_recall_3d(labels):
-	recall_fxns = []
+    recall_fxns = []
 
-	def recall(y_true, y_pred, label_idx):
-		true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)), axis=(0, 1))
-		possible_positives = K.sum(K.round(K.clip(y_true, 0, 1)), axis=(0, 1))
-		return true_positives[label_idx] / (possible_positives[label_idx] + K.epsilon())
+    for label_key in labels:
+        label_idx = labels[label_key]
+        string_fxn = 'def '+ label_key + '_recall(y_true, y_pred):\n'
+        string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
+        string_fxn += '\tpossible_positives = K.sum(K.sum(K.round(K.clip(y_true, 0, 1)), axis=0), axis=0)\n'
+        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (possible_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-	for label_key in labels:
-		label_idx = labels[label_key]
-		recall_fxns.append(lambda y_true, y_pred : recall(y_true, y_pred, label_idx))
+        exec(string_fxn)
+        recall_fxn = eval(label_key + '_recall')
+        recall_fxns.append(recall_fxn)
 
-	return recall_fxns
+    return recall_fxns
 
 
 def per_class_precision_3d(labels):
-	precision_fxns = []
+    precision_fxns = []
 
-	def precision(y_true, y_pred, label_idx):
-		true_positives = K.sum(K.round(K.clip(y_true * y_pred, 0, 1)), axis=(0, 1))
-		predicted_positives = K.sum(K.round(K.clip(y_pred, 0, 1)), axis=(0, 1))
-		return true_positives[label_idex] / (predicted_positives[label_idx] + K.epsilon())
+    for label_key in labels:
+        label_idx = labels[label_key]
+        string_fxn = 'def '+ label_key + '_precision(y_true, y_pred):\n'
+        string_fxn += '\ttrue_positives = K.sum(K.sum(K.round(K.clip(y_true*y_pred, 0, 1)), axis=0), axis=0)\n'
+        string_fxn += '\tpredicted_positives = K.sum(K.sum(K.round(K.clip(y_pred, 0, 1)), axis=0), axis=0)\n'
+        string_fxn += '\treturn true_positives['+str(label_idx)+'] / (predicted_positives['+str(label_idx)+'] + K.epsilon())\n'
 
-	for label_key in labels:
-		label_idx = labels[label_key]
-		precision_fxns.append(lambda y_true, y_pred : precision(y_true, y_pred, label_idx))
+        exec(string_fxn)
+        precision_fxn = eval(label_key + '_precision')
+        precision_fxns.append(precision_fxn)
 
-	return precision_fxns
+    return precision_fxns
 
 
 def bqsr_get_metrics(classes=None, dim=2):
