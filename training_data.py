@@ -131,7 +131,7 @@ def tensors_from_tensor_map(args,
 	vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
 	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
 
-	tensor_channel_map = defines.get_tensor_channel_map_from_args(args)
+
 
 	if args.chrom:
 		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
@@ -183,10 +183,20 @@ def tensors_from_tensor_map(args,
 			read_tensors = {}
 			for tt in args.tensor_types:
 				args.tensor_map = tt
-				if "read_tensor" == tt:
+				if 'read_tensor' == tt:
 					read_tensors[tt] = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
-				elif "paired_reads" == tt:	
+				elif 'paired_reads' == tt:	
 					read_tensors[tt] = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
+				elif 'reads_only' == tt:
+					args.tensor_map = 'read_tensor'
+					rt = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)	
+					args.tensor_map = tt
+					read_tensors[tt] = rt[:len(defines.get_tensor_channel_map_from_args(args)), :, :]
+				elif 'reads_reference' == tt:
+					args.tensor_map = 'read_tensor'
+					rt = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
+					args.tensor_map = tt
+					read_tensors[tt] = rt[:len(defines.get_tensor_channel_map_from_args(args)), :, :]				
 				else:
 					raise ValueError("Unknown read tensor mapping."+tt)
 
