@@ -98,9 +98,10 @@ def run_training_data():
 
 
 def tensors_from_tensor_map(args, 
-							annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
-							pileup=False, 
-							reference_map='reference'):
+                            annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
+                            pileup=False, 
+                            reference_map='reference',
+                            include_annotations=True):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -133,12 +134,15 @@ def tensors_from_tensor_map(args,
 
 	tensor_channel_map = defines.get_tensor_channel_map_from_args(args)
 
-	if args.chrom:
+	if args.chrom and not (args.start_pos and args.end_pos):
+		variants = vcf_reader.fetch(args.chrom)
+	elif args.chrom and args.start_pos and args.end_pos:
 		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
 	else:
 		variants = vcf_reader
 
 	for variant in variants:
+	    	print(variant)
 		for allele_idx, allele in enumerate(variant.ALT):
 			idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 			contig = record_dict[variant.CHROM]	
@@ -172,14 +176,15 @@ def tensors_from_tensor_map(args,
 			if not cur_label_key or downsample(args, cur_label_key, stats, variant):
 				continue
 
-			annotation_data = {}
-			for a_set in annotation_sets:
-				annos = defines.annotations[a_set]
-				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
-					stats['Missing ALL annotations'] += 1
-					continue # Require at least 1 annotation...
-				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-
+			if include_annotations:
+				annotation_data = {}
+            			for a_set in annotation_sets:
+                			annos = defines.annotations[a_set]
+					if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
+						stats['Missing ALL annotations'] += 1
+						continue # Require at least 1 annotation...
+					annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
+            
 			read_tensors = {}
 			for tt in args.tensor_types:
 				args.tensor_map = tt
@@ -197,27 +202,29 @@ def tensors_from_tensor_map(args,
 
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
-			with h5py.File(tensor_path, 'w') as hf:
-				for rt in read_tensors:
-					hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
-				for a_set in annotation_sets:
-					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
-				if reference_map is not None:
-					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
-				if pileup:
-					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
-					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
-
+				with h5py.File(tensor_path, 'w') as hf:
+					for rt in read_tensors:
+						if read_tensors[rt]:
+							hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
+						if include_annotations:
+							for a_set in annotation_sets:
+								hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
+						if reference_map:
+							hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
+						if pileup:
+							pileup_tensor = read_tensor_to_pileup(args, read_tensor)
+							hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
+			
 			stats['count'] += 1
 			if stats['count']%500 == 0:
 				print('Wrote', stats['count'], 'tensors out of', args.samples, ' last variant:', str(variant))
 			if stats['count'] >= args.samples:
 				break
 
-	for s in stats.keys():
-		print(s, 'has:', stats[s])
-	if variant:
-		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
+		for s in stats.keys():
+			print(s, 'has:', stats[s])
+		if variant:
+			print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
 
 
 def calling_tensors_from_tensor_map(args, pileup=False):
@@ -2822,12 +2829,15 @@ def get_path_to_train_valid_or_test(args, contig):
 
 
 def get_train_valid_test_paths(args):
-	train_dir = args.data_dir + 'train/'
-	valid_dir = args.data_dir + 'valid/'
-	test_dir = args.data_dir + 'test/'
-	train_paths = [train_dir + tp for tp in sorted(os.listdir(train_dir)) if os.path.isdir(train_dir + tp)]
-	valid_paths = [valid_dir + vp for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(valid_dir + vp)]
-	test_paths = [test_dir + vp for vp in sorted(os.listdir(test_dir)) if os.path.isdir(test_dir + vp)]		
+
+	from os.path import join as pj
+
+	train_dir = pj(args.data_dir,'train')
+	valid_dir = pj(args.data_dir,'valid')
+	test_dir = pj(args.data_dir,'test')
+	train_paths = [pj(train_dir,tp) for tp in sorted(os.listdir(train_dir)) if os.path.isdir(pj(train_dir + tp))]
+	valid_paths = [pj(valid_dir,vp) for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(pj(valid_dir + vp))]
+	test_paths = [pj(test_dir,vp) for vp in sorted(os.listdir(test_dir)) if os.path.isdir(pj(test_dir + vp))]		
 
 	assert(len(train_paths) == len(valid_paths) == len(test_paths))
 
