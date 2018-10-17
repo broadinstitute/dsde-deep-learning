@@ -126,6 +126,7 @@ def parse_args():
 	parser.add_argument('--label_smoothing', default=0.0, type=float, help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
 	parser.add_argument('--base_quality_mode', default='phot', choices=['phot', 'phred', '1hot'],
 		help='How to treat base qualities, must be in [phot, phred, 1hot]')
+	parser.add_argument('--input_in_log_space', default = True, type=boolean, help='')
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
@@ -285,7 +286,7 @@ def label_bases_model_from_args(args):
 	concat_axis = -1	
 	x = read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name=args.tensor_name)
 	
-	max_pool_diff = len(args.conv_layers)-len(args.max_pools)	
+	max_pool_diff = len(args.conv_layers)-len(args.max_pools)
 	for i, (c, w) in enumerate(zip(args.conv_layers, args.conv_widths)):
 		in_x = x
 		if args.conv_batch_normalize:
@@ -660,6 +661,9 @@ def bqsr_label_tensors_generator(args, train_paths):
 			try:
 				with h5py.File(tp, 'r') as hf:
 					tensor[stats['batch_index']] = np.array(hf.get(args.tensor_name))
+					if args.input_in_log_space:
+						log_tmp = np.log(tensor[stats['batch_index'],:,:4])
+						tensor[stats['batch_index'],:,:4] = log_tmp
 					label_matrix[stats['batch_index']] = np.array(hf.get('bqsr_labels'))
 
 			except Exception as e:
@@ -710,9 +714,9 @@ def bqsr_get_train_valid_test_paths_all(args):
 	train_dir = args.data_dir + 'train/'
 	valid_dir = args.data_dir + 'valid/'
 	test_dir = args.data_dir + 'test/'
-	train_paths = [train_dir + tp for tp in sorted(os.listdir(train_dir))]
-	valid_paths = [valid_dir + vp for vp in sorted(os.listdir(valid_dir))]
-	test_paths = [test_dir + vp for vp in sorted(os.listdir(test_dir))]		
+	train_paths = [train_dir + tp for tp in os.listdir(train_dir)]
+	valid_paths = [valid_dir + vp for vp in os.listdir(valid_dir)]
+	test_paths = [test_dir + vp for vp in os.listdir(test_dir)]
 
 	return train_paths, valid_paths, test_paths
 
@@ -1089,26 +1093,6 @@ def bqsr_bed_file_to_dict(bed_file, shift1=1):
 		bed[k] = (np.array(bed[k][0]), np.array(bed[k][1]))		
 
 	return bed
-
-def recalibrate(args):
-	samfile = pysam.AlignmentFile(args.bam_file, "rb")
-
-	# convert to tensor
-	# load model
-	for read in samfile.fetch(args.chrom):
-		tensor = read_to_bqsr_tensor(read, args)
-
-		model = load_model(args.model, custom_objects=bqsr_get_metric_dict(args.labels, args.label_weights))
-		# model = load_model('/dsde/working/sam/dsde-deep-learning/weights/bqsr_anno_try_128_160_192_224_256x_lw07.hd5',
-		# 				   custom_objects=bqsr_get_metric_dict(args.labels))
-		recalibrated_tensor = model.predict(read)
-		recalibrated_read = bqsr_tensor_to_read(tensor, args)
-
-		# apply the model to tensor
-
-	#def bqsr_tensor_to_read(tensor, args):
-
-
 
 if __name__ == '__main__':
 	run() # Back to the top!
