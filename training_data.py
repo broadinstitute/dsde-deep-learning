@@ -142,7 +142,6 @@ def tensors_from_tensor_map(args,
 		variants = vcf_reader
 
 	for variant in variants:
-	    	print(variant)
 		for allele_idx, allele in enumerate(variant.ALT):
 			idx_offset, ref_start, ref_end = get_variant_window(args, variant)
 			contig = record_dict[variant.CHROM]	
@@ -202,19 +201,19 @@ def tensors_from_tensor_map(args,
 
 			if not os.path.exists(os.path.dirname(tensor_path)):
 				os.makedirs(os.path.dirname(tensor_path))
-				with h5py.File(tensor_path, 'w') as hf:
-					for rt in read_tensors:
-						if read_tensors[rt] is not None:
-							hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
-						if include_annotations:
-							for a_set in annotation_sets:
-								hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
-						if reference_map:
-							hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
-						if pileup:
-							pileup_tensor = read_tensor_to_pileup(args, read_tensor)
-							hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
-			
+			with h5py.File(tensor_path, 'w') as hf:
+				for rt in read_tensors:
+					if read_tensors[rt] is not None:
+						hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
+				if include_annotations:
+					for a_set in annotation_sets:
+						hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
+				if reference_map is not None:
+					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
+				if pileup:
+					pileup_tensor = read_tensor_to_pileup(args, read_tensor)
+					hf.create_dataset('pileup_tensor', data=pileup_tensor, compression='gzip')
+
 			stats['count'] += 1
 			if stats['count']%500 == 0:
 				print('Wrote', stats['count'], 'tensors out of', args.samples, ' last variant:', str(variant))
