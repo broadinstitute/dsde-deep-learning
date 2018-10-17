@@ -204,7 +204,7 @@ def tensors_from_tensor_map(args,
 				os.makedirs(os.path.dirname(tensor_path))
 				with h5py.File(tensor_path, 'w') as hf:
 					for rt in read_tensors:
-						if read_tensors[rt]:
+						if read_tensors[rt] is not None:
 							hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
 						if include_annotations:
 							for a_set in annotation_sets:
