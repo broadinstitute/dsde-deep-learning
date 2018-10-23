@@ -481,6 +481,9 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 		print('empirical p:', p, ' and quality:', q, file=stats_log)
 		print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf, file=stats_log)
 
+	with open(args.data_dir + "arguments.txt", "w") as arg_log:
+		print('Arguments are', args, file=arg_log)
+
 
 def stats_to_empirical_quality(stats, args):
 	num_bad_bases = stats[bad_bases_key]
