@@ -42,7 +42,7 @@ from keras.optimizers import SGD, Adam, RMSprop
 from keras.utils import plot_model, to_categorical
 from keras.models import Sequential, Model, load_model
 from keras.callbacks import ModelCheckpoint, EarlyStopping, TensorBoard, ReduceLROnPlateau
-from keras.layers import Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D
+from keras.layers import Activation, Flatten, Reshape, LSTM, merge, Permute, GlobalAveragePooling2D, MaxPooling1D
 from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
 
@@ -126,7 +126,8 @@ def parse_args():
 	parser.add_argument('--label_smoothing', default=0.0, type=float, help='Rate of smoothing for class labels  [0.0, 1.0] i.e. [label_smoothing, 1.0-label_smoothing].')
 	parser.add_argument('--base_quality_mode', default='phot', choices=['phot', 'phred', '1hot'],
 		help='How to treat base qualities, must be in [phot, phred, 1hot]')
-	parser.add_argument('--input_in_log_space', default = True, type=boolean, help='')
+	parser.add_argument('--input_in_log_space', default = False, type=bool, help='')
+	parser.add_argument('--use_original_quality', default = False, type=bool, help='Use original base qualities if available')
 
 	# Annotation arguments
 	parser.add_argument('--annotations', help='Array of annotation names, initialised via annotation_set argument')
@@ -196,7 +197,7 @@ def parse_args():
 	
 
 	# Genomic position for parallelization
-	parser.add_argument('--chrom', help='Chromosome to load for parallel tensor writing.')
+	parser.add_argument('--chrom', nargs='+', help='Chromosomes to load for parallel tensor writing.')
 	parser.add_argument('--start_pos', default=0, type=int,
 		help='Genomic position start for parallel tensor writing.')
 	parser.add_argument('--end_pos', default=0, type=int,
@@ -449,19 +450,25 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
 
 	margin = args.window_size
-	contig = record_dict[args.chrom]
-	for start,stop in zip(bed_dict[args.chrom][0], bed_dict[args.chrom][1]):
-		if stop - start < args.window_size:
-			stats['interval too small'] += 1
-			continue
-		last_variant = None
-		for v in vcf_ram.fetch(args.chrom, start, stop):
-			if last_variant is not None and (v.POS-last_variant.POS) > 2*args.window_size:
-				write_reads_in_region_to_tensors(args, samfile, contig, args.chrom, last_variant.POS+margin, v.POS-margin, stats)
-			last_variant = v
+        # TODO: int(c) below will not work with e.g. ChrX
+	contigs = [ record_dict[c] for c in args.chrom ]
+	for (i,c) in enumerate(args.chrom):
+		for start,stop in zip(bed_dict[c][0], bed_dict[c][1]):
+			if stop - start < args.window_size:
+				stats['interval too small'] += 1
+				continue
+			last_variant = None
+			if not any(vcf_ram.fetch(c, start, stop)):
+				# no variants in the interval and the interval is larger than the window size
+				write_reads_in_region_to_tensors(args, samfile, contigs[i], c, start, stop - margin, stats)
+			else:
+				for v in vcf_ram.fetch(c, start, stop):
+					if last_variant is not None and (v.POS-last_variant.POS) > 2*args.window_size:
+						write_reads_in_region_to_tensors(args, samfile, contigs[i], c, last_variant.POS+margin, v.POS-margin, stats)
+					last_variant = v
 
-		if stats['count'] >= args.samples:
-			break
+			if stats['count'] >= args.samples:
+				break
 
 	for k in stats.keys():
 		print('%s has %d' %(k, stats[k]))
@@ -480,8 +487,7 @@ def stats_to_empirical_quality(stats, args):
 
 def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
 	for read in samfile.fetch(chrom, start, stop):
-
-		read_group = read.get_tag('RG')	
+		read_group = read.get_tag('RG')
 		if 'artificial' in read_group.lower():
 			continue
 		if not read.is_proper_pair or not read.is_paired:
@@ -495,14 +501,14 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		got_bad_base = False
 	
 		label_vector = np.zeros((args.window_size, len(BQSR_LABELS)))
-		for ref_pos, read_idx in zip(read.get_reference_positions(), range(len(read.query_sequence))):	
+		for ref_pos, read_idx in zip(read.get_reference_positions(), np.arange(len(read.query_sequence))):
 			if chrom_seq[ref_pos] != read.query_sequence[read_idx]:
 				label_vector[read_idx, BQSR_LABELS['BAD_BASE']] = 1.0
 				got_bad_base = True
-				stats['bad bases'] += 1
+				stats[bad_bases_key] += 1
 			else:
-				label_vector[read_idx, BQSR_LABELS['GOOD_BASE']] = 1.0 
-				stats['good bases'] += 1			
+				label_vector[read_idx, BQSR_LABELS['GOOD_BASE']] = 1.0
+				stats[good_bases_key] += 1
 
 		if not got_bad_base:
 			stats[perfect_read_key] += 1
@@ -523,11 +529,11 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 				elif a.lower() == 'mappingquality':
 					annotation_data[i] = float(read.mapping_quality) / max_mq
 				elif a.lower() == 'cycle':
-					annotation_data[i] = float(read_idx) / args.window_size	
+					annotation_data[i] = float(read_idx) / args.window_size
 
-		tensor_path = bqsr_get_path_to_train_valid_or_test(args, args.chrom)	
+		tensor_path = bqsr_get_path_to_train_valid_or_test(args, chrom)
 		tensor_prefix = bqsr_plain_name(args.bam_file) +'_'+ bqsr_plain_name(args.ignore_vcf)
-		tensor_path += tensor_prefix + '-' + read_group.replace(':', '')+ args.chrom +'_'+ str(read.reference_start) + '.hd5'
+		tensor_path += tensor_prefix + '-' + read_group.replace(':', '')+ chrom +'_'+ str(read.reference_start) + '.hd5'
 		if not os.path.exists(os.path.dirname(tensor_path)):
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
@@ -541,7 +547,9 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 	
 def read_to_bqsr_tensor(read, args):
 	bqsr_tensor = np.zeros((args.window_size, len(args.input_symbols)))
-	bqsr_tensor[:, :4] = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
+	base_qualities = read.get_forward_qualities() if not args.use_original_quality else get_forward_oq(read)
+
+	bqsr_tensor[:, :4] = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), base_qualities.tolist())
 	for a in args.input_symbols:
 		if a.lower() == 'strand':
 			bqsr_tensor[:, args.input_symbols[a]] = float(read.is_reverse)
@@ -552,6 +560,11 @@ def read_to_bqsr_tensor(read, args):
 		elif a.lower() == 'cycle':
 			bqsr_tensor[:, args.input_symbols[a]] = np.arange(args.window_size) / float(args.window_size)
 	return bqsr_tensor
+
+def get_forward_oq(read):
+	''' get the original qualities if available '''
+	# TODO: account for the strand of the read
+	return read.get_tag('OQ')[::-1] if read.is_reverse else read.get_tag('OQ')
 
 def bqsr_get_path_to_train_valid_or_test(args, contig):
 	if any(x == contig for x in args.valid_contigs):
