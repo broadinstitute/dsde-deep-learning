@@ -83,6 +83,7 @@ precision_label = 'Precision | Positive Predictive Value | TP/(TP+FP)'
 recall_label = 'Recall | Sensitivity | True Positive Rate | TP/(TP+FN)'
 fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 bad_bases_key, perfect_read_key, good_bases_key = 'bad bases', 'perfect read', 'good bases'
+read_with_mismatch_key = 'read with mismatch'
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -470,20 +471,21 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 			if stats['count'] >= args.samples:
 				break
 
-	for k in stats.keys():
-		print('%s has %d' %(k, stats[k]))
+	with open(args.data_dir + "stats.txt", "w") as stats_log:
+		for k in stats.keys():
+			print('%s has %d' % (k, stats[k]), file=stats_log)
 
-	p = stats_to_empirical_quality(stats, args)
-	q = -10.0 * np.log10(p) 
-	print('empirical p:', p, ' and quality:', q)
-	print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf)
+		p = stats_to_empirical_quality(stats, args)
+		q = -10.0 * np.log10(p)
+
+		print('empirical p:', p, ' and quality:', q, file=stats_log)
+		print('Done generating BQSR tensors. Wrote them to:', args.data_dir ,' Known variation vcf:', args.ignore_vcf, file=stats_log)
 
 
 def stats_to_empirical_quality(stats, args):
 	num_bad_bases = stats[bad_bases_key]
 	num_good_bases = stats[good_bases_key] + stats[perfect_read_key] * args.window_size
 	return num_bad_bases / (num_bad_bases + num_good_bases)
-
 
 def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
 	for read in samfile.fetch(chrom, start, stop):
@@ -510,7 +512,10 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 				label_vector[read_idx, BQSR_LABELS['GOOD_BASE']] = 1.0
 				stats[good_bases_key] += 1
 
-		if not got_bad_base:
+		if got_bad_base:
+			stats[read_with_mismatch_key] += 1
+			# TODO: a histogram of num mismatches would be nice
+		else:
 			stats[perfect_read_key] += 1
 			dice = np.random.rand()
 			if dice < args.downsample_perfect_reads:
@@ -587,7 +592,7 @@ def bqsr_base_string_to_tensor(args, bases, qualities):
 
 	for i,b in enumerate(bases):
 		if b in DNA_SYMBOLS:
-			tensor[i, :len(DNA_SYMBOLS)] = bqsr_quality_from_mode(args, qualities[i], b, args.input_symbols)
+			tensor[i, :len(DNA_SYMBOLS)] = bqsr_quality_from_mode(args, qualities[i], b)
 		elif b in AMBIGUITY_CODES:
 			tensor[i, :len(DNA_SYMBOLS)] = AMBIGUITY_CODES[b]
 		elif b == SKIP_CHAR:
@@ -616,23 +621,26 @@ def bqsr_base_quality_to_phred_array(base_quality, base, base_dict):
 
 
 def bqsr_base_quality_to_p_hot_array(base_quality, base, base_dict):
-	phot = np.zeros((4,))
+	if base_quality <= 6:
+		return 0.25*np.ones(4)
+	p_hot = np.zeros((4,))
 	exponent = float(-base_quality) / 10.0
 	p = 1.0-(10.0**exponent)
 	not_p = (1.0-p)/3.0
 
 	for b in DNA_SYMBOLS:
 		if b == base:
-			phot[base_dict[b]] = p
+			p_hot[base_dict[b]] = p
 		elif b == INDEL_CHAR:
 			continue
 		else:
-			phot[base_dict[b]] = not_p
+			p_hot[base_dict[b]] = not_p
 
-	return phot
+	return p_hot
 
 
-def bqsr_quality_from_mode(args, base_quality, base, base_dict):
+def bqsr_quality_from_mode(args, base_quality, base):
+	base_dict=args.input_symbols
 	if args.base_quality_mode == 'phot':
 		return bqsr_base_quality_to_p_hot_array(base_quality, base, base_dict)
 	elif args.base_quality_mode == 'phred':
