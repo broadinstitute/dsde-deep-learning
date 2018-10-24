@@ -2339,7 +2339,6 @@ def tensor_generator(args, train_paths, tensor_shape):
 		for label in tensors.keys():
 			for i in range(per_batch_per_label):
 				tensor_path = tensors[label][tensor_counts[label]]
-
 				try:
 					with h5py.File(tensor_path,'r') as hf:
 						tensor[cur_example] = np.array(hf.get('read_tensor'))
@@ -2630,7 +2629,7 @@ def load_images_from_class_dirs(args, train_paths, shape=(224,224), per_class_ma
 	return (np.asarray(train_set), np.asarray(t_labels), np.asarray(positions))
 
 
-def load_tensors_from_class_dirs(args, train_paths, per_class_max=2500, dataset_id='read_tensor'):
+def load_tensors_from_class_dirs(args, train_paths, per_class_max=2500, dataset_id='read_tensor',tensor_shape=None):
 	count = 0
 
 	positions = []
@@ -2658,7 +2657,12 @@ def load_tensors_from_class_dirs(args, train_paths, per_class_max=2500, dataset_
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get(dataset_id)))
+				A = np.array(hf.get(dataset_id))
+				if tensor_shape:
+					if A.shape!=tensor_shape:
+						print("ERROR: unexpected tensor shape:",A.shape,"vs expected",tensor_shape)
+						continue
+				tensors.append(A)
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -2834,9 +2838,9 @@ def get_train_valid_test_paths(args):
 	train_dir = pj(args.data_dir,'train')
 	valid_dir = pj(args.data_dir,'valid')
 	test_dir = pj(args.data_dir,'test')
-	train_paths = [pj(train_dir,tp) for tp in sorted(os.listdir(train_dir)) if os.path.isdir(pj(train_dir + tp))]
-	valid_paths = [pj(valid_dir,vp) for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(pj(valid_dir + vp))]
-	test_paths = [pj(test_dir,vp) for vp in sorted(os.listdir(test_dir)) if os.path.isdir(pj(test_dir + vp))]		
+	train_paths = [pj(train_dir,tp) for tp in sorted(os.listdir(train_dir)) if os.path.isdir(pj(train_dir,tp))]
+	valid_paths = [pj(valid_dir,vp) for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(pj(valid_dir,vp))]
+	test_paths = [pj(test_dir,vp) for vp in sorted(os.listdir(test_dir)) if os.path.isdir(pj(test_dir,vp))]		
 
 	assert(len(train_paths) == len(valid_paths) == len(test_paths))
 
