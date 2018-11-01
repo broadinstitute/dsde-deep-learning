@@ -1079,7 +1079,7 @@ def per_class_precision_3d(labels):
 
 def bqsr_get_metrics(classes=None, dim=2):
     if classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
+        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + KL_divergence
     else:
         return [metrics.categorical_accuracy]
 
