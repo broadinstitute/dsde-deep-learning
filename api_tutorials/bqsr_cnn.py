@@ -20,6 +20,7 @@ import scipy
 import pysam
 import argparse
 import numpy as np
+import numpy.ma as ma
 from array import array
 from scipy import interpolate
 
@@ -85,6 +86,7 @@ recall_label = 'Recall | Sensitivity | True Positive Rate | TP/(TP+FN)'
 fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 bad_bases_key, perfect_read_key, good_bases_key = 'bad bases', 'perfect read', 'good bases'
 read_with_mismatch_key = 'read with mismatch'
+dropped_q2_read_key = 'dropped read with q2'
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -129,6 +131,7 @@ def parse_args():
 	parser.add_argument('--base_quality_mode', default='phot', choices=['phot', 'phred', '1hot'],
 		help='How to treat base qualities, must be in [phot, phred, 1hot]')
 	parser.add_argument('--map_input_to_logspace', default = False, type=bool, help='')
+	## TODO: this argument should say use_bqsr_quality - OQ should be the default
 	parser.add_argument('--use_original_quality', default = True, type=bool, help='Use original base qualities if available')
 	parser.add_argument('--remove_q2', default = True, type=bool, help='remove reads with quality 2 at the end from training set')
 
@@ -274,6 +277,8 @@ def bqsr_train_tensor(args):
 	test_truth = test_labels.reshape(melt_shape)	
 	bqsr_plot_precision_recall_per_class_predictions(predictions, test_truth, args.labels, args.id)
 
+	with open(args.data_dir + "/finished.txt", "w") as f:
+		print('finished at (TODO: time goes here)', file=f)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Models ~~~~~~~~~~~~~~~~~~~~~~~
@@ -457,7 +462,7 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 	record_dict = SeqIO.to_dict(SeqIO.parse(args.reference_fasta, "fasta"))
 
 	margin = args.window_size
-        # TODO: int(c) below will not work with e.g. ChrX
+    # TODO: int(c) below will not work with e.g. ChrX
 	contigs = [ record_dict[c] for c in args.chrom ]
 	for (i,c) in enumerate(args.chrom):
 		for start,stop in zip(bed_dict[c][0], bed_dict[c][1]):
@@ -476,6 +481,7 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 
 			if stats['count'] >= args.samples:
 				break
+
 
 	with open(args.data_dir + "stats.txt", "w") as stats_log:
 		for k in stats.keys():
@@ -509,6 +515,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			continue
 		num_bases_at_end = 10
 		if args.remove_q2 and 2 in read.get_forward_qualities()[-num_bases_at_end:]:
+			stats[dropped_q2_read_key] += 1
 			continue
 
 		assert(len(read.query_sequence) <= args.window_size)
@@ -534,7 +541,15 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 				stats['downsampled perfect reads'] += 1
 				continue
 
-		bqsr_tensor = read_to_bqsr_tensor(read, args)
+		# If the bam comes with OQ, then we will add the BQSR qualities to the tensor, too
+		# Contract is that the user should always use OQ if it's available
+		if args.use_original_quality:
+			# note that the scope of variables in an if-statement is the function that contains it
+			oq_tensor = read_to_bqsr_tensor(read, args)
+			bqsr_tesor = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
+		else:
+			bqsr_tensor = read_to_bqsr_tensor(read, args, use_oq=False)
+
 
 		if len(args.annotations) > 0:
 			annotation_data = np.zeros(( len(args.annotations), ))
@@ -554,7 +569,9 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		if not os.path.exists(os.path.dirname(tensor_path)):
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
-			hf.create_dataset(args.tensor_name, data=bqsr_tensor, compression='gzip')
+			if args.use_original_quality:
+				hf.create_dataset('oq', data=oq_tensor, compression='gzip')
+			hf.create_dataset('bqsr', data=bqsr_tensor, compression='gzip')
 			if len(args.annotations) > 0:
 				hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
 			hf.create_dataset('bqsr_labels', data=label_vector, compression='gzip')
@@ -562,9 +579,9 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		if stats['count']%400 == 0:
 			print('Wrote', stats['count'], 'tensors out of', args.samples)
 	
-def read_to_bqsr_tensor(read, args):
+def read_to_bqsr_tensor(read, args, use_oq=True):
 	bqsr_tensor = np.zeros((args.window_size, len(args.input_symbols)))
-	base_qualities = read.get_forward_qualities() if not args.use_original_quality else get_forward_oq(read)
+	base_qualities = read.get_forward_qualities() if not use_oq else get_forward_oq(read)
 
 	bqsr_tensor[:, :4] = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), base_qualities.tolist())
 	for a in args.input_symbols:
@@ -580,7 +597,6 @@ def read_to_bqsr_tensor(read, args):
 
 def get_forward_oq(read):
 	''' get the original qualities if available '''
-	# TODO: account for the strand of the read
 	OQ_TAG = 'OQ'
 	if not read.has_tag(OQ_TAG):
 		sys.exit("original quality requested but unavailable")
@@ -1023,6 +1039,7 @@ def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
 		metrics[label_key+'_precision'] = precision_fxns[i]
 		metrics[label_key+'_recall'] = recall_fxns[i]
 	metrics['loss'] = bqsr_weighted_categorical_crossentropy(label_weights)
+	metrics['KL_divergence'] = KL_divergence
 	return metrics
 
 
@@ -1094,7 +1111,29 @@ def bqsr_weighted_categorical_crossentropy(weights):
 
 	return loss
 
-def KL_divergence():
+def KL_divergence(y_true, y_pred):
+	'''
+	Compute the KL divergence between the match bases and the mismatch bases
+	'''
+
+	# TODO: there has got to be a KL divergence metric/implementation somewhere .... use it, maybe scikit learn
+	predicted_qs = -10 * np.log10(y_pred[:, :, args.labels['BAD_BASE']])
+	match_qs = (predicted_qs[:, :, np.newaxis] * y_true)[:, :, args.labels['GOOD_BASE']]
+	mismatch_qs = (predicted_qs[:, :, np.newaxis] * y_true)[:, :, args.labels['BAD_BASE']]
+	match_qs = match_qs[match_qs > 0]
+	mismatch_qs = mismatch_qs[mismatch_qs > 0]
+
+	# bins are half open: 1 will go in the [1,2) bin
+	max_quality = 50
+	match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range=(0, max_quality))
+	mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range=(0, max_quality))
+
+	# compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
+	# mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
+	ma_match_hist = ma.array(match_hist, mask=match_hist == 0)
+	ma_mismatch_hist = ma.array(mismatch_hist, mask=match_hist == 0)
+	KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
+	return KL
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
