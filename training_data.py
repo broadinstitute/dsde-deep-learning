@@ -2832,15 +2832,12 @@ def get_path_to_train_valid_or_test(args, contig):
 
 
 def get_train_valid_test_paths(args):
-
-	from os.path import join as pj
-
-	train_dir = pj(args.data_dir,'train')
-	valid_dir = pj(args.data_dir,'valid')
-	test_dir = pj(args.data_dir,'test')
-	train_paths = [pj(train_dir,tp) for tp in sorted(os.listdir(train_dir)) if os.path.isdir(pj(train_dir,tp))]
-	valid_paths = [pj(valid_dir,vp) for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(pj(valid_dir,vp))]
-	test_paths = [pj(test_dir,vp) for vp in sorted(os.listdir(test_dir)) if os.path.isdir(pj(test_dir,vp))]		
+	train_dir = os.path.join(args.data_dir,'train')
+	valid_dir = os.path.join(args.data_dir,'valid')
+	test_dir = os.path.join(args.data_dir,'test')
+	train_paths = [os.path.join(train_dir,tp) for tp in sorted(os.listdir(train_dir)) if os.path.isdir(os.path.join(train_dir,tp))]
+	valid_paths = [os.path.join(valid_dir,vp) for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(os.path.join(valid_dir,vp))]
+	test_paths = [os.path.join(test_dir,vp) for vp in sorted(os.listdir(test_dir)) if os.path.isdir(os.path.join(test_dir,vp))]		
 
 	assert(len(train_paths) == len(valid_paths) == len(test_paths))
 
