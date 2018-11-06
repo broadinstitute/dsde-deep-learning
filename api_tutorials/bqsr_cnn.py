@@ -1039,7 +1039,8 @@ def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
 		metrics[label_key+'_precision'] = precision_fxns[i]
 		metrics[label_key+'_recall'] = recall_fxns[i]
 	metrics['loss'] = bqsr_weighted_categorical_crossentropy(label_weights)
-	metrics['KL_divergence'] = KL_divergence
+	# on hold for now
+	# metrics['KL_divergence'] = KL_divergence
 	return metrics
 
 
@@ -1079,7 +1080,7 @@ def per_class_precision_3d(labels):
 
 def bqsr_get_metrics(classes=None, dim=2):
     if classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + KL_divergence
+        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
     else:
         return [metrics.categorical_accuracy]
 
@@ -1111,29 +1112,29 @@ def bqsr_weighted_categorical_crossentropy(weights):
 
 	return loss
 
-def KL_divergence(y_true, y_pred):
-	'''
-	Compute the KL divergence between the match bases and the mismatch bases
-	'''
-
-	# TODO: there has got to be a KL divergence metric/implementation somewhere .... use it, maybe scikit learn
-	predicted_qs = -10 * np.log10(y_pred[:, :, args.labels['BAD_BASE']])
-	match_qs = (predicted_qs[:, :, np.newaxis] * y_true)[:, :, args.labels['GOOD_BASE']]
-	mismatch_qs = (predicted_qs[:, :, np.newaxis] * y_true)[:, :, args.labels['BAD_BASE']]
-	match_qs = match_qs[match_qs > 0]
-	mismatch_qs = mismatch_qs[mismatch_qs > 0]
-
-	# bins are half open: 1 will go in the [1,2) bin
-	max_quality = 50
-	match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range=(0, max_quality))
-	mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range=(0, max_quality))
-
-	# compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
-	# mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
-	ma_match_hist = ma.array(match_hist, mask=match_hist == 0)
-	ma_mismatch_hist = ma.array(mismatch_hist, mask=match_hist == 0)
-	KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
-	return KL
+# def KL_divergence(y_true, y_pred):
+# 	'''
+# 	Compute the KL divergence between the match bases and the mismatch bases
+# 	'''
+#
+# 	# TODO: for this to be a metric it needs to use the backend functions, not numpy
+# 	predicted_qs = -10 * np.log10(y_pred[:, :, args.labels['BAD_BASE']])
+# 	match_qs = (predicted_qs[:, :, np.newaxis] * y_true)[:, :, args.labels['GOOD_BASE']]
+# 	mismatch_qs = (predicted_qs[:, :, np.newaxis] * y_true)[:, :, args.labels['BAD_BASE']]
+# 	match_qs = match_qs[match_qs > 0]
+# 	mismatch_qs = mismatch_qs[mismatch_qs > 0]
+#
+# 	# bins are half open: 1 will go in the [1,2) bin
+# 	max_quality = 50
+# 	match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range=(0, max_quality))
+# 	mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range=(0, max_quality))
+#
+# 	# compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
+# 	# mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
+# 	ma_match_hist = ma.array(match_hist, mask=match_hist == 0)
+# 	ma_mismatch_hist = ma.array(mismatch_hist, mask=match_hist == 0)
+# 	KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
+# 	return KL
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
