@@ -87,6 +87,7 @@ fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 bad_bases_key, perfect_read_key, good_bases_key = 'bad bases', 'perfect read', 'good bases'
 read_with_mismatch_key = 'read with mismatch'
 dropped_q2_read_key = 'dropped read with q2'
+BQSR_TENSOR_NAME, OQ_TENSOR_NAME = 'bqsr', 'oq'
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -172,7 +173,7 @@ def parse_args():
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
 	parser.add_argument('--semantics_json', default='')
-	parser.add_argument('--tensor_name', default='bqsr', help='Key which looks up the map from tensor channels to their meaning.')
+	parser.add_argument('--tensor_name', default=BQSR_TENSOR_NAME, help='Key which looks up the map from tensor channels to their meaning.')
 	parser.add_argument('--weights_hd5', default='', help='A hd5 file of weights to initialize a model, will use all layers with names that match.')
 	parser.add_argument('--ignore_vcf', help='VCF of variant sites to ignore when making training data.')
 	parser.add_argument('--bed_file', help='Bed file specifying high confident intervals.')
@@ -502,6 +503,22 @@ def stats_to_empirical_quality(stats, args):
 	num_good_bases = stats[good_bases_key] + stats[perfect_read_key] * args.window_size
 	return num_bad_bases / (num_bad_bases + num_good_bases)
 
+def read_meets_data_qc(read, stats, fail_read_with_q2=True):
+	read_group = read.get_tag('RG')
+	if 'artificial' in read_group.lower():
+		return False
+	if not read.is_proper_pair or not read.is_paired:
+		return False
+	if read.is_duplicate or read.is_secondary or read.is_supplementary or read.is_qcfail or read.is_unmapped:
+		return False
+	if "S" in read.cigarstring:
+		return False
+	num_bases_at_end = 10 # if q2 appears within this many bases from the end, consider this a bad base
+	if fail_read_with_q2 and 2 in read.get_forward_qualities()[-num_bases_at_end:]:
+		stats[dropped_q2_read_key] += 1
+		return False
+	return True
+
 def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
 	for read in samfile.fetch(chrom, start, stop):
 		read_group = read.get_tag('RG')
@@ -545,7 +562,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		# Contract is that the user should always use OQ if it's available
 		if args.use_original_quality:
 			# note that the scope of variables in an if-statement is the function that contains it
-			oq_tensor = read_to_bqsr_tensor(read, args)
+			oq_tensor = read_to_bqsr_tensor(read, args, use_oq=args.use_original_quality)
 			bqsr_tesor = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
 		else:
 			bqsr_tensor = read_to_bqsr_tensor(read, args, use_oq=False)
@@ -570,8 +587,8 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			os.makedirs(os.path.dirname(tensor_path))
 		with h5py.File(tensor_path, 'w') as hf:
 			if args.use_original_quality:
-				hf.create_dataset('oq', data=oq_tensor, compression='gzip')
-			hf.create_dataset('bqsr', data=bqsr_tensor, compression='gzip')
+				hf.create_dataset(OQ_TENSOR_NAME, data=oq_tensor, compression='gzip')
+			hf.create_dataset(BQSR_TENSOR_NAME, data=bqsr_tensor, compression='gzip')
 			if len(args.annotations) > 0:
 				hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
 			hf.create_dataset('bqsr_labels', data=label_vector, compression='gzip')
