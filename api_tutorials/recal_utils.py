@@ -14,42 +14,41 @@ def tensor_to_quality_array(tensor):
 def KL_divergence_metric(y_true, y_pred):
 	'''	KL divergence metrics for Keras - still under construction '''
 
-    # maybe scikit learn
-    predicted_qs = -10*np.log10(y_pred[:,:, args.labels['BAD_BASE']])
-    match_qs = (predicted_qs[:,:,np.newaxis] * y_true)[:,:, args.labels['GOOD_BASE']]
-    mismatch_qs = (predicted_qs[:,:,np.newaxis] * y_true)[:,:, args.labels['BAD_BASE']]
-    match_qs = match_qs[match_qs > 0]
-    mismatch_qs = mismatch_qs[mismatch_qs > 0]
+	# maybe scikit learn
+	predicted_qs = -10*np.log10(y_pred[:,:, args.labels['BAD_BASE']])
+	match_qs = (predicted_qs[:,:,np.newaxis] * y_true)[:,:, args.labels['GOOD_BASE']]
+	mismatch_qs = (predicted_qs[:,:,np.newaxis] * y_true)[:,:, args.labels['BAD_BASE']]
+	match_qs = match_qs[match_qs > 0]
+	mismatch_qs = mismatch_qs[mismatch_qs > 0]
 
+	# bins are half open: 1 will go in the [1,2) bin
+	max_quality=50
+	match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range = (0,max_quality))
+	mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range = (0,max_quality))
 
-    # bins are half open: 1 will go in the [1,2) bin
-    max_quality=50
-    match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range = (0,max_quality))
-    mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range = (0,max_quality))
-
-    # compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
-    # mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
-    ma_match_hist = ma.array(match_hist/np.sum(match_hist), mask=match_hist == 0)
-    ma_mismatch_hist = ma.array(mismatch_hist/np.sum(mismatch_hist), mask=match_hist == 0)
-    print(ma_match_hist)
-    print(ma_mismatch_hist)
-    print(entropy(ma_match_hist, ma_mismatch_hist))
-    KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
-    return KL
+	# compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
+	# mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
+	ma_match_hist = ma.array(match_hist/np.sum(match_hist), mask=match_hist == 0)
+	ma_mismatch_hist = ma.array(mismatch_hist/np.sum(mismatch_hist), mask=match_hist == 0)
+	print(ma_match_hist)
+	print(ma_mismatch_hist)
+	print(entropy(ma_match_hist, ma_mismatch_hist))
+	KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
+	return KL
 
 def KL_divergence(match_qs, mismatch_qs):
-    ''' compute the KL divergence between the predicted qualities of bases that match the reference and those that don't
-    match_qs and mismatch_qs are both arrays of qualities, unsorted and unrounded, straight out of the CNN or SAM.
-    greater the KL divergence, the greater the separation between the two distributions
-    '''
-    # bins are half open: 1 will go in the [1,2) bin
-    max_quality=50
-    match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range = (0,max_quality))
-    mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range = (0,max_quality))
+	''' compute the KL divergence between the predicted qualities of bases that match the reference and those that don't
+	match_qs and mismatch_qs are both arrays of qualities, unsorted and unrounded, straight out of the CNN or SAM.
+	greater the KL divergence, the greater the separation between the two distributions
+	'''
+	# bins are half open: 1 will go in the [1,2) bin
+	max_quality=50
+	match_hist, match_bins = np.histogram(np.round(match_qs), bins=max_quality, range = (0,max_quality))
+	mismatch_hist, mismatch_bins = np.histogram(np.round(mismatch_qs), bins=max_quality, range = (0,max_quality))
 
-    # compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
-    # mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
-    ma_match_hist = ma.array(match_hist, mask=match_hist == 0)
-    ma_mismatch_hist = ma.array(mismatch_hist, mask=match_hist == 0)
-    KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
-    return KL
+	# compute the KL divergence KL(match||mismatch) - the order chosen arbitrariliy i.e. could've easily chosen KL(mismatch||match)
+	# mask bins with 0 probability mass because numpy doens't know 0*log(0)=0
+	ma_match_hist = ma.array(match_hist, mask=match_hist == 0)
+	ma_mismatch_hist = ma.array(mismatch_hist, mask=match_hist == 0)
+	KL = -ma.sum(ma_match_hist * ma.log(ma_mismatch_hist)) - ma.sum(- ma_match_hist * ma.log(ma_match_hist))
+	return KL
