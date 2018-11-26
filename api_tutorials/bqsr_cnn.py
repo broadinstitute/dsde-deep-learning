@@ -87,7 +87,7 @@ fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 bad_bases_key, perfect_read_key, good_bases_key = 'bad bases', 'perfect read', 'good bases'
 read_with_mismatch_key = 'read with mismatch'
 dropped_q2_read_key = 'dropped read with q2'
-BQSR_TENSOR_NAME, OQ_TENSOR_NAME = 'bqsr', 'oq'
+BQSR_TENSOR_NAME, OQ_TENSOR_NAME, LABEL_TENSOR_NAME = 'bqsr', 'oq', 'bqsr_labels'
 
 def run():
 	'''Parse arguments, create a model and dispatch on mode'''
@@ -591,7 +591,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			hf.create_dataset(BQSR_TENSOR_NAME, data=bqsr_tensor, compression='gzip')
 			if len(args.annotations) > 0:
 				hf.create_dataset(args.annotation_set, data=annotation_data, compression='gzip')
-			hf.create_dataset('bqsr_labels', data=label_vector, compression='gzip')
+			hf.create_dataset(LABEL_TENSOR_NAME, data=label_vector, compression='gzip')
 		stats['count'] += 1
 		if stats['count']%400 == 0:
 			print('Wrote', stats['count'], 'tensors out of', args.samples)
@@ -708,7 +708,7 @@ def bqsr_plain_name(full_name):
 	return name.split('.')[0]
 
 
-def bqsr_label_tensors_generator(args, train_paths):
+def bqsr_label_tensors_generator(args, train_paths, has_oq=False):
 	'''Data generator of read tensors for calling variants and site labels for segmentation ground truth.
 
 	Loops over all examples yielding args.batch_size examples.
@@ -720,22 +720,33 @@ def bqsr_label_tensors_generator(args, train_paths):
 	Returns:
 		A tuple with a dict of the input tensors 
 		and a 1-Hot matrix (2D numpy array) of the labels
-	'''	
+	'''
+
+
+	'''
+	For evaluation purposes it's nice to store both OQ and post-BQSR qualities in the hd5 file.
+	The rule is the caller must explicitly specify 'bqsr' or 'oq' in order to access these tensors.
+	For now I will always use OQ, but in the future, if I start using novaseq and what now, I may need to revisit this code.
+	Maybe the oq tensor would be empty when it is not available.
+	'''
 	tensors = {}
-	stats = Counter()
+	i = 0
 
 	tensor = np.zeros((args.batch_size, args.window_size, len(args.input_symbols)))
+	bqsr_tensor = np.zeros((args.batch_size, args.window_size, len(DNA_SYMBOLS)))
 	label_matrix = np.zeros((args.batch_size, args.window_size, len(args.labels)))
 	print('batch shape is:', tensor.shape)
 	while True:
 		for tp in train_paths:
 			try:
 				with h5py.File(tp, 'r') as hf:
-					tensor[stats['batch_index']] = np.array(hf.get(args.tensor_name))
+					tensor[i] = np.array(hf.get(OQ_TENSOR_NAME))
+					bqsr_tensor[i] = np.array(hf.get(BQSR_TENSOR_NAME))
+
 					if args.map_input_to_logspace:
-						log_tmp = np.log(tensor[stats['batch_index'],:,:4])
-						tensor[stats['batch_index'],:,:4] = log_tmp
-					label_matrix[stats['batch_index']] = np.array(hf.get('bqsr_labels'))
+						log_tmp = np.log(tensor[i,:,:4])
+						tensor[i,:,:4] = log_tmp
+					label_matrix[i] = np.array(hf.get(LABEL_TENSOR_NAME))
 
 			except Exception as e:
 				print('Exception for tensor at:', tp, '\n\n\nError is:', str(e))
@@ -744,10 +755,10 @@ def bqsr_label_tensors_generator(args, train_paths):
 				raise Exception('bad tensor')
 				#continue
 
-			stats['batch_index'] += 1
-			if stats['batch_index'] == args.batch_size:
-				yield ({args.tensor_name:tensor}, label_matrix)
-				stats['batch_index'] = 0
+			i += 1
+			if i == args.batch_size:
+				yield ({OQ_TENSOR_NAME : tensor, BQSR_TENSOR_NAME : bqsr_tensor}, label_matrix)
+				i = 0
 
 		print('\n\nGenerator looped over all ', len(train_paths),' tensors, now shuffle them. Last tensor was:', train_paths[-1])
 		np.random.shuffle(train_paths)
