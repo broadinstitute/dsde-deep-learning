@@ -249,7 +249,7 @@ def bqsr_train_tensor(args):
 	with open(args.output_dir + "/arguments.txt", "w") as arg_log:
 		print('Arguments are', args, file=arg_log)
 
-	train_paths, valid_paths, test_paths = bqsr_get_train_valid_test_paths_all(args)
+	train_paths, valid_paths, test_paths = bqsr_get_train_valid_test_paths_all(args.data_dir)
 
 	generate_train = bqsr_label_tensors_generator(args, train_paths)
 	generate_valid = bqsr_label_tensors_generator(args, valid_paths)
@@ -563,7 +563,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		if args.use_original_quality:
 			# note that the scope of variables in an if-statement is the function that contains it
 			oq_tensor = read_to_bqsr_tensor(read, args, use_oq=args.use_original_quality)
-			bqsr_tesor = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
+			bqsr_tensor = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
 		else:
 			bqsr_tensor = read_to_bqsr_tensor(read, args, use_oq=False)
 
@@ -781,10 +781,10 @@ def bqsr_position_string_from_tensor_name(tensor_name):
 	return pos_str	
 
 
-def bqsr_get_train_valid_test_paths_all(args):
-	train_dir = args.data_dir + 'train/'
-	valid_dir = args.data_dir + 'valid/'
-	test_dir = args.data_dir + 'test/'
+def bqsr_get_train_valid_test_paths_all(data_dir):
+	train_dir = data_dir + 'train/'
+	valid_dir = data_dir + 'valid/'
+	test_dir = data_dir + 'test/'
 	train_paths = [train_dir + tp for tp in os.listdir(train_dir)]
 	valid_paths = [valid_dir + vp for vp in os.listdir(valid_dir)]
 	test_paths = [test_dir + vp for vp in os.listdir(test_dir)]
