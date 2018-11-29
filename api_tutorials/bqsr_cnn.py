@@ -86,7 +86,7 @@ recall_label = 'Recall | Sensitivity | True Positive Rate | TP/(TP+FN)'
 fallout_label = 'Fallout | 1 - Specificity | False Positive Rate | FP/(FP+TN)'
 bad_bases_key, perfect_read_key, good_bases_key = 'bad bases', 'perfect read', 'good bases'
 read_with_mismatch_key = 'read with mismatch'
-dropped_q2_read_key = 'dropped read with q2'
+dropped_error_q_key = 'dropped read with q < 6'
 BQSR_TENSOR_NAME, OQ_TENSOR_NAME, LABEL_TENSOR_NAME = 'bqsr', 'oq', 'bqsr_labels'
 
 def run():
@@ -134,7 +134,7 @@ def parse_args():
 	parser.add_argument('--map_input_to_logspace', default = False, type=bool, help='')
 	## TODO: this argument should say use_bqsr_quality - OQ should be the default
 	parser.add_argument('--use_original_quality', default = True, type=bool, help='Use original base qualities if available')
-	parser.add_argument('--remove_q2', default = True, type=bool, help='remove reads with quality 2 at the end from training set')
+	parser.add_argument('--remove_reads_with_error', default = True, type=bool, help='remove reads with quality < 6 from training set')
 
 
 	# Annotation arguments
@@ -169,7 +169,9 @@ def parse_args():
 	parser.add_argument('--fc_initializer', default='glorot_normal',
 		help='Initializer for fully connected (dense) layers.')
 	parser.add_argument('--resnet', default=False, action='store_true',
-		help='Add residual connections around hidden layers.') 
+		help='Add residual connections around hidden layers.')
+	parser.add_argument('--skip_connections', default=[0, -1, 0, 0], nargs='+',
+		help='Residual connections. Should have the same number of elements as the conv_layers')
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
 	parser.add_argument('--semantics_json', default='')
@@ -299,6 +301,7 @@ def label_bases_model_from_args(args):
 	'''	
 	concat_axis = -1	
 	x = read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name=args.tensor_name)
+	xs = []
 	
 	max_pool_diff = len(args.conv_layers)-len(args.max_pools)
 	for i, (c, w) in enumerate(zip(args.conv_layers, args.conv_widths)):
@@ -320,9 +323,10 @@ def label_bases_model_from_args(args):
 		if i >= max_pool_diff:
 			x = MaxPooling1D(args.max_pools[i-max_pool_diff])(x)
 
-		if args.resnet and in_x != read_tensor:
-			shortcut = in_x
-			#shortcut = Conv1D(c, 1, kernel_initializer=args.kernel_initializer)(in_x)
+		xs.append(x)
+		skip_origin_idx = i + int(args.skip_connections[i])
+		if args.skip_connections[i] != 0:
+			shortcut = xs[skip_origin_idx]
 			if args.conv_batch_normalize:
 				shortcut = BatchNormalization(axis=concat_axis)(shortcut)
 			x = keras.layers.add([x, shortcut])   
@@ -503,7 +507,7 @@ def stats_to_empirical_quality(stats, args):
 	num_good_bases = stats[good_bases_key] + stats[perfect_read_key] * args.window_size
 	return num_bad_bases / (num_bad_bases + num_good_bases)
 
-def read_meets_data_qc(read, stats, fail_read_with_q2=True):
+def read_meets_data_qc(read, stats, remove_read_with_error_base=True):
 	read_group = read.get_tag('RG')
 	if 'artificial' in read_group.lower():
 		return False
@@ -513,26 +517,15 @@ def read_meets_data_qc(read, stats, fail_read_with_q2=True):
 		return False
 	if "S" in read.cigarstring:
 		return False
-	num_bases_at_end = 10 # if q2 appears within this many bases from the end, consider this a bad base
-	if fail_read_with_q2 and 2 in read.get_forward_qualities()[-num_bases_at_end:]:
-		stats[dropped_q2_read_key] += 1
+	if remove_read_with_error_base and 2 in any(q < 6 for q in read.get_forward_qualities()):
+		stats[dropped_error_q_key] += 1
 		return False
 	return True
 
 def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, stop, stats):
 	for read in samfile.fetch(chrom, start, stop):
 		read_group = read.get_tag('RG')
-		if 'artificial' in read_group.lower():
-			continue
-		if not read.is_proper_pair or not read.is_paired:
-			continue
-		if read.is_duplicate or read.is_secondary or read.is_supplementary or read.is_qcfail or read.is_unmapped:
-			continue
-		if "S" in read.cigarstring:
-			continue
-		num_bases_at_end = 10
-		if args.remove_q2 and 2 in read.get_forward_qualities()[-num_bases_at_end:]:
-			stats[dropped_q2_read_key] += 1
+		if not read_meets_data_qc(read, stats, args.remove_reads_with_error):
 			continue
 
 		assert(len(read.query_sequence) <= args.window_size)
@@ -562,8 +555,8 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 		# Contract is that the user should always use OQ if it's available
 		if args.use_original_quality:
 			# note that the scope of variables in an if-statement is the function that contains it
-			oq_tensor = read_to_bqsr_tensor(read, args, use_oq=args.use_original_quality)
-			bqsr_tensor = bqsr_base_string_to_tensor(args, read.get_forward_sequence(), read.get_forward_qualities().tolist())
+			oq_tensor = read_to_bqsr_tensor(read, args, use_oq=True)
+			bqsr_tensor = read_to_bqsr_tensor(read, args, use_oq=False)
 		else:
 			bqsr_tensor = read_to_bqsr_tensor(read, args, use_oq=False)
 
