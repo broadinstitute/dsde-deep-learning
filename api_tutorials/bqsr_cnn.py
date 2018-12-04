@@ -170,7 +170,7 @@ def parse_args():
 		help='Initializer for fully connected (dense) layers.')
 	parser.add_argument('--resnet', default=False, action='store_true',
 		help='Add residual connections around hidden layers.')
-	parser.add_argument('--skip_connections', default=[0, -1, 0, 0], nargs='+',
+	parser.add_argument('--skip_connections', default=[0, 0, 0, 0], nargs='+',
 		help='Residual connections. Should have the same number of elements as the conv_layers')
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
@@ -230,6 +230,8 @@ def parse_args():
 	np.random.seed(args.random_seed)
 	print('Arguments are', args)
 	K.set_learning_phase(0)
+
+	assert len(args.conv_layers) == len(args.skip_connections)
 	
 	return args
 
@@ -701,7 +703,7 @@ def bqsr_plain_name(full_name):
 	return name.split('.')[0]
 
 
-def bqsr_label_tensors_generator(args, train_paths, has_oq=False):
+def bqsr_label_tensors_generator(args, train_paths, include_bqsr=True):
 	'''Data generator of read tensors for calling variants and site labels for segmentation ground truth.
 
 	Loops over all examples yielding args.batch_size examples.
@@ -750,7 +752,10 @@ def bqsr_label_tensors_generator(args, train_paths, has_oq=False):
 
 			i += 1
 			if i == args.batch_size:
-				yield ({OQ_TENSOR_NAME : tensor, BQSR_TENSOR_NAME : bqsr_tensor}, label_matrix)
+				if include_bqsr:
+					yield ({OQ_TENSOR_NAME: tensor}, label_matrix)
+				else:
+					yield ({OQ_TENSOR_NAME : tensor, BQSR_TENSOR_NAME : bqsr_tensor}, label_matrix)
 				i = 0
 
 		print('\n\nGenerator looped over all ', len(train_paths),' tensors, now shuffle them. Last tensor was:', train_paths[-1])
