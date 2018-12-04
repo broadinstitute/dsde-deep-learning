@@ -519,7 +519,7 @@ def read_meets_data_qc(read, stats, remove_read_with_error_base=True):
 		return False
 	if "S" in read.cigarstring:
 		return False
-	if remove_read_with_error_base and 2 in any(q < 6 for q in read.get_forward_qualities()):
+	if remove_read_with_error_base and any(q < 6 for q in read.get_forward_qualities()):
 		stats[dropped_error_q_key] += 1
 		return False
 	return True
