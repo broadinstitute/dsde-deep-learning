@@ -16,6 +16,7 @@ import json
 import h5py
 import time
 import math
+import pdb
 import scipy
 import pysam
 import argparse
@@ -255,9 +256,9 @@ def bqsr_train_tensor(args):
 
 	train_paths, valid_paths, test_paths = bqsr_get_train_valid_test_paths_all(args.data_dir)
 
-	generate_train = bqsr_label_tensors_generator(args, train_paths)
-	generate_valid = bqsr_label_tensors_generator(args, valid_paths)
-	generate_test = bqsr_label_tensors_generator(args, test_paths)
+	generate_train = bqsr_label_tensors_generator(args, train_paths, False)
+	generate_valid = bqsr_label_tensors_generator(args, valid_paths, False)
+	generate_test = bqsr_label_tensors_generator(args, test_paths, False)
 
 	model = label_bases_model_from_args(args)
 	if args.inspect_model:
@@ -728,7 +729,7 @@ def bqsr_label_tensors_generator(args, train_paths, include_bqsr=True):
 	i = 0
 
 	tensor = np.zeros((args.batch_size, args.window_size, len(args.input_symbols)))
-	bqsr_tensor = np.zeros((args.batch_size, args.window_size, len(DNA_SYMBOLS)))
+	bqsr_tensor = np.zeros((args.batch_size, args.window_size, len(args.input_symbols)))
 	label_matrix = np.zeros((args.batch_size, args.window_size, len(args.labels)))
 	print('batch shape is:', tensor.shape)
 	while True:
@@ -752,7 +753,7 @@ def bqsr_label_tensors_generator(args, train_paths, include_bqsr=True):
 
 			i += 1
 			if i == args.batch_size:
-				if include_bqsr:
+				if not include_bqsr:
 					yield ({OQ_TENSOR_NAME: tensor}, label_matrix)
 				else:
 					yield ({OQ_TENSOR_NAME : tensor, BQSR_TENSOR_NAME : bqsr_tensor}, label_matrix)
