@@ -171,7 +171,7 @@ def parse_args():
 		help='Initializer for fully connected (dense) layers.')
 	parser.add_argument('--resnet', default=False, action='store_true',
 		help='Add residual connections around hidden layers.')
-	parser.add_argument('--skip_connections', default=[0, 0, 0, 0], nargs='+',
+	parser.add_argument('--skip_connections', default=[0, 0, 0, 0], nargs='+', type=int,
 		help='Residual connections. Should have the same number of elements as the conv_layers')
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
