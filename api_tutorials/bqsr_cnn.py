@@ -121,7 +121,7 @@ def parse_args():
 
 	# Tensor defining arguments
 	parser.add_argument('--labels', default=BQSR_LABELS, help='Dict mapping label names to their index within label tensors.')
-	parser.add_argument('--label_weights',  nargs='+', default=[0.5, 0.5], type=float, help='List of weights for each label.')
+	parser.add_argument('--label_weights',  nargs='+', default=[], type=float, help='List of weights for each label.')
 	parser.add_argument('--input_symbol_set', default='dna_annotations', choices=INPUT_SYMBOLS.keys(), help='Key which maps to an input symbol to index mapping.')
 	parser.add_argument('--input_symbols', default=None, help='Dict mapping input symbols to their index within input tensors, initialised via input_symbols_set argument')
 	parser.add_argument('--batch_size', default=32, type=int, help='Mini batch size for stochastic gradient descent algorithms.')
@@ -264,6 +264,9 @@ def bqsr_train_tensor(args):
 	if args.inspect_model:
 		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
+
+	with open(args.output_dir + "/" + args.id + ".txt") as f:
+		print(model.summary(), file=f)
 	
 	test = next(generate_test)
 	bqsr_plot_roc_per_class(model, test[0][args.tensor_name], test[1], args.labels, args.id, melt=True)
@@ -340,8 +343,9 @@ def label_bases_model_from_args(args):
 	model = Model(inputs=read_tensor, outputs=conv_out)
 
 	weighted_loss = bqsr_weighted_categorical_crossentropy(args.label_weights)
+	loss = keras.losses.categorical_crossentropy if len(args.label_weights) == 0 else weighted_loss
 
-	model.compile(optimizer=Adam(lr=1e-4), loss=weighted_loss, metrics=bqsr_get_metrics(args.labels, dim=3))
+	model.compile(optimizer=Adam(lr=1e-4), loss=loss, metrics=bqsr_get_metrics(args.labels, dim=3))
 
 	model.summary()
 	
@@ -1104,13 +1108,16 @@ def per_class_precision_3d(labels):
 
     return precision_fxns
 
+def average_mismatch_base_quality(y_true, y_pred):
+	''' The average quality of mismatch bases in a batch.
+	    We want this metrics to decrease as training progresses '''
+	pass
 
 def bqsr_get_metrics(classes=None, dim=2):
     if classes and dim == 3:
         return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
     else:
         return [metrics.categorical_accuracy]
-
 
 def bqsr_weighted_categorical_crossentropy(weights):
 	"""

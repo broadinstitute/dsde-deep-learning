@@ -3,6 +3,21 @@ import numpy.ma as ma
 from scipy.stats import entropy
 
 
+def get_next_batch(generator, quality_correction=0.0):
+	batch = next(generator)
+	tensor = batch[0][OQ_TENSOR_NAME]
+	bqsr = batch[0][BQSR_TENSOR_NAME]
+	label = batch[1]
+	pred = model.predict_on_batch(tensor)
+	pred_qscores = -10 * np.log10(
+		pred[:, :, args.labels['BAD_BASE']]) + quality_correction  # +10 only if the tensor is generated with a bias
+
+	orig_qscores = -10 * np.log10(1 - np.max(tensor[:, :, :4], axis=2))
+	annot = tensor[:, 0, (args.input_symbols['pair'], args.input_symbols['mq'])]
+
+	return pred_qscores, orig_qscores, bqsr, label, annot
+
+
 def tensor_to_quality_array(tensor):
 	'''
     tensor : (batch_size, 151, 7)
