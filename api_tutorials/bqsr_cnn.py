@@ -1094,6 +1094,10 @@ def kl_divergence(y_true, y_pred):
         return tf.distributions.kl_divergence(match, mismatch)
 
 def distance_in_mean(y_true, y_pred):
+        ''' Distance between mean base quality of match bases and mismatch baesese.
+            In the event of the model learning the trivial solution, this metric shoudld go close to 0
+        '''
+        
         # drop irrelevant entries
         y = y_pred * y_true
         # y_match = y[:,:,BQSR_LABELS['GOOD_BASE']]
@@ -1106,11 +1110,11 @@ def distance_in_mean(y_true, y_pred):
         y_match = tf.boolean_mask(y_match, y_match > 0.0)
         y_mismatch = tf.boolean_mask(y_mismatch, y_mismatch > 0.0)
 
-        # ln_of_10 = tf.log(tf.constant(10, dtype=y.dtype))
-        # match_quals = K.round(tf.log(y_match) / ln_of_10)
-        # mismatch_quals = K.round(tf.log(y_mismatch) / ln_of_10)
+        ln_of_10 = tf.log(tf.constant(10, dtype=y.dtype))
+        match_quals = K.round(-10 * tf.log(1-y_match) / ln_of_10)
+        mismatch_quals = K.round(-10 * tf.log(1-y_mismatch) / ln_of_10)
 
-        return K.mean(y_match) - K.mean(y_mismatch)
+        return K.mean(match_quals) - K.mean(mismatch_quals)
 
 def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
 	metrics = {}
@@ -1165,7 +1169,7 @@ def average_mismatch_base_quality(y_true, y_pred):
 
 def bqsr_get_metrics(classes=None, dim=2):
     if classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + [distance_in_mean]
+        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + [distance_in_mean, kl_divergence]
     else:
         return [metrics.categorical_accuracy]
 
