@@ -49,6 +49,8 @@ from keras.layers import Activation, Flatten, Reshape, LSTM, merge, Permute, Glo
 from keras.layers import Add, Input, Dense, Dropout, BatchNormalization, SpatialDropout2D, SpatialDropout1D
 from keras.layers.convolutional import Conv1D, Conv2D, ZeroPadding2D, UpSampling1D, UpSampling2D, Conv2DTranspose
 
+import tensorflow as tf
+
 HD5_EXT = '.hd5'
 IMAGE_EXT = '.png'
 
@@ -176,7 +178,7 @@ def parse_args():
 
 	# I/O files and directories: vcfs, bams, beds, hd5, fasta
 	parser.add_argument('--semantics_json', default='')
-	parser.add_argument('--tensor_name', default=BQSR_TENSOR_NAME, help='Key which looks up the map from tensor channels to their meaning.')
+	parser.add_argument('--tensor_name', default=OQ_TENSOR_NAME, help='Key which looks up the map from tensor channels to their meaning.')
 	parser.add_argument('--weights_hd5', default='', help='A hd5 file of weights to initialize a model, will use all layers with names that match.')
 	parser.add_argument('--ignore_vcf', help='VCF of variant sites to ignore when making training data.')
 	parser.add_argument('--bed_file', help='Bed file specifying high confident intervals.')
@@ -708,7 +710,7 @@ def bqsr_plain_name(full_name):
 	return name.split('.')[0]
 
 
-def bqsr_label_tensors_generator(args, train_paths, include_bqsr=True):
+def bqsr_label_tensors_generator(args, train_paths, include_bqsr=False):
 	'''Data generator of read tensors for calling variants and site labels for segmentation ground truth.
 
 	Loops over all examples yielding args.batch_size examples.
@@ -716,6 +718,7 @@ def bqsr_label_tensors_generator(args, train_paths, include_bqsr=True):
 	Arguments:
 		args: args object needed for batch_size, labels, and annotations
 		train_paths: directory with hd5 calling tensors made with write_calling_tensors()
+                include_bqsr: also return the BQSR tensors. Set to True when comparing the CNN with BQSR qualities
 
 	Returns:
 		A tuple with a dict of the input tensors 
@@ -1062,6 +1065,53 @@ def bqsr_get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def kl_divergence(y_true, y_pred):
+        # drop irrelevant entries
+        y = y_pred * y_true
+        y_match = tf.reshape(y[:,:,BQSR_LABELS['GOOD_BASE']], [-1])
+        y_mismatch = tf.reshape(y[:,:,BQSR_LABELS['BAD_BASE']], [-1])
+
+        # remove 0's
+        y_match = tf.boolean_mask(y_match, y_match > 0.0)
+        y_mismatch = tf.boolean_mask(y_mismatch, y_mismatch > 0.0)
+
+        # ln_of_10 = tf.log(tf.constant(10, dtype=y.dtype))
+        # match_quals = K.round(tf.log(y_match) / ln_of_10)
+        # mismatch_quals = K.round(tf.log(y_mismatch) / ln_of_10)
+
+        num_bins = 100
+
+        # KL divergence is undefined when one of the discrete distributions has 0 mass and the other doesn't.
+        # To work around this problem, we'll put a Dirichlet prior with pseudocounts 1.
+        # And use the categorical distribution defined by the MAP estimate of the weights
+        # see : https://mathoverflow.net/questions/72668/how-to-compute-kl-divergence-when-pmf-contains-0s
+        match_dist = (tf.histogram_fixed_width(y_match, [0.0, 1.0], nbins=num_bins) + 1) / tf.size(y_match)
+        mismatch_dist = (tf.histogram_fixed_width(y_mismatch, [0.0, 1.0], nbins=num_bins) + 1) / tf.size(y_mismatch)
+
+        match = tf.distributions.Categorical(probs=match_dist)
+        mismatch = tf.distributions.Categorical(probs=mismatch_dist)
+
+        return tf.distributions.kl_divergence(match, match)
+
+def distance_in_mean(y_true, y_pred):
+        # drop irrelevant entries
+        y = y_pred * y_true
+        # y_match = y[:,:,BQSR_LABELS['GOOD_BASE']]
+        # y_mismatch = y[:,:,BQSR_LABELS['BAD_BASE']]
+
+        y_match = tf.reshape(y[:,:,BQSR_LABELS['GOOD_BASE']], [-1])
+        y_mismatch = tf.reshape(y[:,:,BQSR_LABELS['BAD_BASE']], [-1])
+
+        # remove 0's
+        y_match = tf.boolean_mask(y_match, y_match > 0.0)
+        y_mismatch = tf.boolean_mask(y_mismatch, y_mismatch > 0.0)
+
+        # ln_of_10 = tf.log(tf.constant(10, dtype=y.dtype))
+        # match_quals = K.round(tf.log(y_match) / ln_of_10)
+        # mismatch_quals = K.round(tf.log(y_mismatch) / ln_of_10)
+
+        return K.mean(y_match) - K.mean(y_mismatch)
+
 def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
 	metrics = {}
 	precision_fxns = per_class_recall_3d(labels)
@@ -1115,7 +1165,7 @@ def average_mismatch_base_quality(y_true, y_pred):
 
 def bqsr_get_metrics(classes=None, dim=2):
     if classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes)
+        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + [distance_in_mean]
     else:
         return [metrics.categorical_accuracy]
 
