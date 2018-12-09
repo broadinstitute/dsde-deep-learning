@@ -1085,13 +1085,13 @@ def kl_divergence(y_true, y_pred):
         # To work around this problem, we'll put a Dirichlet prior with pseudocounts 1.
         # And use the categorical distribution defined by the MAP estimate of the weights
         # see : https://mathoverflow.net/questions/72668/how-to-compute-kl-divergence-when-pmf-contains-0s
-        match_dist = (tf.histogram_fixed_width(y_match, [0.0, 1.0], nbins=num_bins) + 1) / tf.size(y_match)
-        mismatch_dist = (tf.histogram_fixed_width(y_mismatch, [0.0, 1.0], nbins=num_bins) + 1) / tf.size(y_mismatch)
+        match_dist = (tf.histogram_fixed_width(y_match, [0.0, 1.0], nbins=num_bins) + 1) / (tf.size(y_match) + num_bins)
+        mismatch_dist = (tf.histogram_fixed_width(y_mismatch, [0.0, 1.0], nbins=num_bins) + 1) / (tf.size(y_mismatch) + num_bins)
 
         match = tf.distributions.Categorical(probs=match_dist)
         mismatch = tf.distributions.Categorical(probs=mismatch_dist)
 
-        return tf.distributions.kl_divergence(match, match)
+        return tf.distributions.kl_divergence(match, mismatch)
 
 def distance_in_mean(y_true, y_pred):
         # drop irrelevant entries
