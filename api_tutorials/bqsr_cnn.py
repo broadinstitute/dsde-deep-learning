@@ -16,14 +16,10 @@ import json
 import h5py
 import time
 import math
-import pdb
-import scipy
 import pysam
 import argparse
 import numpy as np
-import numpy.ma as ma
 from array import array
-from scipy import interpolate
 
 import matplotlib
 matplotlib.use('Agg') # Need this to write images from the GSA servers.  Order matters:
@@ -560,7 +556,7 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			if dice < args.downsample_perfect_reads:
 				stats['downsampled perfect reads'] += 1
 				continue
-            stats[perfect_read_key] += 1
+			stats[perfect_read_key] += 1
 			stats[good_bases_key] += args.window_size
 
 		# If the bam comes with OQ, then we will add the BQSR qualities to the tensor, too
