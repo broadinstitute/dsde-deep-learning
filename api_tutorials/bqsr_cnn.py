@@ -263,13 +263,12 @@ def bqsr_train_tensor(args):
 	generate_test = bqsr_label_tensors_generator(args, test_paths, False)
 
 	model = label_bases_model_from_args(args)
+	with open(args.output_dir  + "model.txt") as f:
+		print(model.summary(), file=f)
 	if args.inspect_model:
 		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
 
-	with open(args.output_dir  + "model.txt") as f:
-		print(model.summary(), file=f)
-	
 	test = next(generate_test)
 	bqsr_plot_roc_per_class(model, test[0][args.tensor_name], test[1], args.labels, args.id, melt=True)
 	test_tensors = np.zeros((args.iterations*args.batch_size, args.window_size, len(args.input_symbols)))
@@ -498,6 +497,7 @@ def write_base_recalibrate_tensors(args, include_annotations=True):
 
 
 	with open(args.data_dir + "stats.txt", "w") as stats_log:
+		print('Perfect reads downsampled at %f' % args.downsample_perfect_reads)
 		for k in stats.keys():
 			print('%s has %d' % (k, stats[k]), file=stats_log)
 
@@ -539,26 +539,29 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 
 		assert(len(read.query_sequence) <= args.window_size)
 		got_bad_base = False
-	
+
+		num_bad_bases_in_read = 0
 		label_vector = np.zeros((args.window_size, len(BQSR_LABELS)))
 		for ref_pos, read_idx in zip(read.get_reference_positions(), np.arange(len(read.query_sequence))):
 			if chrom_seq[ref_pos] != read.query_sequence[read_idx]:
 				label_vector[read_idx, BQSR_LABELS['BAD_BASE']] = 1.0
 				got_bad_base = True
-				stats[bad_bases_key] += 1
+				num_bad_bases_in_read += 1
 			else:
 				label_vector[read_idx, BQSR_LABELS['GOOD_BASE']] = 1.0
-				stats[good_bases_key] += 1
 
 		if got_bad_base:
 			stats[read_with_mismatch_key] += 1
+			stats[bad_bases_key] += num_bad_bases_in_read
+			stats[good_bases_key] += args.window_size - num_bad_bases_in_read
 			# TODO: a histogram of num mismatches would be nice
 		else:
 			dice = np.random.rand()
 			if dice < args.downsample_perfect_reads:
 				stats['downsampled perfect reads'] += 1
 				continue
-                        stats[perfect_read_key] += 1
+            stats[perfect_read_key] += 1
+			stats[good_bases_key] += args.window_size
 
 		# If the bam comes with OQ, then we will add the BQSR qualities to the tensor, too
 		# Contract is that the user should always use OQ if it's available
