@@ -267,7 +267,7 @@ def bqsr_train_tensor(args):
 		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
 	model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
 
-	with open(args.output_dir + "/" + args.id + ".txt") as f:
+	with open(args.output_dir  + "model.txt") as f:
 		print(model.summary(), file=f)
 	
 	test = next(generate_test)
@@ -554,11 +554,11 @@ def write_reads_in_region_to_tensors(args, samfile, chrom_seq, chrom, start, sto
 			stats[read_with_mismatch_key] += 1
 			# TODO: a histogram of num mismatches would be nice
 		else:
-			stats[perfect_read_key] += 1
 			dice = np.random.rand()
 			if dice < args.downsample_perfect_reads:
 				stats['downsampled perfect reads'] += 1
 				continue
+                        stats[perfect_read_key] += 1
 
 		# If the bam comes with OQ, then we will add the BQSR qualities to the tensor, too
 		# Contract is that the user should always use OQ if it's available
