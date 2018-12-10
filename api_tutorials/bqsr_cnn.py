@@ -259,7 +259,7 @@ def bqsr_train_tensor(args):
 	generate_test = bqsr_label_tensors_generator(args, test_paths, False)
 
 	model = label_bases_model_from_args(args)
-	with open(args.output_dir  + "model.txt") as f:
+	with open(args.output_dir  + "model.txt", "w") as f:
 		print(model.summary(), file=f)
 	if args.inspect_model:
 		bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
@@ -1116,15 +1116,17 @@ def distance_in_mean(y_true, y_pred):
         return K.mean(match_quals) - K.mean(mismatch_quals)
 
 def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
-	metrics = {}
+        ''' Keras needs to know all about the custom metrics when it loads the model.
+        So acount for them here. '''
+       metrics = {}
 	precision_fxns = per_class_recall_3d(labels)
 	recall_fxns = per_class_recall_3d(labels)
 	for i,label_key in enumerate(labels.keys()):
 		metrics[label_key+'_precision'] = precision_fxns[i]
 		metrics[label_key+'_recall'] = recall_fxns[i]
 	metrics['loss'] = bqsr_weighted_categorical_crossentropy(label_weights)
-	# on hold for now
-	# metrics['KL_divergence'] = KL_divergence
+	metrics['kl_divergence'] = kl_divergence
+        metrics['distance_in_mean'] = distance_in_mean
 	return metrics
 
 
