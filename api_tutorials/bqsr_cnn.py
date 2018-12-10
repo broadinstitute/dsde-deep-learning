@@ -1064,6 +1064,14 @@ def bqsr_get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+def read_variance(y_true, y_pred):
+    ''' per base variance of read qualities across a batch
+        designed to detect the model learning the trivial solution
+    '''
+    read_length = tf.shape(y_pred)[1] # this should equal the length of the read
+    return K.sum(K.var(y_pred[:,:,BQSR_LABELS['GOOD_BASE']], axis=0))/read_length
+
+
 def kl_divergence(y_true, y_pred):
     # drop irrelevant entries
     y = y_pred * y_true
@@ -1126,7 +1134,8 @@ def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
         metrics[label_key+'_recall'] = recall_fxns[i]
     metrics['loss'] = bqsr_weighted_categorical_crossentropy(label_weights)
     metrics['kl_divergence'] = kl_divergence
-        metrics['distance_in_mean'] = distance_in_mean
+    metrics['distance_in_mean'] = distance_in_mean
+    metrics['read_variance'] = read_variance
     return metrics
 
 
