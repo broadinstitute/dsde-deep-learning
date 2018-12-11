@@ -260,7 +260,8 @@ def bqsr_train_tensor(args):
 
     model = label_bases_model_from_args(args)
     with open(args.output_dir  + "model.txt", "w") as f:
-        print(model.summary(), file=f)
+        with redirect_stdout(f):
+            model.summary()
     if args.inspect_model:
         bqsr_inspect_model(args, model, generate_train, generate_valid, args.output_dir+args.id+IMAGE_EXT)
     model = bqsr_train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir+args.id+HD5_EXT)
@@ -844,7 +845,7 @@ def bqsr_train_model_from_generators(args, model, generate_train, generate_valid
         validation_steps=args.validation_steps, validation_data=generate_valid,
         callbacks=bqsr_get_callbacks(args, save_weight_hd5))
 
-    bqsr_plot_metric_history(history, bqsr_weight_path_to_title(save_weight_hd5))
+    bqsr_plot_metric_history(history, bqsr_weight_path_to_title(save_weight_hd5), prefix=args.output_dir)
     print('Model weights saved at: %s' % save_weight_hd5)
     
     return model
@@ -1064,12 +1065,15 @@ def bqsr_get_fpr_tpr_roc_pred(y_pred, test_truth, labels):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # ~~~~~~~ Metrics ~~~~~~~~~~~~~~~~~
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-def read_variance(y_true, y_pred):
+def num_validation_samples(y_true, y_pred):
+    ''' just for sanity checking '''
+    return K.shape(y_true)[0]
+
+def read_std(y_true, y_pred):
     ''' per base variance of read qualities across a batch
         designed to detect the model learning the trivial solution
     '''
-    read_length = tf.shape(y_pred)[1] # this should equal the length of the read
-    return K.sum(K.var(y_pred[:,:,BQSR_LABELS['GOOD_BASE']], axis=0))/read_length
+    return K.sum(K.std(y_pred[:,:,BQSR_LABELS['GOOD_BASE']], axis=0)) / 151
 
 
 def kl_divergence(y_true, y_pred):
@@ -1135,7 +1139,8 @@ def bqsr_get_metric_dict(labels=BQSR_LABELS, label_weights=[0.05, 0.95]):
     metrics['loss'] = bqsr_weighted_categorical_crossentropy(label_weights)
     metrics['kl_divergence'] = kl_divergence
     metrics['distance_in_mean'] = distance_in_mean
-    metrics['read_variance'] = read_variance
+    metrics['read_std'] = read_std
+    metrics['num_validation_samples'] = num_validation_samples
     return metrics
 
 
@@ -1179,7 +1184,7 @@ def average_mismatch_base_quality(y_true, y_pred):
 
 def bqsr_get_metrics(classes=None, dim=2):
     if classes and dim == 3:
-        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + [distance_in_mean, kl_divergence]
+        return [metrics.categorical_accuracy] + per_class_precision_3d(classes) + per_class_recall_3d(classes) + [distance_in_mean, kl_divergence, read_std, num_validation_samples]
     else:
         return [metrics.categorical_accuracy]
 
