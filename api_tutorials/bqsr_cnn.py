@@ -20,6 +20,7 @@ import pysam
 import argparse
 import numpy as np
 from array import array
+from contextlib import redirect_stdout
 
 import matplotlib
 matplotlib.use('Agg') # Need this to write images from the GSA servers.  Order matters:
@@ -169,7 +170,7 @@ def parse_args():
         help='Initializer for fully connected (dense) layers.')
     parser.add_argument('--resnet', default=False, action='store_true',
         help='Add residual connections around hidden layers.')
-    parser.add_argument('--skip_connections', default=[0, 0, 0, 0], nargs='+', type=int,
+    parser.add_argument('--skip_connections', default=[], nargs='+', type=int,
         help='Residual connections. Should have the same number of elements as the conv_layers')
 
     # I/O files and directories: vcfs, bams, beds, hd5, fasta
@@ -230,7 +231,7 @@ def parse_args():
     print('Arguments are', args)
     K.set_learning_phase(0)
 
-    assert len(args.conv_layers) == len(args.skip_connections)
+    assert len(args.skip_connections) == 0 or len(args.conv_layers) == len(args.skip_connections)
     
     return args
 
@@ -303,7 +304,7 @@ def label_bases_model_from_args(args):
     Returns
         The keras model
     ''' 
-    concat_axis = -1    
+    concat_axis = -1
     x = read_tensor = Input(shape=(args.window_size, len(args.input_symbols)), name=args.tensor_name)
     xs = []
     
@@ -329,7 +330,7 @@ def label_bases_model_from_args(args):
 
         xs.append(x)
         skip_origin_idx = i + int(args.skip_connections[i])
-        if args.skip_connections[i] != 0:
+        if len(args.skip_connection) > 0 and args.skip_connections[i] != 0:
             shortcut = xs[skip_origin_idx]
             if args.conv_batch_normalize:
                 shortcut = BatchNormalization(axis=concat_axis)(shortcut)
@@ -743,8 +744,8 @@ def bqsr_label_tensors_generator(args, train_paths, include_bqsr=False):
         for tp in train_paths:
             try:
                 with h5py.File(tp, 'r') as hf:
-                    tensor[i] = np.array(hf.get(OQ_TENSOR_NAME))
-                    bqsr_tensor[i] = np.array(hf.get(BQSR_TENSOR_NAME))
+                    tensor[i] = np.array(hf.get(OQ_TENSOR_NAME))[:, :len(args.input_symbols)]
+                    bqsr_tensor[i] = np.array(hf.get(BQSR_TENSOR_NAME))[:, :len(args.input_symbols)]
 
                     if args.map_input_to_logspace:
                         log_tmp = np.log(tensor[i,:,:4])
