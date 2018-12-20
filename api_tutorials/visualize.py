@@ -346,7 +346,7 @@ def image_journey(args, model):
 	objective_switch = 20 
 	counter = 0
 	
-	input_img_data = cv2_image_load(args, images[0])
+	input_img_data = cv2_image_load(args, args.images[0])
 	for img in args.images[1:]:
 		cur_img = cv2_image_load(args, img)
 		img_fxn = grad_towards_input(args, model, cur_img, layer_dict)
