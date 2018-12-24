@@ -41,9 +41,9 @@ p_lut = np.zeros((256,))
 not_p_lut = np.zeros((256,))
 
 for i in range(256):
-    exponent = float(-i) / 10.0
-    p_lut[i] = 1.0 - (10.0**exponent)
-    not_p_lut[i] = (1.0 - p_lut[i]) / 3.0
+	exponent = float(-i) / 10.0
+	p_lut[i] = 1.0 - (10.0**exponent)
+	not_p_lut[i] = (1.0 - p_lut[i]) / 3.0
 
 
 def run_training_data():
@@ -98,10 +98,10 @@ def run_training_data():
 
 
 def tensors_from_tensor_map(args, 
-                            annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
-                            pileup=False, 
-                            reference_map='reference',
-                            include_annotations=True):
+							annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
+							pileup=False, 
+							reference_map='reference',
+							include_annotations=True):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -177,13 +177,13 @@ def tensors_from_tensor_map(args,
 
 			if include_annotations:
 				annotation_data = {}
-            			for a_set in annotation_sets:
-                			annos = defines.annotations[a_set]
+				for a_set in annotation_sets:
+					annos = defines.annotations[a_set]
 					if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
 						stats['Missing ALL annotations'] += 1
 						continue # Require at least 1 annotation...
 					annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-            
+
 			read_tensors = {}
 			for tt in args.tensor_types:
 				args.tensor_map = tt
@@ -2970,11 +2970,11 @@ def base_quality_to_p_hot_array_old(base_quality, base, base_dict):
 	return phot
 
 def base_quality_to_p_hot_array(base_quality, base, base_dict):
-    not_p = not_p_lut[base_quality]
-    phot = [not_p, not_p, not_p, not_p]
-    phot[base_dict[base]] = p_lut[base_quality]
+	not_p = not_p_lut[base_quality]
+	phot = [not_p, not_p, not_p, not_p]
+	phot[base_dict[base]] = p_lut[base_quality]
 
-    return phot
+	return phot
 
 
 def quality_from_mode(args, base_quality, base, base_dict):
