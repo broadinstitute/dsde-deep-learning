@@ -684,8 +684,8 @@ def train_ref_read_c(args):
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
-	test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max=800)
-	plots.plot_roc_per_class(model, [test[0]], test[1], args.labels, args.id)
+	test = td.load_tensors_from_class_dirs(args, test_paths, per_class_max=800,dataset_id='read_tensor',tensor_shape=tensor_shape)
+	plots.plot_roc_per_class(model,[test[0]], test[1], args.labels, args.id)
 
 
 

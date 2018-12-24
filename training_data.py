@@ -98,9 +98,10 @@ def run_training_data():
 
 
 def tensors_from_tensor_map(args, 
-							annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
-							pileup=False, 
-							reference_map='reference'):
+                            annotation_sets=['best_practices', 'm2mix', 'm2combine'], 
+                            pileup=False, 
+                            reference_map='reference',
+                            include_annotations=True):
 	'''Create tensors structured as tensor map of reads organized by labels in the data directory.
 
 	Defines true variants as those in the args.train_vcf, defines false variants as 
@@ -133,7 +134,9 @@ def tensors_from_tensor_map(args,
 
 
 
-	if args.chrom:
+	if args.chrom and not (args.start_pos and args.end_pos):
+		variants = vcf_reader.fetch(args.chrom)
+	elif args.chrom and args.start_pos and args.end_pos:
 		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
 	else:
 		variants = vcf_reader
@@ -172,14 +175,15 @@ def tensors_from_tensor_map(args,
 			if not cur_label_key or downsample(args, cur_label_key, stats, variant):
 				continue
 
-			annotation_data = {}
-			for a_set in annotation_sets:
-				annos = defines.annotations[a_set]
-				if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
-					stats['Missing ALL annotations'] += 1
-					continue # Require at least 1 annotation...
-				annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
-
+			if include_annotations:
+				annotation_data = {}
+            			for a_set in annotation_sets:
+                			annos = defines.annotations[a_set]
+					if all(map(lambda x: x not in variant.INFO and x not in variant.FORMAT and x != "QUAL", annos)):
+						stats['Missing ALL annotations'] += 1
+						continue # Require at least 1 annotation...
+					annotation_data[a_set] = get_annotation_data(args, variant, stats, allele_idx, annos)
+            
 			read_tensors = {}
 			for tt in args.tensor_types:
 				args.tensor_map = tt
@@ -209,9 +213,11 @@ def tensors_from_tensor_map(args,
 				os.makedirs(os.path.dirname(tensor_path))
 			with h5py.File(tensor_path, 'w') as hf:
 				for rt in read_tensors:
-					hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
-				for a_set in annotation_sets:
-					hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
+					if read_tensors[rt] is not None:
+						hf.create_dataset(rt, data=read_tensors[rt], compression='gzip')
+				if include_annotations:
+					for a_set in annotation_sets:
+						hf.create_dataset(a_set, data=annotation_data[a_set], compression='gzip')
 				if reference_map is not None:
 					hf.create_dataset(reference_map, data=reference_tensor, compression='gzip')
 				if pileup:
@@ -224,10 +230,10 @@ def tensors_from_tensor_map(args,
 			if stats['count'] >= args.samples:
 				break
 
-	for s in stats.keys():
-		print(s, 'has:', stats[s])
-	if variant:
-		print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
+		for s in stats.keys():
+			print(s, 'has:', stats[s])
+		if variant:
+			print('Generated tensors at:', args.data_dir, '\nLast variant:', str(variant), 'from vcf:', args.negative_vcf)
 
 
 def calling_tensors_from_tensor_map(args, pileup=False):
@@ -2355,7 +2361,6 @@ def tensor_generator(args, train_paths, tensor_shape):
 		for label in tensors.keys():
 			for i in range(per_batch_per_label):
 				tensor_path = tensors[label][tensor_counts[label]]
-
 				try:
 					with h5py.File(tensor_path,'r') as hf:
 						tensor[cur_example] = np.array(hf.get('read_tensor'))
@@ -2646,7 +2651,7 @@ def load_images_from_class_dirs(args, train_paths, shape=(224,224), per_class_ma
 	return (np.asarray(train_set), np.asarray(t_labels), np.asarray(positions))
 
 
-def load_tensors_from_class_dirs(args, train_paths, per_class_max=2500, dataset_id='read_tensor'):
+def load_tensors_from_class_dirs(args, train_paths, per_class_max=2500, dataset_id='read_tensor',tensor_shape=None):
 	count = 0
 
 	positions = []
@@ -2674,7 +2679,12 @@ def load_tensors_from_class_dirs(args, train_paths, per_class_max=2500, dataset_
 				continue
 
 			with h5py.File(tp+'/'+t, 'r') as hf:
-				tensors.append(np.array(hf.get(dataset_id)))
+				A = np.array(hf.get(dataset_id))
+				if tensor_shape:
+					if A.shape!=tensor_shape:
+						print("ERROR: unexpected tensor shape:",A.shape,"vs expected",tensor_shape)
+						continue
+				tensors.append(A)
 				
 			y_vector = np.zeros(len(args.labels)) # One hot Y vector of size labels, correct label is 1 all others are 0
 			y_vector[label] = 1.0
@@ -2844,12 +2854,12 @@ def get_path_to_train_valid_or_test(args, contig):
 
 
 def get_train_valid_test_paths(args):
-	train_dir = args.data_dir + 'train/'
-	valid_dir = args.data_dir + 'valid/'
-	test_dir = args.data_dir + 'test/'
-	train_paths = [train_dir + tp for tp in sorted(os.listdir(train_dir)) if os.path.isdir(train_dir + tp)]
-	valid_paths = [valid_dir + vp for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(valid_dir + vp)]
-	test_paths = [test_dir + vp for vp in sorted(os.listdir(test_dir)) if os.path.isdir(test_dir + vp)]		
+	train_dir = os.path.join(args.data_dir,'train')
+	valid_dir = os.path.join(args.data_dir,'valid')
+	test_dir = os.path.join(args.data_dir,'test')
+	train_paths = [os.path.join(train_dir,tp) for tp in sorted(os.listdir(train_dir)) if os.path.isdir(os.path.join(train_dir,tp))]
+	valid_paths = [os.path.join(valid_dir,vp) for vp in sorted(os.listdir(valid_dir)) if os.path.isdir(os.path.join(valid_dir,vp))]
+	test_paths = [os.path.join(test_dir,vp) for vp in sorted(os.listdir(test_dir)) if os.path.isdir(os.path.join(test_dir,vp))]		
 
 	assert(len(train_paths) == len(valid_paths) == len(test_paths))
 
