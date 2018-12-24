@@ -80,7 +80,7 @@ def build_reference_model(args):
 	#x = Dense(units=32, activation='relu')(x)
 	#x = Dropout(0.5)(x)	
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
@@ -264,7 +264,7 @@ def build_reference_annotation_skip_model(args):
 		channel_axis = 1
 
 	channel_map = defines.get_tensor_channel_map_from_args(args)	
-	reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	conv_width = 12
 	conv_dropout = 0.1
 	fc_dropout = 0.2
@@ -275,7 +275,7 @@ def build_reference_annotation_skip_model(args):
 	x = Dropout(conv_dropout)(x)	
 	x = Flatten()(x)
 
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	annos_normed = BatchNormalization(axis=channel_axis)(annotations)
 	annos_normed_x = Dense(units=40, kernel_initializer='normal', activation='relu')(annos_normed)
 
@@ -731,26 +731,26 @@ def separable_2d_annotation_model_from_args(args,
 
 	read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
-	x = layers.Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(read_tensor_in)
+	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv1')(read_tensor_in)
 	x = layers.BatchNormalization(name='block1_conv1_bn')(x)
 	x = layers.Activation('relu', name='block1_conv1_act')(x)
 	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv2')(x)
 	x = layers.BatchNormalization(name='block1_conv2_bn')(x)
 	x = layers.Activation('relu', name='block1_conv2_act')(x)
 
-	residual = layers.Conv2D(128, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(64, (1, 1), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
-	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
+	x = layers.SeparableConv2D(64, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
 	x = layers.BatchNormalization(name='block2_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block2_sepconv2_act')(x)
-	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
+	x = layers.SeparableConv2D(64, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
 	x = layers.BatchNormalization(name='block2_sepconv2_bn')(x)
 
-	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_pool')(x)
+	#x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_pool')(x)
 	x = layers.add([x, residual])
 
-	residual = layers.Conv2D(728, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(64, (1, 1), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
 	# x = layers.Activation('relu', name='block3_sepconv1_act')(x)
@@ -767,49 +767,49 @@ def separable_2d_annotation_model_from_args(args,
 	# residual = layers.BatchNormalization()(residual)
 
 	x = layers.Activation('relu', name='block4_sepconv1_act')(x)
-	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block4_sepconv1')(x)
+	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block4_sepconv1')(x)
 	x = layers.BatchNormalization(name='block4_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block4_sepconv2_act')(x)
-	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block4_sepconv2')(x)
+	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block4_sepconv2')(x)
 	x = layers.BatchNormalization(name='block4_sepconv2_bn')(x)
 
-	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block4_pool')(x)
+	#x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block4_pool')(x)
 	x = layers.add([x, residual])
 
-	for i in range(3):
+	for i in range(2):
 		residual = x
 		prefix = 'block' + str(i + 5)
 
 		x = layers.Activation('relu', name=prefix + '_sepconv1_act')(x)
-		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv1')(x)
+		x = layers.SeparableConv2D(128, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv1')(x)
 		x = layers.BatchNormalization(name=prefix + '_sepconv1_bn')(x)
 		x = layers.Activation('relu', name=prefix + '_sepconv2_act')(x)
-		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv2')(x)
+		x = layers.SeparableConv2D(128, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv2')(x)
 		x = layers.BatchNormalization(name=prefix + '_sepconv2_bn')(x)
 		x = layers.Activation('relu', name=prefix + '_sepconv3_act')(x)
-		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv3')(x)
+		x = layers.SeparableConv2D(128, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv3')(x)
 		x = layers.BatchNormalization(name=prefix + '_sepconv3_bn')(x)
 
 		x = layers.add([x, residual])
 
-	residual = layers.Conv2D(1024, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(256, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
 	x = layers.Activation('relu', name='block13_sepconv1_act')(x)
-	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block13_sepconv1')(x)
+	x = layers.SeparableConv2D(160, (3, 3), padding='same', use_bias=False, name='block13_sepconv1')(x)
 	x = layers.BatchNormalization(name='block13_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block13_sepconv2_act')(x)
-	x = layers.SeparableConv2D(1024, (3, 3), padding='same', use_bias=False, name='block13_sepconv2')(x)
+	x = layers.SeparableConv2D(256, (3, 3), padding='same', use_bias=False, name='block13_sepconv2')(x)
 	x = layers.BatchNormalization(name='block13_sepconv2_bn')(x)
 
 	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block13_pool')(x)
 	x = layers.add([x, residual])
 
-	x = layers.SeparableConv2D(1536, (3, 3), padding='same', use_bias=False,  name='block14_sepconv1')(x)
+	x = layers.SeparableConv2D(320, (3, 3), padding='same', use_bias=False,  name='block14_sepconv1')(x)
 	x = layers.BatchNormalization(name='block14_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block14_sepconv1_act')(x)
 
-	x = layers.SeparableConv2D(2048, (3, 3), padding='same', use_bias=False, name='block14_sepconv2')(x)
+	x = layers.SeparableConv2D(512, (3, 3), padding='same', use_bias=False, name='block14_sepconv2')(x)
 	x = layers.BatchNormalization(name='block14_sepconv2_bn')(x)
 	x = layers.Activation('relu', name='block14_sepconv2_act')(x)
 
@@ -1835,7 +1835,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	Returns:
 		The Keras model
 	'''
-	with open(semantics_json, 'r') as infile:
+	with open(semantics_json, 'rb') as infile:
 		semantics = json.load(infile)
 
 	if 'input_tensor_map' in semantics:

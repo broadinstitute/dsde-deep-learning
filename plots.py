@@ -371,7 +371,7 @@ def plot_metric_history(history, title, prefix='./figures/'):
 	figure_path = prefix+"metric_history_"+title+image_ext
 	if not os.path.exists(os.path.dirname(figure_path)):
 		os.makedirs(os.path.dirname(figure_path))	
-	plt.savefig(figure_path)	
+	plt.savefig(figure_path)
 
 
 def read_tensor_to_image(args, tensor):

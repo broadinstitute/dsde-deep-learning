@@ -1,7 +1,7 @@
 #!/bin/bash
 ECHO=echo
 SAMPLES=3200
-ARCHS="./weights/pg_giab_hybridd_hg19_rra_small.json ./weights/platinum_hg19_rra_small.json "
+ARCHS="./weights/pg_giab_hybridd_hg19_rra_small.json ./weights/pg_platinum_fix_rra_small.json "
 ARCHS=$ARCHS" ./weights/g94982_hg19_giab_small_new.json ./weights/g94794_wgs1_hg38_small_new.json "
 ARCHS=$ARCHS" ./weights/xna12878_exome_small_new.json ./weights/syndip_exome_small_new.json "
 ARCHS=$ARCHS" ./weights/nova_g947m_small_new.json ./weights/nova_g947t_small_new.json"
@@ -99,12 +99,12 @@ $ECHO python recipes.py \
 	--architectures $ARCHS \
 	--random_forest_training_sites ignore \
 	--id g94982_na12878_hg19_platinum_gen_test \
-	--baseline_key GATK4_platinum_hg19_rra_small \
+	--baseline_key GATK4_pg_platinum_fix_rra_small \
 	--negative_vcf /dsde/data/deep/vqsr/vcfs/recalibrated_g94982.vcf.gz \
-	--data_dir /dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum/ \
+	--data_dir /dsde/data/deep/vqsr/tensors/g94982_na12878_hg19_platinum_fix/ \
 	--train_vcf /dsde/data/deep/vqsr/vcfs/platinum_genomes/pg_hg19_na12878.vcf.gz \
 	--deep_variant_vcf /dsde/data/deep/vqsr/vcfs/deep_variant_g94982_na12878.vcf.gz \
-	--bed_file /dsde/data/deep/vqsr/beds/platinum_genomes/pg_hg19_confident_regions.bed
+	--bed_file /dsde/data/deep/vqsr/beds/platinum_genomes/ConfidentRegions_pg_b37_2017.bed
 
 $ECHO python recipes.py \
 	test_architectures \

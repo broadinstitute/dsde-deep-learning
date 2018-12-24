@@ -132,7 +132,7 @@ def tensors_from_tensor_map(args,
 	vcf_reader = vcf.Reader(open(args.negative_vcf, 'r'))
 	vcf_ram = vcf.Reader(open(args.train_vcf, 'r'))
 
-	tensor_channel_map = defines.get_tensor_channel_map_from_args(args)
+
 
 	if args.chrom and not (args.start_pos and args.end_pos):
 		variants = vcf_reader.fetch(args.chrom)
@@ -187,10 +187,20 @@ def tensors_from_tensor_map(args,
 			read_tensors = {}
 			for tt in args.tensor_types:
 				args.tensor_map = tt
-				if "read_tensor" == tt:
+				if 'read_tensor' == tt:
 					read_tensors[tt] = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
-				elif "paired_reads" == tt:	
+				elif 'paired_reads' == tt:	
 					read_tensors[tt] = make_paired_read_tensor(args, variant, samfile, record.seq, ref_start, ref_end, stats)
+				elif 'reads_only' == tt:
+					args.tensor_map = 'read_tensor'
+					rt = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)	
+					args.tensor_map = tt
+					read_tensors[tt] = rt[:len(defines.get_tensor_channel_map_from_args(args)), :, :]
+				elif 'reads_reference' == tt:
+					args.tensor_map = 'read_tensor'
+					rt = make_reference_and_reads_tensor(args, variant, samfile, record.seq, ref_start, stats)
+					args.tensor_map = tt
+					read_tensors[tt] = rt[:len(defines.get_tensor_channel_map_from_args(args)), :, :]				
 				else:
 					raise ValueError("Unknown read tensor mapping."+tt)
 
@@ -1060,7 +1070,7 @@ def nist_samples_to_png(args):
 				continue
 
 			stats[cur_label_key] += 1
-			good_reads, insert_dict = get_good_reads(args, samfile, variant, sort_by='reference_start')
+			good_reads, insert_dict = get_good_reads(args, samfile, variant)
 			reference_seq = record.seq
 			for i in sorted(insert_dict.keys(), key=int, reverse=True):
 				if i < 0:
@@ -1336,7 +1346,7 @@ def make_reference_and_reads_tensor(args, variant, samfile, reference_seq, refer
 
 
 def make_paired_read_tensor(args, variant, samfile, ref_seq, ref_start, ref_end, stats):
-	good_reads, insert_dict, pairs = get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant)
+	good_reads, insert_dict, pairs = get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, stats, variant)
 	if len(good_reads) >= args.read_limit:
 		stats['More reads than read_limit'] += 1
 	if len(good_reads) == 0:
@@ -1370,7 +1380,7 @@ def make_calling_tensor(args, samfile, reference_seq, reference_start, stats):
 	return read_tensor
 
 
-def get_good_reads(args, samfile, variant, sort_by='base'):
+def get_good_reads(args, samfile, variant):
 	'''Return an array of usable reads centered at the variant.
 	
 	Ignores artificial haplotype read group.
@@ -1383,6 +1393,7 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 
 	Arguments:
 		args.read_limit: maximum number of reads to return
+		args.read_sort: how to sort the reads (i.e. by allele or by start position)
 		samfile: the BAM (or BAMout) file
 		variant: the variant around which reads will load
 
@@ -1425,9 +1436,9 @@ def get_good_reads(args, samfile, variant, sort_by='base'):
 		
 	if len(good_reads) > args.read_limit:
 		good_reads = np.random.choice(good_reads, size=args.read_limit, replace=False).tolist()
-
+	
 	good_reads.sort(key=lambda x: (x.reference_start+x.query_alignment_start, x.query_alignment_end))
-	if sort_by == 'base':
+	if args.read_sort == 'base':
 		good_reads.sort(key=lambda read: get_base_to_sort_by(read, variant))
 
 	return good_reads, insert_dict
@@ -1521,7 +1532,7 @@ def get_good_reads_in_window(args, samfile, start_pos, end_pos, variant=None):
 	return good_reads, insert_dict
 
 
-def get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, variant=None):
+def get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, stats, variant=None):
 	'''Return an array of usable reads centered at the variant.
 	
 	Ignores artificial haplotype read group.
@@ -1551,9 +1562,14 @@ def get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, varian
 
 	for read in samfile.fetch(args.chrom, ref_start, ref_end):
 		if not read or not hasattr(read, 'cigarstring') or read.cigarstring is None:
+			stats['no read or read without cigar'] += 1
 			continue
 		read_group = read.get_tag('RG')	
 		if 'artificial' in read_group.lower():
+			stats['artificial haplotype read'] += 1
+			continue
+		if read.is_supplementary:
+			stats['skipped supplementary read'] += 1
 			continue
 
 		read_already_seen = False
@@ -1563,13 +1579,19 @@ def get_good_reads_and_mates_in_window(args, samfile, ref_start, ref_end, varian
 				if len(read.seq) > len(p.seq):
 					del pairs[read.query_name][i]
 					pairs[read.query_name].append(read)
-		if not read_already_seen and not read.is_supplementary:
+					break
+
+		if not read_already_seen:
 			pairs[read.query_name].append(read)
+		if len(pairs) > args.read_limit*2:
+			stats['more than read_limit*2 pairs found, bailing.'] += 1
+			break
 
 	for p in pairs:
 		for read in pairs[p]:
 			index_dif = ref_start - read.reference_start
 			if abs(index_dif) >= args.window_size:
+				stats['pair out of range'] += 1
 				continue
 
 			if 'I' in read.cigarstring:

@@ -50,7 +50,7 @@ def annotate_vcf_with_inference(args):
 		if defines.annotations_from_args(args) is not None:
 			input_tensors[args.annotation_set] = (len(args.annotations),)
 		input_tensors[args.tensor_map] = defines.tensor_shape_from_args(args)
-
+	input_tensors['annotations'] = (7,)
 	vcf_writer = pysam.VariantFile(args.output_vcf, 'w', header=vcf_reader.header)
 	print('got vcfs. input tensor shape mapping:', input_tensors)
 
@@ -67,7 +67,7 @@ def annotate_vcf_with_inference(args):
 	batch = {}
 	for tm in input_tensors:
 		batch[tm] = np.zeros(((args.batch_size,) + input_tensors[tm]))
-
+	print('input tensors:', input_tensors)
 	if args.chrom:
 		print('iterate over region of vcf', args.chrom, args.start_pos, args.end_pos)
 		variants = vcf_reader.fetch(args.chrom, args.start_pos, args.end_pos)
@@ -78,32 +78,41 @@ def annotate_vcf_with_inference(args):
 	start_time = time.time()
 	for variant in variants:
 		idx_offset, ref_start, ref_end = get_variant_window(args, variant)
-
+		args.chrom = variant.contig # In case chrom isn't set on command line we need it to fetch reads.
 		contig = reference[variant.contig]	
 		record = contig[ ref_start : ref_end ]
 		v = pysam_variant_in_pyvcf(variant, pyvcf_vcf_reader)
 		for tm in batch:
 			batch_key = tm+'_in_batch'
-
 			if tm in defines.annotations:
 				args.annotation_set = tm
 				annotation_data = td.get_annotation_data(args, v, stats)
 				batch[tm][stats[batch_key]] = annotation_data
+				# hack for backward compatibility
+				batch['annotations'][stats[batch_key]] = annotation_data
 				stats[batch_key] += 1
 
-			if tm in defines.read_tensor_maps:
+			if 'read' in tm:
 				args.tensor_map = tm
-				read_tensor = td.make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
+				if "read_tensor" == args.tensor_map:
+					read_tensor = td.make_reference_and_reads_tensor(args, v, samfile, record.seq, ref_start, stats)
+				elif "paired_reads" == args.tensor_map:	
+					read_tensor = td.make_paired_read_tensor(args, v, samfile, record.seq, ref_start, ref_end, stats)
+				else:
+					raise ValueError("Unknown read tensor mapping."+tt)
+
 				batch[tm][stats[batch_key]] = read_tensor
 				if read_tensor is None:
+					print('got empty', args.tensor_map, 'tensor at:', v)
 					batch[tm][stats[batch_key]] = np.zeros(input_tensors[tm])
 				stats[batch_key] += 1
 
-			if tm in defines.reference_tensor_maps:
+			if 'reference' in tm:
 				args.tensor_map = tm
 				reference_tensor = td.make_reference_tensor(args, record.seq)
 				batch[tm][stats[batch_key]] = reference_tensor
 				stats[batch_key] += 1
+			
 
 		positions.append(variant.contig + '_' + str(variant.pos))
 		variant_batch.append(variant)
