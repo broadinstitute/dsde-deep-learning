@@ -511,20 +511,19 @@ def train_reference_annotation_c(args):
 
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = 7, 
+											conv_width = 11, 
 											conv_layers = [216, 180, 128, 64, 32],
 											conv_dropout = 0.0, # was .3
 											conv_batch_normalize = False,
 											max_pools = [],
 											padding = 'valid',
-											activation = 'selu',
+											activation = 'relu',
 											annotation_units = 64,
 											annotation_shortcut = True,
 											annotation_batch_normalize = True,
-											fc_layers = [64, 64, 64, 64, 64],
-											fc_dropout = 0.0,
-											fc_batch_normalize = False,
-											alpha_dropout=True)
+											fc_layers = [64, 64],
+											fc_dropout = 0.2,
+											fc_batch_normalize = False)
 	
 	model = models.train_model_from_generators(args, model, generate_train, generate_valid, weight_path)
 
