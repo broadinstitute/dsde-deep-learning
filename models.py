@@ -692,6 +692,230 @@ def read_tensor_2d_annotation_model_from_args(args,
 	return model
 
 
+def read_tensor_2d_annotation_residual_from_args(args, 
+											conv_width = 6, 
+											conv_height = 6,
+											conv_layers = [128, 128, 128, 128],
+											conv_dropout = 0.0,
+											conv_batch_normalize = False,
+											spatial_dropout = True,
+											max_pools = [(3,1), (3,3)],
+											padding = 'valid',
+											annotation_units = 16,
+											annotation_shortcut = False,
+											annotation_batch_normalize = False,
+											fc_layers = [64],
+											fc_dropout = 0.0,
+											fc_batch_normalize = False,
+											fc_initializer = 'glorot_normal',
+											activation = 'relu',
+											kernel_initializer = 'glorot_normal',
+											kernel_single_channel = True):
+	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
+
+	Arguments specify widths and depths of each layer.
+	2d Convolutions followed by dense connection mixed with annotation values.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API. Supports theano or tensorflow channel ordering.
+	Prints out model summary.
+
+	Arguments
+		args.window_size: Length in base-pairs of sequence centered at the variant to use as input.	
+		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
+		args.weights_hd5: An existing model file to load weights from
+		args.channels_last: Theano->False or Tensorflow->True channel ordering flag
+		conv_layers: list of number of convolutional filters in each layer
+		batch_normalization: Boolean whether to apply batch normalization or not
+	Returns
+		The keras model
+	'''			
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		concat_axis = -1
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		concat_axis = 1
+
+	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
+
+	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
+
+	# Add convolutional layers
+	for i,f in enumerate(conv_layers):
+		residual2d = x
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		if conv_batch_normalize:
+			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = BatchNormalization(axis=concat_axis)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
+
+		if conv_dropout > 0 and spatial_dropout:
+			x = SpatialDropout2D(conv_dropout)(x)
+		elif conv_dropout > 0:
+			x = Dropout(conv_dropout)(x)
+
+		if i >= max_pool_diff:
+			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
+			residual2d = MaxPooling2D(max_pools[i-max_pool_diff])(residual2d)
+		
+		if i > 0:
+			x = layers.add([x, residual2d])
+
+	x = Flatten()(x)
+
+	# Mix the variant annotations in
+	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	if annotation_batch_normalize:
+		annotations_in = BatchNormalization(axis=-1)(annotations)
+
+	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
+	x = layers.concatenate([x, annotations_mlp], axis=concat_axis)
+
+	# Fully connected layers
+	for fc_units in fc_layers:	
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
+
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	if annotation_shortcut:
+		x = layers.concatenate([x, annotations_in], axis=concat_axis)
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
+	
+	adamo = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model
+
+
+def read_tensor_2d_residual_from_args(args, 
+											conv_width = 6, 
+											conv_height = 6,
+											conv_layers = [128, 128, 128, 128],
+											conv_dropout = 0.0,
+											conv_batch_normalize = False,
+											spatial_dropout = True,
+											max_pools = [(3,1), (3,3)],
+											padding = 'valid',
+											fc_layers = [64],
+											fc_dropout = 0.0,
+											fc_batch_normalize = False,
+											fc_initializer = 'glorot_normal',
+											activation = 'relu',
+											kernel_initializer = 'glorot_normal',
+											kernel_single_channel = True):
+	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
+
+	Arguments specify widths and depths of each layer.
+	2d Convolutions followed by dense connection mixed with annotation values.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API. Supports theano or tensorflow channel ordering.
+	Prints out model summary.
+
+	Arguments
+		args.window_size: Length in base-pairs of sequence centered at the variant to use as input.	
+		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
+		args.weights_hd5: An existing model file to load weights from
+		args.channels_last: Theano->False or Tensorflow->True channel ordering flag
+		conv_layers: list of number of convolutional filters in each layer
+		batch_normalization: Boolean whether to apply batch normalization or not
+	Returns
+		The keras model
+	'''			
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		concat_axis = -1
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		concat_axis = 1
+
+	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
+
+	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
+
+	# Add convolutional layers
+	for i,f in enumerate(conv_layers):
+		residual2d = x
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		if conv_batch_normalize:
+			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = BatchNormalization(axis=concat_axis)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
+
+		if conv_dropout > 0 and spatial_dropout:
+			x = SpatialDropout2D(conv_dropout)(x)
+		elif conv_dropout > 0:
+			x = Dropout(conv_dropout)(x)
+
+		if i >= max_pool_diff:
+			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
+			residual2d = MaxPooling2D(max_pools[i-max_pool_diff])(residual2d)
+		
+		if i > 0:
+			x = layers.add([x, residual2d])
+
+	x = Flatten()(x)
+
+	# Fully connected layers
+	for fc_units in fc_layers:	
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
+
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor_in], outputs=[prob_output])
+	
+	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model	
 
 def separable_2d_annotation_model_from_args(args,
 											annotation_units = 16,
@@ -1444,8 +1668,7 @@ def build_ref_read_anno_keras_resnet(args):
 
 	annotation_units = 16
 	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
-	annotations_bn = BatchNormalization(axis=1)(annotations)
-	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations_bn)
+	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations)
 	anno_model = Model(inputs=[annotations], outputs=[annotation_mlp])
 	
 	anno_x = anno_model(annotations)

@@ -113,7 +113,6 @@ def annotate_vcf_with_inference(args):
 				batch[tm][stats[batch_key]] = reference_tensor
 				stats[batch_key] += 1
 			
-
 		positions.append(variant.contig + '_' + str(variant.pos))
 		variant_batch.append(variant)
 
@@ -148,6 +147,7 @@ def pysam_variant_to_pyvcf(v):
 	alts = [vcf.model._Substitution(a) for a in v.alts]
 	return vcf.model._Record(v.contig, v.pos, v.id, v.ref, alts, v.qual, v.filter, v.info, [], None)
 
+
 def pysam_variant_in_pyvcf(variant, vcf_ram, contig_prefix=''):
 	''' Check if variant is in a VCF file.
 
@@ -170,8 +170,10 @@ def pysam_variant_in_pyvcf(variant, vcf_ram, contig_prefix=''):
 	
 	return None 
 
+
 def score_key_from_json(json_file):
 	return td.plain_name(json_file).upper() 
+
 
 def get_variant_window(args, variant):
 	index_offset = (args.window_size//2)
@@ -206,7 +208,6 @@ def apply_cnns_to_batch(args, cnns, batch, positions, variant_batch, vcf_writer,
 		stats['variants_written'] += 1
 
 
-
 def load_tensors_and_annotations_from_class_dirs(args):
 	tensors = []
 	positions = []
@@ -232,7 +233,6 @@ def load_tensors_and_annotations_from_class_dirs(args):
 			print(str(e), '\nValue error at:', tp)
 
 	return (np.asarray(tensors), np.asarray(annotations), np.asarray(positions))
-
 
 
 def interval_file_to_dict(interval_file, shift1=0, skip=['@']):
@@ -275,6 +275,7 @@ def interval_file_to_dict(interval_file, shift1=0, skip=['@']):
 
 def is_snp(variant):
 	return len(variant.ref) == 1 and all(map(lambda x: len(x) == 1, variant.alts))
+
 
 def is_indel(variant):
 	return all(map(lambda x: len(x) != len(variant.ref), variant.alts))
