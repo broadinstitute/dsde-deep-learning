@@ -1127,6 +1127,9 @@ def get_annotation_data(args, annotation_variant, stats, allele_index=0, overrid
 	Returns:
 		annotation_data: numpy array of annotation values
 	'''
+	if args.annotations is None:
+		return
+	
 	if not override_annotations is None:
 		annos = override_annotations
 	else:
