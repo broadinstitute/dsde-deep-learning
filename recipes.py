@@ -1570,4 +1570,5 @@ def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_sco
 
 # Back to the top!
 if "__main__" == __name__:
-	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunct
+	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunction(obj) }
+	run(file_fxns)
