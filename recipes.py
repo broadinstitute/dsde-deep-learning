@@ -1002,7 +1002,7 @@ def train_ref_read_residual(args):
 
 	'''
 	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
-
+	args.annotation_set = '_'
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_residual_from_args(args, 
 									conv_width = 5,
