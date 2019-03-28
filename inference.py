@@ -88,8 +88,6 @@ def annotate_vcf_with_inference(args):
 				args.annotation_set = tm
 				annotation_data = td.get_annotation_data(args, v, stats)
 				batch[tm][stats[batch_key]] = annotation_data
-				# hack for backward compatibility
-				batch['annotations'][stats[batch_key]] = annotation_data
 				stats[batch_key] += 1
 
 			if 'read' in tm:
