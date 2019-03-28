@@ -1000,8 +1000,8 @@ def train_ref_read_residual(args):
 			subdirectories for each label with tensors stored as hd5 files. 
 
 	'''
-	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 	args.annotation_set = '_'
+	generate_train, generate_valid, _ = td.train_valid_test_generators_from_args(args, with_positions=False)
 	weight_path = arguments.weight_path_from_args(args)
 	model = models.read_tensor_2d_residual_from_args(args, 
 									conv_width = 5,
@@ -1021,7 +1021,6 @@ def train_ref_read_residual(args):
 
 	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
 	test = td.big_batch_from_minibatch_generator(args, generate_test)
-	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
 	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
 	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
 
@@ -1491,7 +1490,7 @@ def test_architectures(args):
 		snp_truth = [compare_snp[list(compare_snp)[0]][p][1] for p in shared_snp_keys]
 		snp_scores = score_dict_from_shared_positions(args, 'SNP', shared_snp_keys, cnn_snp_dicts, compare_snp)
 		title_suffix = args.id+'_true_'+str(np.sum(snp_truth))+'_false_'+str(len(snp_truth)-np.sum(snp_truth))
-		#plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
+		plots.plot_rocs_from_scores(snp_truth, snp_scores, 'SNP_ROC_'+title_suffix)
 		plots.plot_precision_recall_from_scores(snp_truth, snp_scores, 'SNP_Precision_Recall_'+title_suffix, args.baseline_key)		
 	
 	if 'INDEL' in args.labels:
@@ -1500,7 +1499,7 @@ def test_architectures(args):
 		indel_truth = [compare_indel[list(compare_indel)[0]][p][1] for p in shared_indel_keys]
 		indel_scores = score_dict_from_shared_positions(args, 'INDEL', shared_indel_keys, cnn_indel_dicts, compare_indel)
 		title_suffix = args.id+'_true_'+str(np.sum(indel_truth))+'_false_'+str(len(indel_truth)-np.sum(indel_truth))
-		#plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
+		plots.plot_rocs_from_scores(indel_truth, indel_scores, 'INDEL_ROC_'+title_suffix)
 		plots.plot_precision_recall_from_scores(indel_truth, indel_scores, 'INDEL_Precision_Recall_'+title_suffix, args.baseline_key)
 
 
@@ -1571,5 +1570,4 @@ def emit_interesting_sites(args, kind, shared_positions, cnn_scores, compare_sco
 
 # Back to the top!
 if "__main__" == __name__:
-	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunction(obj) }
-	run(file_fxns)
+	file_fxns = { name:obj for name,obj in inspect.getmembers(sys.modules[__name__]) if inspect.isfunct
