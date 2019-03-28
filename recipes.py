@@ -944,9 +944,8 @@ def train_ref_read_anno_c(args):
 
 	_, _, generate_test = td.train_valid_test_generators_from_args(args, with_positions=True)
 	test = td.big_batch_from_minibatch_generator(args, generate_test)
-	test_data = [test[0][args.tensor_map], test[0][args.annotation_set]]
 	plots.plot_roc_per_class(model, test_data, test[1], args.labels, args.id)
-	return plots.get_per_class_auc(model, test_data, test[1], args.labels)
+	return plots.get_per_class_auc(model, test[0], test[1], args.labels)
 
 def train_ref_read_anno_residual(args):
 	'''Trains a reference and read based architecture on tensors at the supplied data directory.
