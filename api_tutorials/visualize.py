@@ -346,12 +346,8 @@ def image_journey(args, model):
 	objective_switch = 20 
 	counter = 0
 	
-	if K.image_data_format()== 'channels_first':
-		input_img_data = np.random.random((1, 3, args.width, args.height))
-	else:
-		input_img_data = np.random.random((1, args.width, args.height, 3)) 
-	
-	for img in args.images:
+	input_img_data = cv2_image_load(args, args.images[0])
+	for img in args.images[1:]:
 		cur_img = cv2_image_load(args, img)
 		img_fxn = grad_towards_input(args, model, cur_img, layer_dict)
 

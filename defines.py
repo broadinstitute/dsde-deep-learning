@@ -111,9 +111,6 @@ cigar_code = {'M':0, 'I':1, 'D':2, 'N':3, 'S':4}
 code2cigar = 'MIDNSHP=XB'
 cigar2code = dict([y, x] for x, y in enumerate(code2cigar))
 
-reference_tensor_maps = ['reference']
-read_tensor_maps = ['read_tensor', '2d_mapping_quality']
-
 def annotations_from_args(args):
 	if args.annotation_set and args.annotation_set in annotations and args.annotation_set != '_':
 		return annotations[args.annotation_set]
@@ -128,7 +125,11 @@ def get_tensor_channel_map_from_args(args):
 	if 'read_tensor' == args.tensor_map:
 		return get_tensor_channel_map_rt()
 	elif 'paired_reads' == args.tensor_map:
-		return get_tensor_channel_map_rt()		
+		return get_tensor_channel_map_rt()
+	elif 'reads_only' == args.tensor_map:
+		return get_tensor_channel_map_reads_only()			
+	elif 'reads_reference' == args.tensor_map:
+		return get_tensor_channel_map_rr()	
 	elif '2d_2bit' == args.tensor_map:
 		return get_tensor_channel_map_2bit()
 	elif '1d_calling'== args.tensor_map:
@@ -250,6 +251,29 @@ def get_tensor_channel_map_rt():
 
 	return tensor_map
 
+
+def get_tensor_channel_map_reads_only():
+	'''Read and reference tensor with 4 channel DNA encoding.
+	Also includes read flags for strand and pair.
+	'''
+	tensor_map = {}
+	for k in inputs_indel.keys():
+		tensor_map['read_'+k] = inputs_indel[k]
+
+	return tensor_map
+
+
+def get_tensor_channel_map_rr():
+	'''Read and reference tensor with 4 channel DNA encoding.
+	Also includes read flags for strand and pair.
+	'''
+	tensor_map = {}
+	for k in inputs_indel.keys():
+		tensor_map['read_'+k] = inputs_indel[k]
+	for k in inputs_indel.keys():
+		tensor_map['reference_'+k] = len(inputs_indel) + inputs_indel[k]
+
+	return tensor_map
 
 def get_tensor_channel_map_2bit():
 	'''Read and reference tensor with 2bit DNA encoding.

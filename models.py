@@ -80,7 +80,7 @@ def build_reference_model(args):
 	#x = Dense(units=32, activation='relu')(x)
 	#x = Dropout(0.5)(x)	
 
-	prob_output = Dense(units=len(args.labels), activation='softmax')(x)
+	prob_output = Dense(units=len(args.labels), activation='softmax', name='softmax_predictions')(x)
 	
 	model = Model(inputs=[reference], outputs=[prob_output])
 	
@@ -264,7 +264,7 @@ def build_reference_annotation_skip_model(args):
 		channel_axis = 1
 
 	channel_map = defines.get_tensor_channel_map_from_args(args)	
-	reference = Input(shape=(args.window_size, len(channel_map)), name="reference")
+	reference = Input(shape=(args.window_size, len(channel_map)), name=args.tensor_map)
 	conv_width = 12
 	conv_dropout = 0.1
 	fc_dropout = 0.2
@@ -275,7 +275,7 @@ def build_reference_annotation_skip_model(args):
 	x = Dropout(conv_dropout)(x)	
 	x = Flatten()(x)
 
-	annotations = Input(shape=(len(args.annotations),), name="annotations")
+	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
 	annos_normed = BatchNormalization(axis=channel_axis)(annotations)
 	annos_normed_x = Dense(units=40, kernel_initializer='normal', activation='relu')(annos_normed)
 
@@ -692,6 +692,230 @@ def read_tensor_2d_annotation_model_from_args(args,
 	return model
 
 
+def read_tensor_2d_annotation_residual_from_args(args, 
+											conv_width = 6, 
+											conv_height = 6,
+											conv_layers = [128, 128, 128, 128],
+											conv_dropout = 0.0,
+											conv_batch_normalize = False,
+											spatial_dropout = True,
+											max_pools = [(3,1), (3,3)],
+											padding = 'valid',
+											annotation_units = 16,
+											annotation_shortcut = False,
+											annotation_batch_normalize = False,
+											fc_layers = [64],
+											fc_dropout = 0.0,
+											fc_batch_normalize = False,
+											fc_initializer = 'glorot_normal',
+											activation = 'relu',
+											kernel_initializer = 'glorot_normal',
+											kernel_single_channel = True):
+	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
+
+	Arguments specify widths and depths of each layer.
+	2d Convolutions followed by dense connection mixed with annotation values.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API. Supports theano or tensorflow channel ordering.
+	Prints out model summary.
+
+	Arguments
+		args.window_size: Length in base-pairs of sequence centered at the variant to use as input.	
+		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
+		args.weights_hd5: An existing model file to load weights from
+		args.channels_last: Theano->False or Tensorflow->True channel ordering flag
+		conv_layers: list of number of convolutional filters in each layer
+		batch_normalization: Boolean whether to apply batch normalization or not
+	Returns
+		The keras model
+	'''			
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		concat_axis = -1
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		concat_axis = 1
+
+	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
+
+	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
+
+	# Add convolutional layers
+	for i,f in enumerate(conv_layers):
+		residual2d = x
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		if conv_batch_normalize:
+			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = BatchNormalization(axis=concat_axis)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
+
+		if conv_dropout > 0 and spatial_dropout:
+			x = SpatialDropout2D(conv_dropout)(x)
+		elif conv_dropout > 0:
+			x = Dropout(conv_dropout)(x)
+
+		if i >= max_pool_diff:
+			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
+			residual2d = MaxPooling2D(max_pools[i-max_pool_diff])(residual2d)
+		
+		if i > 0:
+			x = layers.add([x, residual2d])
+
+	x = Flatten()(x)
+
+	# Mix the variant annotations in
+	annotations = annotations_in = Input(shape=(len(args.annotations),), name=args.annotation_set)
+	if annotation_batch_normalize:
+		annotations_in = BatchNormalization(axis=-1)(annotations)
+
+	annotations_mlp = Dense(units=annotation_units, kernel_initializer=fc_initializer, activation=activation)(annotations_in)
+	x = layers.concatenate([x, annotations_mlp], axis=concat_axis)
+
+	# Fully connected layers
+	for fc_units in fc_layers:	
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
+
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	if annotation_shortcut:
+		x = layers.concatenate([x, annotations_in], axis=concat_axis)
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor_in, annotations], outputs=[prob_output])
+	
+	adamo = Adam(lr=0.00001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model
+
+
+def read_tensor_2d_residual_from_args(args, 
+											conv_width = 6, 
+											conv_height = 6,
+											conv_layers = [128, 128, 128, 128],
+											conv_dropout = 0.0,
+											conv_batch_normalize = False,
+											spatial_dropout = True,
+											max_pools = [(3,1), (3,3)],
+											padding = 'valid',
+											fc_layers = [64],
+											fc_dropout = 0.0,
+											fc_batch_normalize = False,
+											fc_initializer = 'glorot_normal',
+											activation = 'relu',
+											kernel_initializer = 'glorot_normal',
+											kernel_single_channel = True):
+	'''Builds Read Tensor 2d CNN model with variant annotations mixed in for classifying variants.
+
+	Arguments specify widths and depths of each layer.
+	2d Convolutions followed by dense connection mixed with annotation values.
+	Dynamically sets input channels based on args via defines.total_input_channels_from_args(args)
+	Uses the functional API. Supports theano or tensorflow channel ordering.
+	Prints out model summary.
+
+	Arguments
+		args.window_size: Length in base-pairs of sequence centered at the variant to use as input.	
+		args.labels: The output labels (e.g. SNP, NOT_SNP, INDEL, NOT_INDEL)
+		args.weights_hd5: An existing model file to load weights from
+		args.channels_last: Theano->False or Tensorflow->True channel ordering flag
+		conv_layers: list of number of convolutional filters in each layer
+		batch_normalization: Boolean whether to apply batch normalization or not
+	Returns
+		The keras model
+	'''			
+	in_channels = defines.total_input_channels_from_args(args)
+	if args.channels_last:
+		in_shape = (args.read_limit, args.window_size, in_channels)
+		concat_axis = -1
+	else:
+		in_shape = (in_channels, args.read_limit, args.window_size)
+		concat_axis = 1
+
+	x = read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
+
+	max_pool_diff = max(0, len(conv_layers)-len(max_pools))
+
+	# Add convolutional layers
+	for i,f in enumerate(conv_layers):
+		residual2d = x
+		if kernel_single_channel and i%2 == 0:
+			cur_kernel = (conv_width, 1)
+		elif kernel_single_channel:
+			cur_kernel = (1, conv_height)
+		else:
+			cur_kernel = (conv_width, conv_height)
+
+		if conv_batch_normalize:
+			x = Conv2D(f, cur_kernel, activation='linear', padding=padding, kernel_initializer=kernel_initializer)(x)
+			x = BatchNormalization(axis=concat_axis)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Conv2D(f, cur_kernel, activation=activation, padding=padding, kernel_initializer=kernel_initializer)(x)
+
+		if conv_dropout > 0 and spatial_dropout:
+			x = SpatialDropout2D(conv_dropout)(x)
+		elif conv_dropout > 0:
+			x = Dropout(conv_dropout)(x)
+
+		if i >= max_pool_diff:
+			x = MaxPooling2D(max_pools[i-max_pool_diff])(x)
+			residual2d = MaxPooling2D(max_pools[i-max_pool_diff])(residual2d)
+		
+		if i > 0:
+			x = layers.add([x, residual2d])
+
+	x = Flatten()(x)
+
+	# Fully connected layers
+	for fc_units in fc_layers:	
+		if fc_batch_normalize:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation='linear')(x)
+			x = BatchNormalization(axis=1)(x)
+			x = Activation(activation)(x)
+		else:
+			x = Dense(units=fc_units, kernel_initializer=fc_initializer, activation=activation)(x)		
+
+		if fc_dropout > 0:
+			x = Dropout(fc_dropout)(x)
+
+	# Softmax output
+	prob_output = Dense(units=len(args.labels), kernel_initializer=fc_initializer, activation='softmax', name='softmax_predictions')(x)
+	
+	# Map inputs to outputs
+	model = Model(inputs=[read_tensor_in], outputs=[prob_output])
+	
+	adamo = Adam(lr=0.0001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, clipnorm=1.)
+	model.compile(loss='categorical_crossentropy', optimizer=adamo, metrics=get_metrics(args.labels))
+	model.summary()
+	
+	if os.path.exists(args.weights_hd5):
+		model.load_weights(args.weights_hd5, by_name=True)
+		print('Loaded model weights from:', args.weights_hd5)
+
+	return model	
 
 def separable_2d_annotation_model_from_args(args,
 											annotation_units = 16,
@@ -731,26 +955,26 @@ def separable_2d_annotation_model_from_args(args,
 
 	read_tensor_in = Input(shape=in_shape, name=args.tensor_map)
 
-	x = layers.Conv2D(32, (3, 3), strides=(2, 2), use_bias=False, name='block1_conv1')(read_tensor_in)
+	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv1')(read_tensor_in)
 	x = layers.BatchNormalization(name='block1_conv1_bn')(x)
 	x = layers.Activation('relu', name='block1_conv1_act')(x)
 	x = layers.Conv2D(64, (3, 3), use_bias=False, name='block1_conv2')(x)
 	x = layers.BatchNormalization(name='block1_conv2_bn')(x)
 	x = layers.Activation('relu', name='block1_conv2_act')(x)
 
-	residual = layers.Conv2D(128, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(64, (1, 1), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
-	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
+	x = layers.SeparableConv2D(64, (3, 3), padding='same', use_bias=False, name='block2_sepconv1')(x)
 	x = layers.BatchNormalization(name='block2_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block2_sepconv2_act')(x)
-	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
+	x = layers.SeparableConv2D(64, (3, 3), padding='same', use_bias=False, name='block2_sepconv2')(x)
 	x = layers.BatchNormalization(name='block2_sepconv2_bn')(x)
 
-	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_pool')(x)
+	#x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block2_pool')(x)
 	x = layers.add([x, residual])
 
-	residual = layers.Conv2D(728, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(64, (1, 1), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
 	# x = layers.Activation('relu', name='block3_sepconv1_act')(x)
@@ -767,49 +991,49 @@ def separable_2d_annotation_model_from_args(args,
 	# residual = layers.BatchNormalization()(residual)
 
 	x = layers.Activation('relu', name='block4_sepconv1_act')(x)
-	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block4_sepconv1')(x)
+	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block4_sepconv1')(x)
 	x = layers.BatchNormalization(name='block4_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block4_sepconv2_act')(x)
-	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block4_sepconv2')(x)
+	x = layers.SeparableConv2D(128, (3, 3), padding='same', use_bias=False, name='block4_sepconv2')(x)
 	x = layers.BatchNormalization(name='block4_sepconv2_bn')(x)
 
-	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block4_pool')(x)
+	#x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block4_pool')(x)
 	x = layers.add([x, residual])
 
-	for i in range(3):
+	for i in range(2):
 		residual = x
 		prefix = 'block' + str(i + 5)
 
 		x = layers.Activation('relu', name=prefix + '_sepconv1_act')(x)
-		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv1')(x)
+		x = layers.SeparableConv2D(128, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv1')(x)
 		x = layers.BatchNormalization(name=prefix + '_sepconv1_bn')(x)
 		x = layers.Activation('relu', name=prefix + '_sepconv2_act')(x)
-		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv2')(x)
+		x = layers.SeparableConv2D(128, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv2')(x)
 		x = layers.BatchNormalization(name=prefix + '_sepconv2_bn')(x)
 		x = layers.Activation('relu', name=prefix + '_sepconv3_act')(x)
-		x = layers.SeparableConv2D(728, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv3')(x)
+		x = layers.SeparableConv2D(128, (3, 3),padding='same',use_bias=False,name=prefix + '_sepconv3')(x)
 		x = layers.BatchNormalization(name=prefix + '_sepconv3_bn')(x)
 
 		x = layers.add([x, residual])
 
-	residual = layers.Conv2D(1024, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
+	residual = layers.Conv2D(256, (1, 1), strides=(2, 2), padding='same', use_bias=False)(x)
 	residual = layers.BatchNormalization()(residual)
 
 	x = layers.Activation('relu', name='block13_sepconv1_act')(x)
-	x = layers.SeparableConv2D(728, (3, 3), padding='same', use_bias=False, name='block13_sepconv1')(x)
+	x = layers.SeparableConv2D(160, (3, 3), padding='same', use_bias=False, name='block13_sepconv1')(x)
 	x = layers.BatchNormalization(name='block13_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block13_sepconv2_act')(x)
-	x = layers.SeparableConv2D(1024, (3, 3), padding='same', use_bias=False, name='block13_sepconv2')(x)
+	x = layers.SeparableConv2D(256, (3, 3), padding='same', use_bias=False, name='block13_sepconv2')(x)
 	x = layers.BatchNormalization(name='block13_sepconv2_bn')(x)
 
 	x = layers.MaxPooling2D((3, 3), strides=(2, 2), padding='same', name='block13_pool')(x)
 	x = layers.add([x, residual])
 
-	x = layers.SeparableConv2D(1536, (3, 3), padding='same', use_bias=False,  name='block14_sepconv1')(x)
+	x = layers.SeparableConv2D(320, (3, 3), padding='same', use_bias=False,  name='block14_sepconv1')(x)
 	x = layers.BatchNormalization(name='block14_sepconv1_bn')(x)
 	x = layers.Activation('relu', name='block14_sepconv1_act')(x)
 
-	x = layers.SeparableConv2D(2048, (3, 3), padding='same', use_bias=False, name='block14_sepconv2')(x)
+	x = layers.SeparableConv2D(512, (3, 3), padding='same', use_bias=False, name='block14_sepconv2')(x)
 	x = layers.BatchNormalization(name='block14_sepconv2_bn')(x)
 	x = layers.Activation('relu', name='block14_sepconv2_act')(x)
 
@@ -1444,8 +1668,7 @@ def build_ref_read_anno_keras_resnet(args):
 
 	annotation_units = 16
 	annotations = Input(shape=(len(args.annotations),), name=args.annotation_set)
-	annotations_bn = BatchNormalization(axis=1)(annotations)
-	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations_bn)
+	annotation_mlp = Dense(units=annotation_units, activation='relu')(annotations)
 	anno_model = Model(inputs=[annotations], outputs=[annotation_mlp])
 	
 	anno_x = anno_model(annotations)
@@ -1835,7 +2058,7 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	Returns:
 		The Keras model
 	'''
-	with open(semantics_json, 'r') as infile:
+	with open(semantics_json, 'rb') as infile:
 		semantics = json.load(infile)
 
 	if 'input_tensor_map' in semantics:
@@ -1850,6 +2073,9 @@ def set_args_and_get_model_from_semantics(args, semantics_json):
 	if 'input_annotations' in semantics:
 		args.annotations = semantics['input_annotations']
 		args.annotation_set = semantics['input_annotation_set']
+	else:
+		args.annotations = None
+		args.annotation_set = '_'
 
 	if 'channels_last' in semantics:
 		args.channels_last = semantics['channels_last']
@@ -2097,7 +2323,7 @@ def train_model_from_generators(args, model, generate_train, generate_valid, sav
 	if not os.path.exists(os.path.dirname(save_weight_hd5)):
 		os.makedirs(os.path.dirname(save_weight_hd5))	
 	serialize_model_semantics(args, save_weight_hd5)
-
+	model.save(save_weight_hd5)
 	if args.inspect_model:
 		image_path = args.id+'.png' if args.image_dir is None else args.image_dir+args.id+'.png'
 		inspect_model(args, model, generate_train, generate_valid, image_path=image_path)

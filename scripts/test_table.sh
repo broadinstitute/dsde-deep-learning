@@ -1,11 +1,11 @@
 #!/bin/bash
 #test_table.sh
-ECHO=
-#ARCHS="./weights/mix_hg19_rrab.json ./weights/g947_mix_1d_rab.json ./weights/g947_small_2d.json ./weights/g947_site_labelled_rrac.json ./weights/g947_rr_c2.json ./weights/g947_reference_only.json ./weights/g947_mlp_th.json "
-ARCHS="./weights/nova_hiseq_mix_small.json"
+ECHO=echo
+ARCHS="./weights/mix_hg19_rrab.json ./weights/g947_mix_1d_rab.json ./weights/nova_hiseq_mix_small.json ./weights/g947_site_labelled_rrac.json ./weights/g947_rr_c2.json ./weights/g947_reference_only.json ./weights/g947_mlp_th.json "
 SAMPLES=3232
 
 $ECHO python recipes.py test_architectures \
+	--inspect_model \
 	--gnomad_compare \
 	--samples $SAMPLES \
 	--single_sample_vqsr \

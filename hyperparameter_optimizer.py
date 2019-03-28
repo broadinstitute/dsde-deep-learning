@@ -38,7 +38,12 @@ bools = ['spatial_dropout', 'batch_normalization', 'batch_normalize_input', 'val
 				'conv_batch_normalize', 'fc_batch_normalize', 'annotation_batch_normalize', 'kernel_single_channel']
 
 def run():
-	args = arguments.parse_args()	
+	args = arguments.parse_args()
+
+	cfg = K.tf.ConfigProto()
+	cfg.gpu_options.allow_growth = True
+	K.set_session(K.tf.Session(config=cfg))	
+
 	if '2d' == args.mode:
 		ho = HyperparameterOptimizer()
 		ho.bayesian_search_2d(args, args.iterations)
@@ -68,6 +73,7 @@ class HyperparameterOptimizer(object):
 
 	def __init__(self):
 		self.performances = {}
+		self.max_loss = 99.9
 		self.paddings = ['valid']
 		self.annotation_units = [12, 16, 20]
 		self.conv_dropouts = [0.0, 0.2, 0.4]
@@ -78,11 +84,10 @@ class HyperparameterOptimizer(object):
 		self.conv_widths = [6, 12, 16, 20]
 		self.conv_heights = [3, 6, 12, 24]
 		self.conv_layers_sets = [
-									[48, 64, 96], [96, 64, 48], [32, 64, 128], [128, 64, 32],
-									[64,48,32,24], [24,32,48,64], [48,64,96,128],  [128,96,64,48], 
+									[48, 64, 96], [96, 64, 48], [32, 64, 128], [128, 64, 32], [16, 16, 16], [24, 24, 24], [32, 32, 32],
+									[64,48,32,24], [24,32,48,64], [48,64,96,128],  [128,96,64,48], [16, 16, 16, 16], [24, 24, 24, 24], [32, 32, 32, 32],
 									[48, 48, 64, 64, 96, 96], [96, 96, 64, 64, 48, 32], 
 									[96, 96, 64, 64, 48, 48, 32, 32], [32, 32, 48, 48, 64, 64, 96, 96],
-									[96, 96, 64, 64, 48, 48, 32, 32, 24, 24], [24, 24, 32, 32, 48, 48, 64, 64, 96, 96]
 								]
 
 		self.max_pool_sets_2d = [ 
@@ -105,8 +110,8 @@ class HyperparameterOptimizer(object):
 								]
 
 		self.fc_layer_sets = [
-									[16], [24], [32], 
-									[32, 16], [16, 32], [32, 32]
+									[8], [12], [16], [24], [32], 
+									[8, 64], [16, 32]
 							 ]
 
 		self.mlp_layer_sets = [
@@ -220,7 +225,7 @@ class HyperparameterOptimizer(object):
 		space = {
 			'conv_width' : hp.quniform('conv_width', 3, 25, 2),
 			'conv_height' : hp.quniform('conv_height', 3, 25, 2),
-			#'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
 			'kernel_single_channel' : hp.choice('kernel_single_channel', [0, 1]),
 			'fc' : hp.choice('fc',self.fc_layer_sets),
 			'valid_padding' : hp.choice('valid_padding', [0, 1]),
@@ -228,46 +233,51 @@ class HyperparameterOptimizer(object):
 		}
 		
 		def hp_loss_from_params_2d(x):
-			max_loss = 9e9
 			try:
 				model = models.read_tensor_2d_model_from_args(args, 
 										conv_width = int(x['conv_width']),
 										conv_height = int(x['conv_height']),
-										#conv_layers = x['conv_layers'],
+										conv_layers = x['conv_layers'],
 										max_pools = x['max_pools_2d'],
+										kernel_single_channel = bool(x['kernel_single_channel']),
 										padding = 'valid' if bool(x['valid_padding']) else 'same',
 										fc_layers = x['fc']
 										)
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return max_loss 
+					return self.max_loss 
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
-				print('Loss ', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
+				print('Current architecture: ', self.string_from_arch_dict(x))
+				print('Loss ', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 				
-				#limit_mem()
-				print('Current architecture: ', self.string_from_arch_dict(x))
+				del model
+
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
-				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return max_loss
+				print(str(e) + '\n Impossible architecture perhaps? return max loss')
+				return self.max_loss
 
 		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2) ]
 		print(samples)
 		trials = hyperopt.Trials()
-		best = fmin(hp_loss_from_params_2d, space=space, algo=tpe.suggest, max_evals=args.iterations, trials=trials)
+		best = fmin(hp_loss_from_params_2d, 
+			space=space, 
+			algo=tpe.suggest, 
+			max_evals=args.iterations, 
+			trials=trials)
 		print('trial dicts', trials.trials)
 		print('trials.losses', trials.losses())
 		print('best is:', best)
-		print('best str is:', self.string_from_best_trials(best, trials.trials))
+		print('best str is:', self.string_from_best_trials(trials))
 
 
 	def bayesian_search_2d_anno(self, args, iterations):
@@ -286,80 +296,65 @@ class HyperparameterOptimizer(object):
 		generate_valid = td.tensor_generator_from_label_dirs_and_args(args, valid_paths)
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
-		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_height', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			{'name':'kernel_single_channel', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_2d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_2d))},
-			#{'name':'residual_layers', 'type':'discrete', 'domain':range(len(self.residual_layers_sets))},
-			#{'name':'annotation_units', 'type':'discrete', 'domain':(16,32,64)},
-			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-		]
-
-		param_keys = { d['name']:i for i,d in enumerate(bounds)}
-
-		def loss_from_params_2d_anno(x):
-			p = x[0]
-			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
-			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
-			max_pool_set = self.max_pool_sets_2d[int(p[param_keys['max_pools_2d']])]
-			#residual_layers = self.residual_layers_sets[int(p[param_keys['residual_layers']])]
-
+		space = {
+			'conv_width' : hp.quniform('conv_width', 3, 25, 2),
+			'conv_height' : hp.quniform('conv_height', 3, 25, 2),
+			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'kernel_single_channel' : hp.choice('kernel_single_channel', [0, 1]),
+			'fc' : hp.choice('fc',self.fc_layer_sets),
+			'valid_padding' : hp.choice('valid_padding', [0, 1]),
+			'annotation_units' : hp.quniform('annotation_units', 16, 128, 16),
+			'annotation_shortcut' : hp.choice('annotation_shortcut', [0, 1]),
+			'max_pools_2d' : hp.choice('max_pools_2d', self.max_pool_sets_2d),
+		}
+		
+		def hp_loss_from_params_2d_anno(x):
 			try:
-				print(self.str_from_params_and_keys(p, param_keys))
 				model = models.read_tensor_2d_annotation_model_from_args(args, 
-										conv_width = int(p[param_keys['conv_width']]),
-										conv_height = int(p[param_keys['conv_height']]),
-										conv_layers = conv_layers,
-										max_pools = max_pool_set,
-										padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-										kernel_single_channel = bool(p[param_keys['kernel_single_channel']]),
-										#annotation_units = int(p[param_keys['annotation_units']]),
-										annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
-										fc_layers = fc_layers,
-										)
+										conv_width = int(x['conv_width']),
+										conv_height = int(x['conv_height']),
+										conv_layers = x['conv_layers'],
+										max_pools = x['max_pools_2d'],
+										padding = 'valid' if bool(x['valid_padding']) else 'same',
+										kernel_single_channel = bool(x['kernel_single_channel']),
+										annotation_units = int(x['annotation_units']),
+										annotation_shortcut = bool(x['annotation_shortcut']),
+										fc_layers = x['fc'])
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
-				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
-				print(self.str_from_params_and_keys(p, param_keys))
-
+				print('Current architecture: ', self.string_from_arch_dict(x))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				limit_mem()
+				del model
+
 				return loss_and_metrics[0]
 			
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps?')
-				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+				return self.max_loss
 
-		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_2d_anno, # Objective function       
-                                             domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-											model_type='GP',
-                                             acquisition_type='EI',        			# Expected Improvement
-                                             acquisition_optimizer='DIRECT',
-                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True,							# Talk to me!
-                                             normalize_Y = False
-                                             )           
-
-		optimizer.run_optimization(args.iterations, max_time=6e10, eps=0, verbosity=True, report_file=args.output_dir + args.id + '.bayes_report')
-		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
-		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
+		samples = [ hyperopt.pyll.stochastic.sample(space) for n in range(2) ]
+		print(samples)
+		trials = hyperopt.Trials()
+		best = fmin(hp_loss_from_params_2d_anno, 
+			space=space, 
+			algo=tpe.suggest, 
+			max_evals=args.iterations, 
+			trials=trials)
+		print('trial dicts', trials.trials)
+		print('trials.losses', trials.losses())
+		print('best is:', best)
+		print('best str is:', self.string_from_best_trials(trials))
 
 
 	def bayesian_search_1d(self, args, iterations):
@@ -378,75 +373,57 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		stats = Counter()
-		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			#{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			#{'name':'conv_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
-			#{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			#{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))}
-		]
-
-		param_keys = { d['name']:i for i,d in enumerate(bounds)}
-
+		
+		space = {
+			'conv_width' : hp.quniform('conv_width', 3, 25, 2),
+			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'valid_padding' : hp.choice('valid_padding', [0, 1]),
+			'max_pools_1d' : hp.choice('max_pools_1d', self.max_pool_sets_1d),
+			'fc' : hp.choice('fc',self.fc_layer_sets),
+		}
+		
 		def loss_from_params_1d(x):
-			p = x[0]
-			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
-			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_1d']])]
-			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.build_reference_1d_model_from_args(args, 
-											conv_width = int(p[param_keys['conv_width']]), 
-											conv_layers = conv_layers,
-											#conv_dropout = float(p[param_keys['conv_dropout']]),
-											#conv_batch_normalize = bool(p[param_keys['conv_batch_normalize']]),
-											#spatial_dropout = bool(p[param_keys['spatial_dropout']]),
-											max_pools = max_pool_set,
-											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-											fc_layers = fc_layers
-											#fc_dropout = float(p[param_keys['fc_dropout']])
-											)
+										conv_width = int(x['conv_width']),
+										conv_layers = x['conv_layers'],
+										max_pools = x['max_pools_1d'],
+										padding = 'valid' if bool(x['valid_padding']) else 'same',
+										fc_layers = x['fc'])			
+
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
-				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
-				print(self.str_from_params_and_keys(p, param_keys))
+				print('Current architecture: ', self.string_from_arch_dict(x))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				limit_mem()
+				del model
 				return loss_and_metrics[0]
+
 			except ValueError as e:
-				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+				print(str(e) + '\n Impossible architecture perhaps? return max loss')
+				return self.max_loss       
 
+		trials = hyperopt.Trials()
+		best = fmin(loss_from_params_1d, 
+			space=space, 
+			algo=tpe.suggest, 
+			max_evals=args.iterations, 
+			trials=trials)
 
-		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_1d,  	# Objective function       
-                                             domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-                                             model_type='GP',
-                                             acquisition_type='EI',        			# Expected Improvement
-                                             acquisition_optimizer='DIRECT',
-                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True,							# Talk to me!
-                                             normalize_Y = False
-                                             )           
-
-		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
-		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
-		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
+		print('trial dicts', trials.trials)
+		print('trials.losses', trials.losses())
+		print('best is:', best)
+		print('best str is:', self.string_from_best_trials(trials))
 
 
 	def bayesian_search_1d_anno(self, args, iterations):
@@ -465,75 +442,62 @@ class HyperparameterOptimizer(object):
 		generate_test  = td.tensor_generator_from_label_dirs_and_args(args, test_paths)
 
 		stats = Counter()
-		bounds = [
-			{'name':'conv_width', 'type':'discrete', 'domain':(3,5,7,11,15,19)},
-			#{'name':'conv_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'conv_layers', 'type':'discrete', 'domain':range(len(self.conv_layers_sets))},
-			#{'name':'spatial_dropout', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'annotation_units', 'type':'discrete', 'domain':(24,32,48,64)},
-			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
-			#{'name':'annotation_batch_normalize', 'type':'categorical', 'domain':(0, 1)},			
-			{'name':'fc', 'type':'discrete', 'domain':range(len(self.fc_layer_sets))},
-			#{'name':'fc_dropout', 'type':'continuous', 'domain':(0.0, 0.4)},
-			{'name':'valid_padding', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'max_pools_1d', 'type':'discrete', 'domain':range(len(self.max_pool_sets_1d))},
-		]
+		
+		space = {
+			'conv_width' : hp.quniform('conv_width', 3, 25, 2),
+			'conv_layers' : hp.choice('conv_layers', self.conv_layers_sets),
+			'fc' : hp.choice('fc',self.fc_layer_sets),
+			'valid_padding' : hp.choice('valid_padding', [0, 1]),
+			'annotation_units' : hp.quniform('annotation_units', 16, 128, 16),
+			'annotation_shortcut' : hp.choice('annotation_shortcut', [0, 1]),
+			'max_pools_1d' : hp.choice('max_pools_1d', self.max_pool_sets_1d),
+		}
 
-		param_keys = { d['name']:i for i,d in enumerate(bounds)}
 
 		def loss_from_params_1d(x):
-			p = x[0]
-			conv_layers = self.conv_layers_sets[int(p[param_keys['conv_layers']])]
-			max_pool_set = self.max_pool_sets_1d[int(p[param_keys['max_pools_1d']])]
-			fc_layers = self.fc_layer_sets[int(p[param_keys['fc']])]
 			try:
 				model = models.build_reference_annotation_1d_model_from_args(args, 
-											conv_width = int(p[param_keys['conv_width']]), 
-											conv_layers = conv_layers,
-											max_pools = max_pool_set,
-											padding = 'valid' if bool(p[param_keys['valid_padding']]) else 'same',
-											annotation_units = int(p[param_keys['annotation_units']]),
-											annotation_shortcut = bool(p[param_keys['annotation_shortcut']]),
-											fc_layers = fc_layers
-											)
+										conv_width = int(x['conv_width']),
+										conv_layers = x['conv_layers'],
+										max_pools = x['max_pools_1d'],
+										padding = 'valid' if bool(x['valid_padding']) else 'same',
+										fc_layers = x['fc'],
+										annotation_units = int(x['annotation_units']),
+										annotation_shortcut = bool(x['annotation_shortcut']),
+									)
 
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
-				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
-				print(self.str_from_params_and_keys(x[0], param_keys))
+				print('Current architecture: ', self.string_from_arch_dict(x))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				limit_mem()
+				del model
 				return loss_and_metrics[0]
+
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps?')
-				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+				return self.max_loss
 
+		trials = hyperopt.Trials()
+		best = fmin(loss_from_params_1d, 
+			space=space, 
+			algo=tpe.suggest, 
+			max_evals=args.iterations, 
+			trials=trials)
 
-		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_1d,  	# Objective function       
-                                             domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-                                             model_type='GP',
-                                             acquisition_type='EI',        			# Expected Improvement
-                                             acquisition_optimizer='DIRECT',
-                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True,							# Talk to me!
-                                             normalize_Y = False
-                                             )           
-
-		optimizer.run_optimization(max_iter=args.iterations, max_time=6e10, verbosity=True, eps=0, report_file=args.output_dir + args.id + '.bayes_report')
-		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
-		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
+		print('trial dicts', trials.trials)
+		print('trials.losses', trials.losses())
+		print('best is:', best)
+		print('best str is:', self.string_from_best_trials(trials))
 
 
 	def bayesian_search_mlp(self, args, iterations):
@@ -549,105 +513,66 @@ class HyperparameterOptimizer(object):
 		generate_train, generate_valid, generate_test = td.train_valid_test_generators_from_args(args)
 
 		stats = Counter()
-		bounds = [
-			{'name':'mlp_fc', 'type':'discrete', 'domain':range(len(self.mlp_layer_sets))},
-			{'name':'dropout', 'type':'continuous', 'domain':(0.0, 0.6)},
-			{'name':'annotation_shortcut', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'batch_normalization', 'type':'categorical', 'domain':(0, 1)},
-			{'name':'batch_normalize_input', 'type':'categorical', 'domain':(0, 1)}
-		]
-
-		param_keys = { d['name']:i for i,d in enumerate(bounds)}
+		
+		space = {
+			'fc' : hp.choice('fc',self.fc_layer_sets),
+			'shortcut' : hp.choice('shortcut', [0, 1]),
+			'batch_normalization' : hp.choice('batch_normalization', [0, 1]),
+			'batch_normalize_input' : hp.choice('batch_normalize_input', [0, 1]),
+		}
 
 		def loss_from_params_mlp(x):
-			p = x[0]
-			layer_set = self.mlp_layer_sets[int(p[param_keys['mlp_fc']])]
 			try:
 				model = models.annotation_multilayer_perceptron_from_args(args,
 											fc_layers = layer_set,
-											dropout = float(p[param_keys['dropout']]),
-											skip_connection = bool(p[param_keys['annotation_shortcut']]),
-											batch_normalization = bool(p[param_keys['batch_normalization']]),
-											batch_normalize_input = bool(p[param_keys['batch_normalize_input']])
+											#dropout = float(x['dropout']),
+											skip_connection = bool(x['shortcut']),
+											batch_normalization = bool(x['batch_normalization']),
+											batch_normalize_input = bool(x['batch_normalize_input'])
 											)
 											
 				if model.count_params() > args.max_parameters:
 					print('Model too big')
-					return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
-
+					return self.max_loss
 
 				model = models.train_model_from_generators(args, model, generate_train, generate_valid, args.output_dir + args.id + '.hd5')
-				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.validation_steps)
+				loss_and_metrics = model.evaluate_generator(generate_test, steps=args.patience)
 				stats['count'] += 1
-				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'init numdata:', args.patience, 'Model size', model.count_params())
-				print(self.str_from_params_and_keys(p, param_keys))
+				print('Current architecture: ', self.string_from_arch_dict(x))
+				print('Loss:', loss_and_metrics[0], '\nCount:', stats['count'], 'iterations', args.iterations, 'Model size', model.count_params())
 				if args.inspect_model:
 					image_name = args.id+'_hyper_'+str(stats['count'])+'.png'
 					image_path = image_name if args.image_dir is None else args.image_dir + image_name
 					models.inspect_model(args, model, generate_train, generate_valid, image_path=image_path)
 
-				limit_mem()
+				del model
 				return loss_and_metrics[0]
+
 			except ValueError as e:
 				print(str(e) + '\n Impossible architecture perhaps? return 9e9')
-				return np.random.uniform(100,10000) # this is ugly but optimization quits when loss is the same
+				return self.max_loss
 
-		optimizer = GPyOpt.methods.BayesianOptimization(f=loss_from_params_mlp,  	# Objective function       
-                                             domain=bounds,          				# Box-constraints of the problem
-                                             initial_design_numdata=args.patience, 	# Random models built before Bayesian optimization
-                                             model_type='GP',
-                                             acquisition_type='EI',        			# Expected Improvement
-                                             acquisition_optimizer='DIRECT',
-                                             exact_feval=True,						# Is loss exact or noisy? Noisy!
-                                             verbosity=True,						# Talk to me!
-                                             normalize_Y = False
-                                             )           		           
+				trials = hyperopt.Trials()
 
-		optimizer.run_optimization(max_iter=args.iterations,
-									max_time=6e10, 
-									verbosity=True, 
-									eps=0, 
-									report_file=args.output_dir + args.id + '.bayes_report')
-		
-		print('Best parameter set:', optimizer.x_opt)
-		print(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
-		with open(args.output_dir + args.id + '.bayes_report', 'a') as f:
-			f.write(self.str_from_params_and_keys(optimizer.x_opt, param_keys))
+		best = fmin(loss_from_params_mlp, 
+			space=space, 
+			algo=tpe.suggest, 
+			max_evals=args.iterations, 
+			trials=trials)
+
+		print('trial dicts', trials.trials)
+		print('trials.losses', trials.losses())
+		print('best is:', best)
+		print('best str is:', self.string_from_best_trials(trials))
 
 
-	def str_from_params_and_keys(self, x, param_keys):
-
-		s = ''
-		for k in param_keys:
-			s += '\n' + k + ' = '
-			if k == 'fc':
-				s += str(self.fc_layer_sets[int(x[param_keys[k]])])
-			elif k == 'mlp_fc':
-				s += str(self.mlp_layer_sets[int(x[param_keys[k]])])	
-			elif k == 'conv_layers':
-				s += str(self.conv_layers_sets[int(x[param_keys[k]])])
-			elif k == 'max_pools_1d':
-				s += str(self.max_pool_sets_1d[int(x[param_keys[k]])])
-			elif k == 'max_pools_2d':
-				s += str(self.max_pool_sets_2d[int(x[param_keys[k]])])
-			elif k == 'residual_layers':
-				s += str(self.residual_layers_sets[int(x[param_keys[k]])])					
-			elif k in bools:
-				s += str(bool(x[param_keys[k]]))
-			else:
-				s += str(x[param_keys[k]])
-
-		return s
-
-
-
-	def string_from_best_trials(self, best, trials):
+	def string_from_best_trials(self, trials):
 		
 		s = ''
 
-		best_trial_idx = np.argmin(best)
-		x = trials[best_trial_idx]['misc']['vals']
-
+		best_trial_idx = np.argmin(trials.losses())
+		x = trials.trials[best_trial_idx]['misc']['vals']
+		print('lowest loss was:', trials.losses()[best_trial_idx], ' at trial:', best_trial_idx)
 		for k in x:
 			
 			s += '\n' + k + ' = '
@@ -686,7 +611,6 @@ class HyperparameterOptimizer(object):
 				s += str(v)
 
 		return s
-
 
 
 	def ab_test_2d(self, args, params_a, params_b):
@@ -863,10 +787,10 @@ class HyperparameterOptimizer(object):
 def limit_mem():
 	try:
 		K.clear_session()
-		K.get_session().close()
-		cfg = K.tf.ConfigProto()
-		cfg.gpu_options.allow_growth = True
-		K.set_session(K.tf.Session(config=cfg))
+		#K.get_session().close()
+		# cfg = K.tf.ConfigProto()
+		# cfg.gpu_options.allow_growth = True
+		# K.set_session(K.tf.Session(config=cfg))
 	except AttributeError as e:
 		print('Could not clear session. Maybe you are using Theano backend?')
 
